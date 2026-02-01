@@ -1,0 +1,52 @@
+{
+  "1 ON": {
+    "code": 4478259,
+    "pulselength": 150,
+    "protocol": 1
+  },
+  "1 OFF": {
+    "code": 4478268,
+    "pulselength": 150,
+    "protocol": 1
+  },
+  "2 ON": {
+    "code": 4478403,
+    "pulselength": 150,
+    "protocol": 1
+  },
+  "2 OFF": {
+    "code": 4478412,
+    "pulselength": 150,
+    "protocol": 1
+  },
+  "3 ON": {
+    "code": 4478723,
+    "pulselength": 150,
+    "protocol": 1
+  },
+  "3 OFF": {
+    "code": 4478732,
+    "pulselength": 150,
+    "protocol": 1
+  },
+  "4 ON": {
+    "code": 4480259,
+    "pulselength": 150,
+    "protocol": 1
+  },
+  "4 OFF": {
+    "code": 4480268,
+    "pulselength": 150,
+    "protocol": 1
+  },
+  "5 ON": {
+    "code": 4486403,
+    "pulselength": 150,
+    "protocol": 1
+  },
+  "5 OFF": {
+    "code": 4486412,
+    "pulselength": 150,
+    "protocol": 1
+  }
+}

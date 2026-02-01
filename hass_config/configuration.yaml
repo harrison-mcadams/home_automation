@@ -1,0 +1,43 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Text to speech
+tts:
+  - platform: google_translate
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# Modern Command Line syntax
+# Ref: https://www.home-assistant.io/integrations/command_line/
+command_line:
+  - switch:
+      name: "RF Light 1"
+      unique_id: rf_light_1
+      command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "1 ON"}'''
+      command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "1 OFF"}'''
+
+  - switch:
+      name: "RF Light 2"
+      unique_id: rf_light_2
+      command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "2 ON"}'''
+      command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "2 OFF"}'''
+
+  - switch:
+      name: "RF Light 3"
+      unique_id: rf_light_3
+      command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "3 ON"}'''
+      command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "3 OFF"}'''
+
+  - switch:
+      name: "RF Light 4"
+      unique_id: rf_light_4
+      command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "4 ON"}'''
+      command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "4 OFF"}'''
+
+  - switch:
+      name: "RF Light 5"
+      unique_id: rf_light_5
+      command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "5 ON"}'''
+      command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "5 OFF"}'''

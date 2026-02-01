@@ -1,0 +1,3 @@
+flask
+rpi-rf
+rpi-lgpio
