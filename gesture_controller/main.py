@@ -49,12 +49,26 @@ class ThreadedCamera:
         self.stopped = True
         self.stream.release()
 
+import platform
+# Audio libs removed as per user request
+
 class GestureController:
     def __init__(self, source, headless=False, target_fps=15, complexity=0):
         self.source = source
         self.headless = headless
         self.target_fps = target_fps
         self.frame_duration = 1.0 / target_fps
+        
+        # Parse IP for flashlight control if source is URL
+        self.camera_ip = None
+        if isinstance(source, str) and "http" in source:
+             try:
+                 # Extract base URL (e.g. http://192.168.1.100:8080)
+                 from urllib.parse import urlparse
+                 parsed = urlparse(source)
+                 self.camera_ip = f"{parsed.scheme}://{parsed.netloc}"
+             except:
+                 pass
         
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
@@ -73,6 +87,22 @@ class GestureController:
         
         # Toggle State Tracking (1-5)
         self.light_states = {i: False for i in range(1, 6)}
+
+    def set_torch(self, on):
+        """Turn IP Webcam torch ON or OFF"""
+        if not self.camera_ip:
+            return
+
+        endpoint = "/enabletorch" if on else "/disabletorch"
+        url = f"{self.camera_ip}{endpoint}"
+        
+        def _send():
+            try:
+                requests.get(url, timeout=1)
+            except:
+                pass
+        
+        threading.Thread(target=_send, args=(), daemon=True).start()
 
     def send_command(self, light_id):
         """Toggle light_id (1-5)"""
@@ -217,10 +247,12 @@ class GestureController:
                     if finger_count == 0: 
                         fist_frames += 1
                         if fist_frames >= FIST_THRESHOLD:
+                            # Transition to READY
                             self.state = "READY"
                             self.state_time = current_time
                             fist_frames = 0
                             print("System READY -> Waiting for command")
+                            self.set_torch(True) # Flashlight ON
                     else:
                         fist_frames = 0
                 
@@ -228,12 +260,14 @@ class GestureController:
                     if current_time - self.state_time > self.ready_timeout:
                         self.state = "IDLE"
                         print("Timeout -> IDLE")
+                        self.set_torch(False) # Flashlight OFF
                     
                     elif finger_count >= 1 and finger_count <= 5:
                         if len(gesture_buffer) < BUFFER_SIZE:
                              gesture_buffer.append(finger_count)
                         else:
                             if all(x == finger_count for x in gesture_buffer):
+                                self.set_torch(False) # Flashlight OFF
                                 cmd = self.send_command(finger_count)
                                 print(f"ACTION: {cmd}")
                                 self.state = "COOLDOWN"
