@@ -50,10 +50,15 @@ class ThreadedCamera:
         self.stream.release()
 
 class GestureController:
-    def __init__(self, source):
+    def __init__(self, source, headless=False, target_fps=15, complexity=0):
         self.source = source
+        self.headless = headless
+        self.target_fps = target_fps
+        self.frame_duration = 1.0 / target_fps
+        
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
+            model_complexity=complexity, # 0=Lite, 1=Full
             max_num_hands=1,
             min_detection_confidence=0.5,
             min_tracking_confidence=0.4
@@ -67,11 +72,11 @@ class GestureController:
         self.cooldown_time = 0.5
         
         # Toggle State Tracking (1-5)
-        # Default to False (OFF)
         self.light_states = {i: False for i in range(1, 6)}
 
     def send_command(self, light_id):
         """Toggle light_id (1-5)"""
+        # ... (same as before) ...
         if light_id not in self.light_states:
             return
 
@@ -97,6 +102,7 @@ class GestureController:
         return f"{button_name}"
 
     def get_finger_status(self, landmarks):
+        # ... (same as before) ...
         """
         Returns a list of booleans [Thumb, Index, Middle, Ring, Pinky] indicating if open.
         """
@@ -122,10 +128,6 @@ class GestureController:
         is_thumb_open = dist_thumb_tip > dist_thumb_ip
         status.append(is_thumb_open)
         
-        # Debug info attached to status (hacky, but useful for main loop visualization)
-        # We'll just return status list, main loop handles debug prints if needed
-        # Or we can print here? No, keep it clean.
-        
         # --- Fingers Logic ---
         for tip, pip in zip(finger_tips, finger_pips):
             tip_pt = landmarks[tip]
@@ -150,7 +152,7 @@ class GestureController:
             camera.stop()
             return
 
-        print("Press 'q' to quit.")
+        print("Running... Press Ctrl+C to stop.")
         
         prev_time = 0
         
@@ -161,133 +163,137 @@ class GestureController:
         fist_frames = 0
         FIST_THRESHOLD = 5 # Require 5 consecutive frames of fist to arm
         
-        while True:
-            img = camera.read()
-            if img is None:
-                time.sleep(0.01)
-                continue
-            
-            if isinstance(self.source, int):
-                img = cv2.flip(img, 1)
-
-            imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            results = self.hands.process(imgRGB)
-
-            finger_count = -1
-            finger_status = [False]*5
-            
-            if results.multi_hand_landmarks:
-                for hand_lms in results.multi_hand_landmarks:
-                    self.mp_draw.draw_landmarks(img, hand_lms, self.mp_hands.HAND_CONNECTIONS)
-                    
-                    finger_status = self.get_finger_status(hand_lms.landmark)
-                    
-                    # Smart Thumb Logic:
-                    # User rule: "Thumb should only be counted as a finger for the 5 count"
-                    # Meaning: Count [Index, Middle, Ring, Pinky].
-                    # If that count is 4 AND Thumb is Open -> Total 5.
-                    # Else -> Total is just the 4-finger count.
-                    
-                    non_thumb_count = sum(finger_status[1:]) # Index..Pinky
-                    is_thumb_open = finger_status[0]
-                    
-                    if non_thumb_count == 4 and is_thumb_open:
-                        finger_count = 5
-                    else:
-                        finger_count = non_thumb_count
-                    
-                    # Visualize Finger Status
-                    h, w, c = img.shape
-                    tips_ids = [4, 8, 12, 16, 20]
-                    for idx, is_open in enumerate(finger_status):
-                        tid = tips_ids[idx]
-                        lm = hand_lms.landmark[tid]
-                        cx, cy = int(lm.x * w), int(lm.y * h)
-                        color = (0, 255, 0) if is_open else (0, 0, 255)
-                        cv2.circle(img, (cx, cy), 10, color, cv2.FILLED)
-            
-            # State Machine Logic
-            current_time = time.time()
-            message = ""
-            color = (255, 255, 255)
-            
-            if self.state == "IDLE":
-                color = (200, 200, 200)
-                if finger_count == 0: # Closed Fist
-                    fist_frames += 1
-                    if fist_frames >= FIST_THRESHOLD:
-                        # Transition to READY
-                        self.state = "READY"
-                        self.state_time = current_time
-                        fist_frames = 0
-                else:
-                    fist_frames = 0
-            
-            elif self.state == "READY":
-                color = (0, 255, 0)
-                # Check for timeout
-                if current_time - self.state_time > self.ready_timeout:
-                    self.state = "IDLE"
+        try:
+            while True:
+                loop_start = time.time()
                 
-                # Check for command (1-5 fingers)
-                # We need it to be stable for a few frames
-                elif finger_count >= 1 and finger_count <= 5:
-                    if len(gesture_buffer) < BUFFER_SIZE:
-                         gesture_buffer.append(finger_count)
-                    else:
-                        # Check if all recent frames agree
-                        if all(x == finger_count for x in gesture_buffer):
-                            # EXECUTE
-                            cmd = self.send_command(finger_count)
-                            message = f"Sent: {cmd}"
-                            self.state = "COOLDOWN"
-                            self.state_time = current_time
-                            gesture_buffer = []
+                img = camera.read()
+                if img is None:
+                    time.sleep(0.01)
+                    continue
+                
+                if isinstance(self.source, int):
+                    img = cv2.flip(img, 1)
+
+                imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                results = self.hands.process(imgRGB)
+
+                finger_count = -1
+                finger_status = [False]*5
+                
+                if results.multi_hand_landmarks:
+                    for hand_lms in results.multi_hand_landmarks:
+                        if not self.headless:
+                             self.mp_draw.draw_landmarks(img, hand_lms, self.mp_hands.HAND_CONNECTIONS)
+                        
+                        finger_status = self.get_finger_status(hand_lms.landmark)
+                        
+                        # Smart Thumb Logic
+                        non_thumb_count = sum(finger_status[1:])
+                        is_thumb_open = finger_status[0]
+                        
+                        if non_thumb_count == 4 and is_thumb_open:
+                            finger_count = 5
                         else:
-                            gesture_buffer.pop(0)
-                            gesture_buffer.append(finger_count)
-                else:
-                    gesture_buffer = [] # Reset if noise (e.g. back to fist)
+                            finger_count = non_thumb_count
+                        
+                        if not self.headless:
+                             # Visualize Finger Status
+                             h, w, c = img.shape
+                             tips_ids = [4, 8, 12, 16, 20]
+                             for idx, is_open in enumerate(finger_status):
+                                 tid = tips_ids[idx]
+                                 lm = hand_lms.landmark[tid]
+                                 cx, cy = int(lm.x * w), int(lm.y * h)
+                                 color = (0, 255, 0) if is_open else (0, 0, 255)
+                                 cv2.circle(img, (cx, cy), 10, color, cv2.FILLED)
+                
+                # State Machine Logic
+                current_time = time.time()
+                message = ""
+                # ... (Logic remains same, visualization separated) ...
+
+                if self.state == "IDLE":
+                    if finger_count == 0: 
+                        fist_frames += 1
+                        if fist_frames >= FIST_THRESHOLD:
+                            self.state = "READY"
+                            self.state_time = current_time
+                            fist_frames = 0
+                            print("System READY -> Waiting for command")
+                    else:
+                        fist_frames = 0
+                
+                elif self.state == "READY":
+                    if current_time - self.state_time > self.ready_timeout:
+                        self.state = "IDLE"
+                        print("Timeout -> IDLE")
                     
-            elif self.state == "COOLDOWN":
-                color = (0, 0, 255)
-                message = "Cooldown..."
-                if current_time - self.state_time > self.cooldown_time:
-                    self.state = "IDLE"
+                    elif finger_count >= 1 and finger_count <= 5:
+                        if len(gesture_buffer) < BUFFER_SIZE:
+                             gesture_buffer.append(finger_count)
+                        else:
+                            if all(x == finger_count for x in gesture_buffer):
+                                cmd = self.send_command(finger_count)
+                                print(f"ACTION: {cmd}")
+                                self.state = "COOLDOWN"
+                                self.state_time = current_time
+                                gesture_buffer = []
+                            else:
+                                gesture_buffer.pop(0)
+                                gesture_buffer.append(finger_count)
+                    else:
+                        gesture_buffer = [] 
+                        
+                elif self.state == "COOLDOWN":
+                    if current_time - self.state_time > self.cooldown_time:
+                        self.state = "IDLE"
 
-            # Display info
-            # FPS
-            curr_time = time.time()
-            fps = 1 / (curr_time - prev_time) if prev_time else 0
-            prev_time = curr_time
-            cv2.putText(img, f"FPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            
-            # State & Fingers
-            cv2.putText(img, f"State: {self.state}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 3)
-            
-            # Debug: Show which fingers are seen as OPEN
-            # T=Thumb, I=Index, M=Middle, R=Ring, P=Pinky
-            finger_names = ["T", "I", "M", "R", "P"]
-            status_str = " ".join([f"{n}:{'O' if s else 'C'}" for n, s in zip(finger_names, finger_status)])
-            cv2.putText(img, status_str, (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-            
-            cv2.putText(img, f"Count: {finger_count}", (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-            
-            if message:
-                cv2.putText(img, message, (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-            
-            cv2.imshow("Gesture Control", img)
-            
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+                # Display info only if not headless
+                if not self.headless:
+                    # FPS
+                    curr_time = time.time()
+                    fps = 1 / (curr_time - prev_time) if prev_time else 0
+                    prev_time = curr_time
+                    cv2.putText(img, f"FPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                    
+                    # State & Fingers
+                    color = (200, 200, 200)
+                    if self.state == "READY": color = (0, 255, 0)
+                    elif self.state == "COOLDOWN": color = (0, 0, 255)
 
-        camera.stop()
-        cv2.destroyAllWindows()
+                    cv2.putText(img, f"State: {self.state}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 3)
+                    
+                    finger_names = ["T", "I", "M", "R", "P"]
+                    status_str = " ".join([f"{n}:{'O' if s else 'C'}" for n, s in zip(finger_names, finger_status)])
+                    cv2.putText(img, status_str, (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                    
+                    cv2.putText(img, f"Count: {finger_count}", (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                    
+                    cv2.imshow("Gesture Control", img)
+                    
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+                
+                # FPS Limiting
+                elapsed = time.time() - loop_start
+                if elapsed < self.frame_duration:
+                    time.sleep(self.frame_duration - elapsed)
+
+        except KeyboardInterrupt:
+            print("Stopping...")
+        finally:
+            camera.stop()
+            if not self.headless:
+                cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hand Gesture Control")
     parser.add_argument("--source", type=str, default=DEFAULT_VIDEO_URL, help="Video URL or camera index (default: IP Webcam)")
     parser.add_argument("--usb", action="store_true", help="Use default USB webcam (Index 0)")
+    parser.add_argument("--headless", action="store_true", help="Run without GUI window")
+    parser.add_argument("--fps", type=int, default=15, help="Target FPS limit (default: 15)")
+    parser.add_argument("--complexity", type=int, default=0, choices=[0, 1], help="MediaPipe Model Complexity (0=Lite, 1=Full). Default 0.")
     
     args = parser.parse_args()
     
@@ -297,5 +303,11 @@ if __name__ == "__main__":
     elif source.isdigit():
         source = int(source)
         
-    controller = GestureController(source)
+    print(f"Starting Gesture Control...")
+    print(f"Source: {source}")
+    print(f"Headless: {args.headless}")
+    print(f"FPS Limit: {args.fps}")
+    print(f"Model Complexity: {args.complexity}")
+        
+    controller = GestureController(source, headless=args.headless, target_fps=args.fps, complexity=args.complexity)
     controller.run()
