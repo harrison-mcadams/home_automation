@@ -30,16 +30,23 @@ class ThreadedCamera:
     def update(self):
         while not self.stopped:
             if not self.grabbed:
-                # If stream connection is lost, check if we need to reconnect
-                pass 
-            
+                # Reconnection logic
+                print("Stream lost... attempting to reconnect")
+                self.stream.release()
+                time.sleep(2)
+                self.stream = cv2.VideoCapture(self.src)
+                self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                (self.grabbed, self.frame) = self.stream.read()
+                if not self.grabbed:
+                    time.sleep(1)
+                    continue
+
             (grabbed, frame) = self.stream.read()
             if grabbed:
                 self.grabbed = True
                 self.frame = frame
             else:
                 self.grabbed = False
-                # If reading fails, maybe wait a bit to avoid hot loop
                 time.sleep(0.1)
 
     def read(self):
