@@ -1,0 +1,13 @@
+[Unit]
+Description=Gesture Control Service
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/home_automation
+Environment="PATH=/home/pi/home_automation/venv/bin"
+ExecStart=/home/pi/home_automation/venv/bin/python gesture_controller/main.py --source "http://192.168.1.100:8080/video" --headless --fps 10 --complexity 0
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
