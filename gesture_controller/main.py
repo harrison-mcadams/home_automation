@@ -1,3 +1,6 @@
+import os
+# Increase FFmpeg network timeout to 30 seconds to prevent drops
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "timeout;30000"
 import cv2
 import mediapipe as mp
 import requests
