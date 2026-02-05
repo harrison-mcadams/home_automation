@@ -54,7 +54,7 @@ sed -i "s|^Environment=.*|Environment=\"PATH=$PYTHON_DIR\"|" "${SERVICE_FILE}.tm
 
 # Update ExecStart to use the detected Python binary
 # Note: Keeping the arguments, just updating the python path
-sed -i "s|^ExecStart=.*|ExecStart=$PYTHON_BIN gesture_controller/main.py --source \"http://192.168.1.100:8080/video\" --headless --fps 10 --complexity 0|" "${SERVICE_FILE}.tmp"
+sed -i "s|^ExecStart=.*|ExecStart=$PYTHON_BIN gesture_controller/main.py --source \"http://192.168.1.97:8080/video\" --headless --fps 10 --complexity 0|" "${SERVICE_FILE}.tmp"
 
 echo "Installing service..."
 sudo cp "${SERVICE_FILE}.tmp" "/etc/systemd/system/$SERVICE_FILE"
