@@ -58,21 +58,19 @@ def extract_stream(url, timeout_secs=20):
         # HLS Codec Spoofing
         # Chrome natively returns 'no' for HLS (`application/vnd.apple.mpegurl`).
         # Tricking JWPlayer makes it blindly load the .m3u8 directly so we can intercept it.
-        # ONLY DO THIS ON PC/MAC. Chromium on the Pi lacks proprietary codecs, meaning
-        # spoofing native support will force a fatal C++ Demuxer error and kill the fetch!
-        if not is_pi:
-            mock_codec_script = """
-            const originalCanPlayType = HTMLMediaElement.prototype.canPlayType;
-            Object.defineProperty(HTMLMediaElement.prototype, 'canPlayType', {
-                value: function(type) {
-                    if (type && typeof type === 'string' && (type.includes('apple.mpegurl') || type.includes('m3u8') || type.includes('hls') || type.includes('mp4'))) {
-                        return 'probably';
-                    }
-                    return originalCanPlayType.apply(this, arguments);
+        # This is universally required because streamed.pk CDN randomly 403s the hls.js fallback library!
+        mock_codec_script = """
+        const originalCanPlayType = HTMLMediaElement.prototype.canPlayType;
+        Object.defineProperty(HTMLMediaElement.prototype, 'canPlayType', {
+            value: function(type) {
+                if (type && typeof type === 'string' && (type.includes('apple.mpegurl') || type.includes('m3u8') || type.includes('hls') || type.includes('mp4'))) {
+                    return 'probably';
                 }
-            });
-            """
-            page.add_init_script(mock_codec_script)
+                return originalCanPlayType.apply(this, arguments);
+            }
+        });
+        """
+        page.add_init_script(mock_codec_script)
         
         # Network Interceptor
         def handle_request(request):
