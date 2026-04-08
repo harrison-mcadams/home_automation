@@ -25,12 +25,18 @@ def cast_to_kodi(stream_data):
         print("(!) Error: Empty stream URL provided to Kodi")
         return False
         
-    ua = quote(headers.get('user-agent', 'Mozilla/5.0'))
-    ref = quote(headers.get('referer', ''))
-    origin = quote(headers.get('origin', ''))
+    ua = headers.get('user-agent', 'Mozilla/5.0')
+    ref = headers.get('referer')
+    origin = headers.get('origin')
+    
+    header_parts = [f"User-Agent={quote(ua)}"]
+    if ref: 
+        header_parts.append(f"Referer={quote(ref)}")
+    if origin: 
+        header_parts.append(f"Origin={quote(origin)}")
     
     # Formats the string to standard Kodi |Header=val format automatically
-    kodi_formatted_url = f"{url}|User-Agent={ua}&Referer={ref}&Origin={origin}"
+    kodi_formatted_url = f"{url}|" + "&".join(header_parts)
     
     payload = {
         "jsonrpc": "2.0",
