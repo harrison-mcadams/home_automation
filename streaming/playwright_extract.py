@@ -136,7 +136,7 @@ def extract_stream(url, timeout_secs=20):
                 for pass_idx in range(3):
                     for frame in page.frames:
                         url_low = frame.url.lower()
-                        if "pooembed" in url_low or "embed" in url_low or "modifiles" in url_low:
+                        if "blank" not in url_low:
                             print(f"[*] Aggressive click pass {pass_idx+1} on frame: {frame.url[:50]}...", file=sys.stderr)
                             try:
                                 js_click = '''
