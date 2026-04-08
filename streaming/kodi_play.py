@@ -26,7 +26,7 @@ def cast_to_kodi(stream_data):
         return False
         
     ua = headers.get('user-agent', 'Mozilla/5.0')
-    ref = headers.get('referer')
+    ref = headers.get('referer') or headers.get('frame_url') or "https://streamed.su/"
     origin = headers.get('origin')
     
     header_parts = [f"User-Agent={quote(ua)}"]
@@ -41,7 +41,13 @@ def cast_to_kodi(stream_data):
     payload = {
         "jsonrpc": "2.0",
         "method": "Player.Open",
-        "params": {"item": {"file": kodi_formatted_url}},
+        "params": {"item": {
+            "file": kodi_formatted_url,
+            "properties": {
+                "inputstream": "inputstream.adaptive",
+                "inputstream.adaptive.manifest_type": "hls"
+            }
+        }},
         "id": 1
     }
 

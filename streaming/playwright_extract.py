@@ -77,6 +77,10 @@ def extract_stream(url, timeout_secs=20):
                 if not target_m3u8 and "placeholder" not in u:
                     target_m3u8 = request.url
                     target_headers = request.headers
+                    try:
+                        target_headers['frame_url'] = request.frame.url
+                    except Exception:
+                        pass
                     print(f"[!] Traffic Found: {target_m3u8}", file=sys.stderr)
 
         def smart_wait(seconds=5):
