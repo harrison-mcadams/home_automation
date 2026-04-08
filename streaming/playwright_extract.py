@@ -100,6 +100,9 @@ def extract_stream(url, timeout_secs=20):
         def handle_console(msg):
             nonlocal target_m3u8
             text = msg.text
+            # Print ALL console messages for deep debugging on the Pi!
+            print(f"[PAGE CONSOLE] {text}", file=sys.stderr)
+            
             if "http" in text and (".m3u8" in text or "manifest" in text):
                 urls = re.findall(r'(https?://[^\s\'\"]+\.m3u8[^\s\'\"]*)', text)
                 if urls and not target_m3u8:
@@ -107,6 +110,7 @@ def extract_stream(url, timeout_secs=20):
                     print(f"[!] Console Found: {target_m3u8}", file=sys.stderr)
 
         page.on("console", handle_console)
+        page.on("pageerror", lambda err: print(f"[PAGE ERROR] {err}", file=sys.stderr))
 
         try:
             # Step A: Load page
