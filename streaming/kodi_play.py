@@ -41,13 +41,7 @@ def cast_to_kodi(stream_data):
     payload = {
         "jsonrpc": "2.0",
         "method": "Player.Open",
-        "params": {"item": {
-            "file": kodi_formatted_url,
-            "properties": {
-                "inputstream": "inputstream.adaptive",
-                "inputstream.adaptive.manifest_type": "hls"
-            }
-        }},
+        "params": {"item": {"file": kodi_formatted_url}},
         "id": 1
     }
 
@@ -58,9 +52,14 @@ def cast_to_kodi(stream_data):
     try:
         response = requests.post(rpc_url, json=payload, auth=auth, timeout=10)
         response.raise_for_status()
-        if response.json().get('result') == "OK":
+        res_json = response.json()
+        
+        if res_json.get('result') == "OK":
             print("[+] Success: Playback command accepted by Kodi.")
             return True
+        elif 'error' in res_json:
+            print(f"(!) Kodi rejected payload: {res_json['error']}")
+            return False
             
     except requests.exceptions.ReadTimeout:
         # Expected behavior during HLS initial buffering
