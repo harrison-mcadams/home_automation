@@ -27,13 +27,13 @@ def extract_stream(url, timeout_secs=20):
         # Platform intelligence
         if is_pi:
             # We assume Xvfb is running this script externally for headful Chromium execution
-            launch_args = {'headless': False, 'args': ['--no-sandbox']}
+            launch_args = {'headless': False, 'args': ['--no-sandbox', '--autoplay-policy=no-user-gesture-required']}
         else:
             # PC/Mac: use out-of-the-box Chrome for proprietary codec support
             launch_args = {
                 'headless': False, 
                 'channel': 'chrome', 
-                'args': ['--no-sandbox']
+                'args': ['--no-sandbox', '--autoplay-policy=no-user-gesture-required']
             }
             
         try:
