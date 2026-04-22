@@ -49,16 +49,28 @@ def extract_stream(url, timeout_secs=20):
             viewport={'width': 1280, 'height': 720},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
         )
+        
+        # Popup Killer (Handles ad redirects immediately)
+        main_page = None
+        def handle_popup(popup):
+            nonlocal main_page
+            try:
+                if main_page is None:
+                    main_page = popup
+                    return
+                print(f"[!] Ad Popup Blocked: {popup.url}", file=sys.stderr)
+                popup.close()
+            except: pass
+        context.on("page", handle_popup)
+        
         page = context.new_page()
+        main_page = page
 
         # Stealth Mode
         page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
         page.add_init_script("if (!window.chrome) { window.chrome = { runtime: {} }; }")
         
         # HLS Codec Spoofing
-        # Chrome natively returns 'no' for HLS (`application/vnd.apple.mpegurl`).
-        # Tricking JWPlayer makes it blindly load the .m3u8 directly so we can intercept it.
-        # This is universally required because streamed.pk CDN randomly 403s the hls.js fallback library!
         mock_codec_script = """
         const originalCanPlayType = HTMLMediaElement.prototype.canPlayType;
         Object.defineProperty(HTMLMediaElement.prototype, 'canPlayType', {
@@ -77,11 +89,39 @@ def extract_stream(url, timeout_secs=20):
             nonlocal target_m3u8, target_headers
             u = request.url.lower()
             if ".m3u8" in u:
-                if not target_m3u8 and "placeholder" not in u:
+                # Exclude known tracking or placeholder m3u8s
+                if "telemetry" in u or "log" in u:
+                    return
+
+                if not target_m3u8 or "index.m3u8" in u:
                     target_m3u8 = request.url
+                    # Capture ALL headers for maximum robustness
                     target_headers = request.headers
+                    
+                    # Capture cookies from the context
+                    try:
+                        # Try to get cookies for BOTH the stream domain and the frame domain
+                        urls_to_check = [request.url]
+                        try: urls_to_check.append(request.frame.url)
+                        except: pass
+                        
+                        cookies = request.frame.page.context.cookies(urls_to_check)
+                        if cookies:
+                            cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
+                            target_headers['Cookie'] = cookie_str
+                            print(f"[!] Cookies Captured: {len(cookies)} items", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[*] Cookie capture warning: {e}", file=sys.stderr)
+
                     try:
                         target_headers['frame_url'] = request.frame.url
+                        # Synthesize Origin if missing but Referer exists
+                        if not target_headers.get('Origin') and target_headers.get('Referer'):
+                            ref_url = target_headers['Referer']
+                            target_headers['Origin'] = "/".join(ref_url.split("/")[:3])
+                        elif not target_headers.get('origin') and target_headers.get('referer'):
+                            ref_url = target_headers['referer']
+                            target_headers['Origin'] = "/".join(ref_url.split("/")[:3])
                     except Exception:
                         pass
                     print(f"[!] Traffic Found: {target_m3u8}", file=sys.stderr)
@@ -98,10 +138,7 @@ def extract_stream(url, timeout_secs=20):
         def handle_console(msg):
             nonlocal target_m3u8
             text = msg.text
-            # Print ALL console messages for deep debugging on the Pi!
-            print(f"[PAGE CONSOLE] {text}", file=sys.stderr)
-            
-            if "http" in text and (".m3u8" in text or "manifest" in text):
+            if "http" in text and (".m3u8" in text or "manifest" in text or "index.m3u8" in text):
                 urls = re.findall(r'(https?://[^\s\'\"]+\.m3u8[^\s\'\"]*)', text)
                 if urls and not target_m3u8:
                     target_m3u8 = urls[0]
@@ -113,58 +150,91 @@ def extract_stream(url, timeout_secs=20):
         try:
             # Step A: Load page
             print(f"[*] Navigating ({timeout_secs}s limit)...", file=sys.stderr)
-            page.goto(url, wait_until="load", timeout=timeout_secs*1000)
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=timeout_secs*1000)
+            except Exception as e:
+                print(f"[*] Navigation warning: {e}. Checking for intercepted traffic...", file=sys.stderr)
+                
             if smart_wait(3): return {"url": target_m3u8, "headers": target_headers}
             
-            # Step B: Fast Jump
-            if "/watch/" in url and not any(p in url for p in ["/admin/", "/delta/", "/echo/"]):
-                print(f"[*] Game page detected. Jumping to provider...", file=sys.stderr)
-                links = page.query_selector_all('a[href*="/watch/"]')
-                for link in links:
-                    href = link.get_attribute("href")
-                    if href and ("admin/1" in href or "delta/1" in href):
-                        target_url = href if "://" in href else f"https://{url.split('/')[2]}{href}"
-                        page.goto(target_url, wait_until="domcontentloaded", timeout=15000)
-                        break
-                if smart_wait(3): return {"url": target_m3u8, "headers": target_headers}
+            # Step B: Fast Jump (Disabled as it may break session context for some providers)
+            # if "/watch/" in url and not any(p in url for p in ["/admin/", "/delta/", "/echo/"]):
+            #     print(f"[*] Game page detected. Jumping to provider...", file=sys.stderr)
+            #     links = page.query_selector_all('a[href*="/watch/"]')
+            #     for link in links:
+            #         href = link.get_attribute("href")
+            #         if href and ("admin/1" in href or "delta/1" in href or "embed?t=" in href):
+            #             target_url = href if "://" in href else f"https://{url.split('/')[2]}{href}"
+            #             print(f"[*] Jumping to: {target_url}", file=sys.stderr)
+            #             try: page.goto(target_url, wait_until="domcontentloaded", timeout=10000)
+            #             except: pass
+            #             break
+            #     if smart_wait(3): return {"url": target_m3u8, "headers": target_headers}
 
-            # Step C: Nested Frame Penetration
+            # Step C: Nested Frame Penetration & Ad Burn
             if not target_m3u8:
-                print(f"[*] Triggering player inside nested iframes...", file=sys.stderr)
-                if smart_wait(2): return {"url": target_m3u8, "headers": target_headers}
+                print(f"[*] Triggering player inside nested iframes (Persistent Mode)...", file=sys.stderr)
                 
-                # Wake up lazy-loaded frames then snap back
-                page.evaluate("window.scrollTo(0, 700)")
-                if smart_wait(1): return {"url": target_m3u8, "headers": target_headers}
-                page.evaluate("window.scrollTo(0, 0)")
-                if smart_wait(1): return {"url": target_m3u8, "headers": target_headers}
+                # Wake up lazy-loaded frames
+                page.evaluate("window.scrollTo(0, 500)")
+                time.sleep(1)
                 
-                # Aggressive Native JS Clicks (3 passes)
-                for pass_idx in range(3):
+                # Aggressive Native JS Clicks (7 passes to burn through ad layers)
+                for pass_idx in range(7):
+                    # We iterate all frames in case the player is deep
                     for frame in page.frames:
                         url_low = frame.url.lower()
-                        if "blank" not in url_low:
-                            print(f"[*] Aggressive click pass {pass_idx+1} on frame: {frame.url[:50]}...", file=sys.stderr)
-                            try:
-                                js_click = '''
+                        if "blank" in url_low: continue
+                        
+                        try:
+                            # Look for "Play" buttons, overlays, and common "Close Ad" selectors
+                            js_click = '''
+                                (function() {
+                                    // 1. Kill common ad overlays first
+                                    const adSelectors = [
+                                        '.ad-popup-close', '#adPopupClose', '#discordFollowLater', 
+                                        'div[class*="close"]', 'button[class*="close"]', 
+                                        'div[id*="rainbet"]', 'div[class*="overlay"]'
+                                    ];
+                                    adSelectors.forEach(s => {
+                                        document.querySelectorAll(s).forEach(el => {
+                                            if (el.offsetParent !== null) el.click();
+                                        });
+                                    });
+
+                                    // 2. Click play elements
+                                    const playSelectors = ['div[class*="play"]', 'button[class*="play"]', 'svg[class*="play"]', '.vjs-big-play-button'];
+                                    playSelectors.forEach(s => {
+                                        document.querySelectorAll(s).forEach(el => {
+                                            if (el.offsetParent !== null) el.click();
+                                        });
+                                    });
+
+                                    // 3. Brute force click the center
                                     const el = document.elementFromPoint(window.innerWidth/2, window.innerHeight/2) || document.body;
                                     if(el) {
-                                        el.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
-                                        el.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
-                                        el.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+                                        const evts = ['mousedown', 'mouseup', 'click'];
+                                        evts.forEach(et => el.dispatchEvent(new MouseEvent(et, {bubbles: true})));
                                     }
-                                    document.querySelectorAll('video').forEach(v => v.play().catch(e=>console.log(e)));
-                                '''
-                                frame.evaluate(js_click)
-                            except Exception:
-                                pass
-                    if smart_wait(2): return {"url": target_m3u8, "headers": target_headers}
+                                    
+                                    // 4. Force video start
+                                    document.querySelectorAll('video').forEach(v => {
+                                        v.play().catch(() => {});
+                                        v.muted = true; // Auto-play requires mute often
+                                    });
+                                })();
+                            '''
+                            frame.evaluate(js_click)
+                        except: pass
+                        
+                    if smart_wait(2): break
 
             # Step D: Polling
             start_time = time.time()
-            print(f"[*] Final flush monitoring...", file=sys.stderr)
-            while not target_m3u8 and (time.time() - start_time) < timeout_secs:
-                time.sleep(1)
+            if not target_m3u8:
+                print(f"[*] Final flush monitoring...", file=sys.stderr)
+                while not target_m3u8 and (time.time() - start_time) < timeout_secs:
+                    time.sleep(1)
 
             if not target_m3u8:
                 page.screenshot(path=str(screenshot_path))
