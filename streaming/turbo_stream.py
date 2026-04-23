@@ -203,10 +203,15 @@ def play_native(stream_data, target_url):
         proxy_port = start_proxy_server()
         proxy_url = f"http://127.0.0.1:{proxy_port}/proxy?url={urllib.parse.quote(url)}"
         
-        # 2. Launch the Native Player (MPV) pointing to the proxy
+        # 2. Launch the Native Player (MPV)        # Start the player in full screen by default
         player_path = find_player()
         if player_path:
-            subprocess.Popen([player_path, proxy_url, "--cache=yes", "--demuxer-max-bytes=150M"])
+            player_args = [player_path, proxy_url, "--cache=yes", "--demuxer-max-bytes=150M"]
+            if "mpv" in player_path.lower():
+                player_args.append("--fs")
+            elif "vlc" in player_path.lower():
+                player_args.append("--fullscreen")
+            subprocess.Popen(player_args)
         
         # 3. Block and serve the proxy from the main thread
         main_loop(page)
@@ -251,11 +256,14 @@ def play_direct(stream_data):
     if not player_path: return False
     cmd = [player_path, url]
     if "mpv" in player_path.lower():
+        cmd.append("--fs")
         if "User-Agent" in headers: cmd.append(f"--user-agent={headers['User-Agent']}")
         if "Referer" in headers: cmd.append(f"--referrer={headers['Referer']}")
         h_fields = [f"{k}: {v}" for k, v in headers.items() if k.lower() not in ['host', 'connection']]
         if h_fields: cmd.append(f'--http-header-fields={",".join(h_fields)}')
         cmd.extend(["--cache=yes", "--demuxer-max-bytes=150M"])
+    elif "vlc" in player_path.lower():
+        cmd.append("--fullscreen")
     try:
         subprocess.Popen(cmd)
         return True
