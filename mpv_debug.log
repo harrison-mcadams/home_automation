@@ -1,0 +1,279 @@
+[   0.004][v][cplayer] mpv v0.41.0-244-gaf9c81fa1 Copyright © 2000-2026 mpv/MPlayer/mplayer2 projects
+[   0.004][v][cplayer]  built on Mar  2 2026 00:06:26
+[   0.004][v][cplayer] libplacebo version: v7.360.0 (v7.360.0-6-g905358e-dirty)
+[   0.004][v][cplayer] FFmpeg version: N-123099-g862338fe3
+[   0.004][v][cplayer] FFmpeg library versions:
+[   0.004][v][cplayer]    libavcodec      62.24.100
+[   0.004][v][cplayer]    libavdevice     62.2.100
+[   0.004][v][cplayer]    libavfilter     11.12.100
+[   0.004][v][cplayer]    libavformat     62.10.101
+[   0.004][v][cplayer]    libavutil       60.25.100
+[   0.004][v][cplayer]    libswresample   6.2.100
+[   0.004][v][cplayer]    libswscale      9.4.100
+[   0.004][v][cplayer] Configuration: -Ddebug=true -Db_ndebug=true -Doptimization=3 -Db_lto=true -Db_lto_mode=thin -Dlibmpv=true -Dpdf-build=enabled -Dlua=enabled -Djavascript=enabled -Dsdl2-gamepad=enabled -Dlibarchive=enabled -Dlibbluray=enabled -Ddvdnav=enabled -Duchardet=enabled -Drubberband=enabled -Dlcms2=enabled -Dopenal=enabled -Dspirv-cross=enabled -Dvulkan=enabled -Dvapoursynth=enabled -Dsubrandr=enabled -Dgl=enabled -Degl-angle=enabled -Dc_args=-Wno-error=int-conversion -Dprefix=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64_v3/x86_64_v3-w64-mingw32 -Dlibdir=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64_v3/x86_64_v3-w64-mingw32/lib -Ddefault_library=shared -Dprefer_static=True --cross-file=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64_v3/meson_cross.txt
+[   0.004][v][cplayer] List of enabled features: amf build-date cplugins cuda-hwaccel cuda-interop d3d-hwaccel d3d11 d3d9-hwaccel debug direct3d dos-paths dvdnav dxgi-debug-d3d11 egl-angle egl-angle-win32 ffmpeg ffnvcodec gl gl-dxinterop gl-dxinterop-d3d9 gl-win32 glob glob-win32 gpl iconv javascript jpeg lcms2 libarchive libass libavdevice libbluray libplacebo luajit openal rubberband rubberband-3 sdl2-gamepad shaderc spirv-cross subrandr uchardet vaapi vaapi-win32 vapoursynth vector vulkan wasapi win32 win32-desktop win32-executable win32-smtc win32-threads zimg zimg-st428 zlib
+[   0.004][v][cplayer] Built with NDEBUG.
+[   0.004][v][cplayer] Command line options: '--player-operation-mode=pseudo-gui' 'https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8' '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36' '--referrer=https://pooembed.eu/embed-noads/mlb/2026-04-23/phi-chc' '--http-header-fields=Accept: */*,Origin: https://pooembed.eu,sec-ch-ua: "Chromium";v="143", "Not A(Brand";v="24",sec-ch-ua-mobile: ?0,sec-ch-ua-platform: "Windows",Sec-Fetch-Dest: empty,Sec-Fetch-Mode: cors,Sec-Fetch-Site: cross-site,Cookie: PHPSESSID=944llh6s2th0m4k9egfbt1osli; user_timezone=America/New_York; 24e9b4c1-1398-453c-a279-e627eff9ed70-v4=QiSGstL-5sNP92TBcVqqx2QRY4I0ka5m6UJFXxPOlag; cc-v4=B6%2BPjSsuP5Fm6hkKzl6nc1xiO9O7f%2BpWB9ggXpM7%2BHuJERgek3RD7lOw8r4bmoomztdYkCJJ4dHapwLc5AWoKK%2F%2Bhjs6OuZdewugiSQwGvndDNw48nEL0d5oGpVw0n7ovPEFbvJsbssVIfcKb4Hotw%3D%3D; NID=530=kofWQIR-KqmeZVM8Z_3BgMsYsOxhaVoC463hEGkaHpjdeUi3xGxp0ZNJfbnG3ZUrLzTDhbZEmGdnjLiNZWZeoWsr9R1MEeNC25PG3DjR0jli8GKjQgdNEtaT2jn9dIaJa5bps369V_tDQCsWZKilQ3DeQ3jJY5kvzQz10q-OhqiqtPQ2wbWrIYh4bDH7vusMO4Tn5DXApGdlYQe0FDrAZdxVo536apOQZZbihzpF' '--cache=yes' '--demuxer-max-bytes=150M' '--v' '--log-file=C:\Users\harri\Desktop\home_automation\mpv_debug.log' '--msg-level=all=v'
+[   0.004][v][cplayer] mpv v0.41.0-244-gaf9c81fa1 Copyright © 2000-2026 mpv/MPlayer/mplayer2 projects
+[   0.004][v][cplayer]  built on Mar  2 2026 00:06:26
+[   0.004][v][cplayer] libplacebo version: v7.360.0 (v7.360.0-6-g905358e-dirty)
+[   0.004][v][cplayer] FFmpeg version: N-123099-g862338fe3
+[   0.004][v][cplayer] FFmpeg library versions:
+[   0.004][v][cplayer]    libavcodec      62.24.100
+[   0.004][v][cplayer]    libavdevice     62.2.100
+[   0.004][v][cplayer]    libavfilter     11.12.100
+[   0.004][v][cplayer]    libavformat     62.10.101
+[   0.004][v][cplayer]    libavutil       60.25.100
+[   0.004][v][cplayer]    libswresample   6.2.100
+[   0.004][v][cplayer]    libswscale      9.4.100
+[   0.004][v][cplayer] Configuration: -Ddebug=true -Db_ndebug=true -Doptimization=3 -Db_lto=true -Db_lto_mode=thin -Dlibmpv=true -Dpdf-build=enabled -Dlua=enabled -Djavascript=enabled -Dsdl2-gamepad=enabled -Dlibarchive=enabled -Dlibbluray=enabled -Ddvdnav=enabled -Duchardet=enabled -Drubberband=enabled -Dlcms2=enabled -Dopenal=enabled -Dspirv-cross=enabled -Dvulkan=enabled -Dvapoursynth=enabled -Dsubrandr=enabled -Dgl=enabled -Degl-angle=enabled -Dc_args=-Wno-error=int-conversion -Dprefix=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64_v3/x86_64_v3-w64-mingw32 -Dlibdir=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64_v3/x86_64_v3-w64-mingw32/lib -Ddefault_library=shared -Dprefer_static=True --cross-file=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64_v3/meson_cross.txt
+[   0.004][v][cplayer] List of enabled features: amf build-date cplugins cuda-hwaccel cuda-interop d3d-hwaccel d3d11 d3d9-hwaccel debug direct3d dos-paths dvdnav dxgi-debug-d3d11 egl-angle egl-angle-win32 ffmpeg ffnvcodec gl gl-dxinterop gl-dxinterop-d3d9 gl-win32 glob glob-win32 gpl iconv javascript jpeg lcms2 libarchive libass libavdevice libbluray libplacebo luajit openal rubberband rubberband-3 sdl2-gamepad shaderc spirv-cross subrandr uchardet vaapi vaapi-win32 vapoursynth vector vulkan wasapi win32 win32-desktop win32-executable win32-smtc win32-threads zimg zimg-st428 zlib
+[   0.004][v][cplayer] Built with NDEBUG.
+[   0.004][d][global] home path: '' -> 'C:\Users\harri\AppData\Roaming/mpv'
+[   0.004][d][global] user path: '~~home/' -> 'C:\Users\harri\AppData\Roaming/mpv'
+[   0.004][d][global] user path: '~~old_home/' -> ''
+[   0.005][d][global] config path: 'encoding-profiles.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/encoding-profiles.conf'
+[   0.005][d][global] config path: 'encoding-profiles.conf' -/-> 'C:/Program Files/MPV Player/encoding-profiles.conf'
+[   0.005][d][global] config path: 'encoding-profiles.conf' -/-> 'C:/Program Files/MPV Player/mpv/encoding-profiles.conf'
+[   0.005][d][global] config path: 'mpv.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/mpv.conf'
+[   0.005][d][global] config path: 'config' -/-> 'C:\Users\harri\AppData\Roaming/mpv/config'
+[   0.005][d][global] config path: 'mpv.conf' -/-> 'C:/Program Files/MPV Player/mpv.conf'
+[   0.005][d][global] config path: 'config' -/-> 'C:/Program Files/MPV Player/config'
+[   0.005][d][global] config path: 'mpv.conf' -/-> 'C:/Program Files/MPV Player/mpv/mpv.conf'
+[   0.005][d][global] config path: 'config' -/-> 'C:/Program Files/MPV Player/mpv/config'
+[   0.005][v][cplayer] Setting option 'player-operation-mode' = 'pseudo-gui' (flags = 8)
+[   0.005][v][cplayer] Setting option 'user-agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36' (flags = 8)
+[   0.005][v][cplayer] Setting option 'referrer' = 'https://pooembed.eu/embed-noads/mlb/2026-04-23/phi-chc' (flags = 8)
+[   0.005][v][cplayer] Setting option 'http-header-fields' = 'Accept: */*,Origin: https://pooembed.eu,sec-ch-ua: "Chromium";v="143", "Not A(Brand";v="24",sec-ch-ua-mobile: ?0,sec-ch-ua-platform: "Windows",Sec-Fetch-Dest: empty,Sec-Fetch-Mode: cors,Sec-Fetch-Site: cross-site,Cookie: PHPSESSID=944llh6s2th0m4k9egfbt1osli; user_timezone=America/New_York; 24e9b4c1-1398-453c-a279-e627eff9ed70-v4=QiSGstL-5sNP92TBcVqqx2QRY4I0ka5m6UJFXxPOlag; cc-v4=B6%2BPjSsuP5Fm6hkKzl6nc1xiO9O7f%2BpWB9ggXpM7%2BHuJERgek3RD7lOw8r4bmoomztdYkCJJ4dHapwLc5AWoKK%2F%2Bhjs6OuZdewugiSQwGvndDNw48nEL0d5oGpVw0n7ovPEFbvJsbssVIfcKb4Hotw%3D%3D; NID=530=kofWQIR-KqmeZVM8Z_3BgMsYsOxhaVoC463hEGkaHpjdeUi3xGxp0ZNJfbnG3ZUrLzTDhbZEmGdnjLiNZWZeoWsr9R1MEeNC25PG3DjR0jli8GKjQgdNEtaT2jn9dIaJa5bps369V_tDQCsWZKilQ3DeQ3jJY5kvzQz10q-OhqiqtPQ2wbWrIYh4bDH7vusMO4Tn5DXApGdlYQe0FDrAZdxVo536apOQZZbihzpF' (flags = 8)
+[   0.005][v][cplayer] Setting option 'cache' = 'yes' (flags = 8)
+[   0.005][v][cplayer] Setting option 'demuxer-max-bytes' = '150M' (flags = 8)
+[   0.005][v][cplayer] Setting option 'v' = '' (flags = 8)
+[   0.005][v][cplayer] Setting option 'log-file' = 'C:\Users\harri\Desktop\home_automation\mpv_debug.log' (flags = 8)
+[   0.005][v][cplayer] Setting option 'msg-level' = 'all=v' (flags = 8)
+[   0.005][v][cplayer] Applying profile 'builtin-pseudo-gui'...
+[   0.005][v][cplayer] Setting option 'terminal' = 'no' (flags = 260)
+[   0.005][v][cplayer] Setting option 'force-window' = 'yes' (flags = 260)
+[   0.005][v][cplayer] Setting option 'idle' = 'once' (flags = 260)
+[   0.005][v][cplayer] Setting option 'screenshot-dir' = '~~desktop/' (flags = 260)
+[   0.005][v][cplayer] Applying profile 'pseudo-gui'...
+[   0.005][v][cplayer] Setting option 'player-operation-mode' = 'pseudo-gui' (flags = 4)
+[   0.007][d][global] config path: 'input.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/input.conf'
+[   0.007][d][global] config path: 'input.conf' -/-> 'C:/Program Files/MPV Player/input.conf'
+[   0.007][d][global] config path: 'input.conf' -/-> 'C:/Program Files/MPV Player/mpv/input.conf'
+[   0.007][d][osc] Loading lua script @osc.lua...
+[   0.008][d][ytdl_hook] Loading lua script @ytdl_hook.lua...
+[   0.008][d][stats] Loading lua script @stats.lua...
+[   0.008][d][console] Loading lua script @console.lua...
+[   0.008][d][auto_profiles] Loading lua script @auto_profiles.lua...
+[   0.008][d][select] Loading lua script @select.lua...
+[   0.008][d][positioning] Loading lua script @positioning.lua...
+[   0.008][d][commands] Loading lua script @commands.lua...
+[   0.008][v][clipboard] Initialized win32 clipboard backend.
+[   0.008][d][auto_profiles] loading mp.defaults
+[   0.008][d][osc] loading mp.defaults
+[   0.008][d][select] loading mp.defaults
+[   0.008][d][global] config path: 'scripts' -/-> 'C:\Users\harri\AppData\Roaming/mpv/scripts'
+[   0.008][d][global] config path: 'scripts' -/-> 'C:/Program Files/MPV Player/scripts'
+[   0.008][d][global] config path: 'scripts' -/-> 'C:/Program Files/MPV Player/mpv/scripts'
+[   0.008][v][cplayer] Waiting for scripts...
+[   0.009][d][osc] loading @osc.lua
+[   0.009][d][auto_profiles] loading @auto_profiles.lua
+[   0.009][d][select] loading @select.lua
+[   0.010][d][positioning] loading mp.defaults
+[   0.010][d][positioning] loading @positioning.lua
+[   0.010][d][ytdl_hook] loading mp.defaults
+[   0.010][d][positioning] reading options for positioning
+[   0.010][d][auto_profiles] Destroying client handle...
+[   0.010][d][select] reading options for select
+[   0.010][d][global] config path: 'script-opts/positioning.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/script-opts/positioning.conf'
+[   0.010][d][global] config path: 'script-opts/positioning.conf' -/-> 'C:/Program Files/MPV Player/script-opts/positioning.conf'
+[   0.010][d][global] config path: 'script-opts/positioning.conf' -/-> 'C:/Program Files/MPV Player/mpv/script-opts/positioning.conf'
+[   0.010][d][positioning] script-opts/positioning.conf not found.
+[   0.011][d][global] config path: 'script-opts/select.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/script-opts/select.conf'
+[   0.011][d][global] config path: 'script-opts/select.conf' -/-> 'C:/Program Files/MPV Player/script-opts/select.conf'
+[   0.011][d][global] config path: 'script-opts/select.conf' -/-> 'C:/Program Files/MPV Player/mpv/script-opts/select.conf'
+[   0.011][d][select] script-opts/select.conf not found.
+[   0.011][d][ytdl_hook] loading @ytdl_hook.lua
+[   0.011][d][global] config path: 'lua-settings/positioning.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/lua-settings/positioning.conf'
+[   0.011][d][global] config path: 'lua-settings/positioning.conf' -/-> 'C:/Program Files/MPV Player/lua-settings/positioning.conf'
+[   0.011][d][global] config path: 'lua-settings/positioning.conf' -/-> 'C:/Program Files/MPV Player/mpv/lua-settings/positioning.conf'
+[   0.011][d][positioning] lua-settings/positioning.conf not found.
+[   0.011][d][cplayer] Run command: define-section, flags=64, args=[name="input_positioning", contents="", flags="default"]
+[   0.011][d][cplayer] Run command: enable-section, flags=64, args=[name="input_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.011][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_positioning", contents="", flags="force"]
+[   0.011][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.011][d][global] config path: 'lua-settings/select.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/lua-settings/select.conf'
+[   0.011][d][global] config path: 'lua-settings/select.conf' -/-> 'C:/Program Files/MPV Player/lua-settings/select.conf'
+[   0.011][d][global] config path: 'lua-settings/select.conf' -/-> 'C:/Program Files/MPV Player/mpv/lua-settings/select.conf'
+[   0.011][d][select] lua-settings/select.conf not found.
+[   0.011][d][ytdl_hook] reading options for ytdl_hook
+[   0.012][d][cplayer] Run command: define-section, flags=64, args=[name="input_select", contents="", flags="default"]
+[   0.012][d][cplayer] Run command: enable-section, flags=64, args=[name="input_select", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.012][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_select", contents="", flags="force"]
+[   0.012][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_select", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.012][d][commands] loading mp.defaults
+[   0.012][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/script-opts/ytdl_hook.conf'
+[   0.012][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> 'C:/Program Files/MPV Player/script-opts/ytdl_hook.conf'
+[   0.012][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> 'C:/Program Files/MPV Player/mpv/script-opts/ytdl_hook.conf'
+[   0.012][d][ytdl_hook] script-opts/ytdl_hook.conf not found.
+[   0.012][d][commands] loading @commands.lua
+[   0.012][d][stats] loading mp.defaults
+[   0.013][d][commands] reading options for commands
+[   0.013][d][global] config path: 'script-opts/commands.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/script-opts/commands.conf'
+[   0.013][d][global] config path: 'script-opts/commands.conf' -/-> 'C:/Program Files/MPV Player/script-opts/commands.conf'
+[   0.013][d][global] config path: 'script-opts/commands.conf' -/-> 'C:/Program Files/MPV Player/mpv/script-opts/commands.conf'
+[   0.013][d][commands] script-opts/commands.conf not found.
+[   0.013][d][stats] loading @stats.lua
+[   0.013][d][global] config path: 'lua-settings/commands.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/lua-settings/commands.conf'
+[   0.013][d][global] config path: 'lua-settings/commands.conf' -/-> 'C:/Program Files/MPV Player/lua-settings/commands.conf'
+[   0.014][d][global] config path: 'lua-settings/commands.conf' -/-> 'C:/Program Files/MPV Player/mpv/lua-settings/commands.conf'
+[   0.014][d][commands] lua-settings/commands.conf not found.
+[   0.014][d][cplayer] Run command: define-section, flags=64, args=[name="input_commands", contents="", flags="default"]
+[   0.014][d][cplayer] Run command: enable-section, flags=64, args=[name="input_commands", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.014][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_commands", contents="", flags="force"]
+[   0.014][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_commands", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.016][d][cplayer] Run command: define-section, flags=64, args=[name="showhide", contents="mouse_move script-binding osc/__keybinding1\nmouse_leave script-binding osc/__keybinding2\n", flags="force"]
+[   0.016][d][cplayer] Run command: define-section, flags=64, args=[name="showhide_wc", contents="mouse_move script-binding osc/__keybinding3\nmouse_leave script-binding osc/__keybinding4\n", flags="force"]
+[   0.016][d][cplayer] Run command: enable-section, flags=64, args=[name="showhide", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.016][d][cplayer] Run command: enable-section, flags=64, args=[name="showhide_wc", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.016][d][cplayer] Run command: define-section, flags=64, args=[name="input", contents="mbtn_left script-binding osc/__keybinding5\nmbtn_mid script-binding osc/__keybinding6\nmbtn_right script-binding osc/__keybinding7\nshift+mbtn_left script-binding osc/__keybinding8\nwheel_up script-binding osc/__keybinding9\nwheel_down script-binding osc/__keybinding10\nmbtn_left_dbl ignore\nshift+mbtn_left_dbl ignore\nmbtn_right_dbl ignore\n", flags="force"]
+[   0.016][d][cplayer] Run command: enable-section, flags=64, args=[name="input", flags=""]
+[   0.016][d][cplayer] Run command: define-section, flags=64, args=[name="window-controls", contents="mbtn_left script-binding osc/__keybinding11\n", flags="force"]
+[   0.016][d][cplayer] Run command: enable-section, flags=64, args=[name="window-controls", flags=""]
+[   0.016][d][osc] reading options for osc
+[   0.017][d][global] config path: 'script-opts/osc.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/script-opts/osc.conf'
+[   0.017][d][global] config path: 'script-opts/osc.conf' -/-> 'C:/Program Files/MPV Player/script-opts/osc.conf'
+[   0.017][d][global] config path: 'script-opts/osc.conf' -/-> 'C:/Program Files/MPV Player/mpv/script-opts/osc.conf'
+[   0.017][d][osc] script-opts/osc.conf not found.
+[   0.017][d][global] config path: 'lua-settings/osc.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/lua-settings/osc.conf'
+[   0.017][d][global] config path: 'lua-settings/osc.conf' -/-> 'C:/Program Files/MPV Player/lua-settings/osc.conf'
+[   0.017][d][global] config path: 'lua-settings/osc.conf' -/-> 'C:/Program Files/MPV Player/mpv/lua-settings/osc.conf'
+[   0.017][d][osc] lua-settings/osc.conf not found.
+[   0.017][v][cplayer] Set property: user-data/osc/visibility="auto" -> 1
+[   0.017][d][cplayer] Run command: disable-section, flags=64, args=[name="input"]
+[   0.017][d][cplayer] Run command: disable-section, flags=64, args=[name="window-controls"]
+[   0.017][v][cplayer] Set property: user-data/osc/margins={"b":0,"t":0,"l":0,"r":0} -> 1
+[   0.018][v][cplayer] Set property: user-data/osc/margins={"b":0,"t":0,"l":0,"r":0} -> 1
+[   0.018][d][osc] osc_init
+[   0.018][v][cplayer] Set property: user-data/osc/margins={"b":0,"t":0,"l":0,"r":0} -> 1
+[   0.018][d][global] config path: 'fonts' -/-> 'C:\Users\harri\AppData\Roaming/mpv/fonts'
+[   0.018][d][global] config path: 'fonts' -/-> 'C:/Program Files/MPV Player/fonts'
+[   0.018][d][global] config path: 'fonts' -/-> 'C:/Program Files/MPV Player/mpv/fonts'
+[   0.018][d][osd/libass] ASS library version: 0x1704000 (runtime 0x1704000)
+[   0.018][v][osd/libass] libass API version: 0x1704000
+[   0.018][v][osd/libass] libass source: meson, commit: 0.17.4-21-gfadc390583f24eb5cf98f16925fd3adee50bca88
+[   0.018][v][osd/libass] Shaper: FriBidi 1.0.16 (SIMPLE) HarfBuzz-ng 12.3.2 (COMPLEX)
+[   0.019][d][global] config path: 'subfont.ttf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/subfont.ttf'
+[   0.019][d][global] config path: 'subfont.ttf' -/-> 'C:/Program Files/MPV Player/subfont.ttf'
+[   0.019][d][global] config path: 'subfont.ttf' -/-> 'C:/Program Files/MPV Player/mpv/subfont.ttf'
+[   0.019][d][global] config path: 'fonts.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/fonts.conf'
+[   0.019][d][global] config path: 'fonts.conf' -/-> 'C:/Program Files/MPV Player/fonts.conf'
+[   0.019][d][global] config path: 'fonts.conf' -> 'C:/Program Files/MPV Player/mpv/fonts.conf'
+[   0.019][v][osd/libass] Setting up fonts...
+[   0.020][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/lua-settings/ytdl_hook.conf'
+[   0.020][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> 'C:/Program Files/MPV Player/lua-settings/ytdl_hook.conf'
+[   0.020][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> 'C:/Program Files/MPV Player/mpv/lua-settings/ytdl_hook.conf'
+[   0.020][d][ytdl_hook] lua-settings/ytdl_hook.conf not found.
+[   0.021][v][osd/libass] Using font provider directwrite (with GDI)
+[   0.021][v][osd/libass] Done.
+[   0.021][d][cplayer] Run command: define-section, flags=64, args=[name="input_osc", contents="", flags="default"]
+[   0.021][d][cplayer] Run command: enable-section, flags=64, args=[name="input_osc", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.021][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_osc", contents="", flags="force"]
+[   0.021][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_osc", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.025][d][console] loading mp.defaults
+[   0.025][d][console] loading @console.lua
+[   0.027][d][stats] reading options for stats
+[   0.028][d][global] config path: 'script-opts/stats.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/script-opts/stats.conf'
+[   0.028][d][global] config path: 'script-opts/stats.conf' -/-> 'C:/Program Files/MPV Player/script-opts/stats.conf'
+[   0.028][d][global] config path: 'script-opts/stats.conf' -/-> 'C:/Program Files/MPV Player/mpv/script-opts/stats.conf'
+[   0.028][d][stats] script-opts/stats.conf not found.
+[   0.028][d][global] config path: 'lua-settings/stats.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/lua-settings/stats.conf'
+[   0.028][d][global] config path: 'lua-settings/stats.conf' -/-> 'C:/Program Files/MPV Player/lua-settings/stats.conf'
+[   0.028][d][global] config path: 'lua-settings/stats.conf' -/-> 'C:/Program Files/MPV Player/mpv/lua-settings/stats.conf'
+[   0.029][d][stats] lua-settings/stats.conf not found.
+[   0.029][d][cplayer] Run command: define-section, flags=64, args=[name="input_stats", contents="", flags="default"]
+[   0.029][d][cplayer] Run command: enable-section, flags=64, args=[name="input_stats", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.029][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_stats", contents="", flags="force"]
+[   0.029][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_stats", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.035][d][console] reading options for console
+[   0.036][d][global] config path: 'script-opts/console.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/script-opts/console.conf'
+[   0.036][d][global] config path: 'script-opts/console.conf' -/-> 'C:/Program Files/MPV Player/script-opts/console.conf'
+[   0.036][d][global] config path: 'script-opts/console.conf' -/-> 'C:/Program Files/MPV Player/mpv/script-opts/console.conf'
+[   0.036][d][console] script-opts/console.conf not found.
+[   0.037][d][global] config path: 'lua-settings/console.conf' -/-> 'C:\Users\harri\AppData\Roaming/mpv/lua-settings/console.conf'
+[   0.037][d][global] config path: 'lua-settings/console.conf' -/-> 'C:/Program Files/MPV Player/lua-settings/console.conf'
+[   0.037][d][global] config path: 'lua-settings/console.conf' -/-> 'C:/Program Files/MPV Player/mpv/lua-settings/console.conf'
+[   0.037][d][console] lua-settings/console.conf not found.
+[   0.037][v][cplayer] Done loading scripts.
+[   0.038][d][global] state path: 'watch_later' -> 'C:\Users\harri\AppData\Local/mpv/watch_later'
+[   0.038][v][cplayer] Running hook: auto_profiles/on_before_start_file
+[   0.038][v][cplayer] Failed sending hook command auto_profiles/on_before_start_file. Removing hook.
+[   0.038][d][global] state path: 'watch_later' -> 'C:\Users\harri\AppData\Local/mpv/watch_later'
+[   0.038][v][cplayer] Running hook: auto_profiles/on_load
+[   0.038][v][cplayer] Failed sending hook command auto_profiles/on_load. Removing hook.
+[   0.038][v][cplayer] Running hook: ytdl_hook/on_load
+[   0.039][v][cplayer] Running hook: ytdl_hook/on_load
+[   0.039][v][ytdl_hook] playlist hook
+[   0.039][d][osc] osc_init
+[   0.040][v][cplayer] Set property: user-data/osc/margins={"b":0,"t":0,"l":0,"r":0} -> 1
+[   0.041][d][cplayer] Run command: define-section, flags=64, args=[name="input_console", contents="", flags="default"]
+[   0.041][d][cplayer] Run command: enable-section, flags=64, args=[name="input_console", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.041][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_console", contents="", flags="force"]
+[   0.041][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_console", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.042][v][stream_callback] Opening https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8
+[   0.042][v][ffmpeg] Opening https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8
+[   0.057][d][osc] osc_init
+[   0.058][v][cplayer] Set property: user-data/osc/margins={"b":0,"t":0,"l":0,"r":0} -> 1
+[   0.067][d][ffmpeg] tcp: Starting connection attempt to 31.43.191.91 port 443
+[   0.158][d][ffmpeg] tcp: Successfully connected to 31.43.191.91 port 443
+[   0.445][v][cplayer] Set property: pause=true -> 1
+[   0.486][w][ffmpeg] https: HTTP error 403 Forbidden
+[   0.486][e][stream] Failed to open https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8.
+[   0.486][v][cplayer] Opening failed or was aborted: https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8
+[   0.486][v][cplayer] Running hook: ytdl_hook/on_load_fail
+[   0.487][d][global] config path: 'yt-dlp.exe' -/-> 'C:\Users\harri\AppData\Roaming/mpv/yt-dlp.exe'
+[   0.487][d][global] config path: 'yt-dlp.exe' -/-> 'C:/Program Files/MPV Player/yt-dlp.exe'
+[   0.487][d][global] config path: 'yt-dlp.exe' -/-> 'C:/Program Files/MPV Player/mpv/yt-dlp.exe'
+[   0.487][v][ytdl_hook] No youtube-dl found with path yt-dlp.exe in config directories
+[   0.487][d][cplayer] Run command: subprocess, flags=64, args=[args="yt-dlp,--no-warnings,-J,--flat-playlist,--sub-format,ass/srt/best,--sub-langs,all,--write-srt,--no-playlist,--,https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8", playback_only="yes", capture_size="67108864", capture_stdout="yes", capture_stderr="yes", detach="no", env="", stdin_data="", passthrough_stdin="no"]
+[   0.487][v][ytdl_hook] Starting subprocess: [yt-dlp, --no-warnings, -J, --flat-playlist, --sub-format, ass/srt/best, --sub-langs, all, --write-srt, --no-playlist, --, https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8]
+[   0.488][e][ytdl_hook] Subprocess failed: init
+[   0.488][v][ytdl_hook] youtube-dl with path yt-dlp not found in PATH or not enough permissions
+[   0.488][d][global] config path: 'yt-dlp_x86.exe' -/-> 'C:\Users\harri\AppData\Roaming/mpv/yt-dlp_x86.exe'
+[   0.488][d][global] config path: 'yt-dlp_x86.exe' -/-> 'C:/Program Files/MPV Player/yt-dlp_x86.exe'
+[   0.488][d][global] config path: 'yt-dlp_x86.exe' -/-> 'C:/Program Files/MPV Player/mpv/yt-dlp_x86.exe'
+[   0.488][v][ytdl_hook] No youtube-dl found with path yt-dlp_x86.exe in config directories
+[   0.488][d][cplayer] Run command: subprocess, flags=64, args=[args="yt-dlp_x86,--no-warnings,-J,--flat-playlist,--sub-format,ass/srt/best,--sub-langs,all,--write-srt,--no-playlist,--,https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8", playback_only="yes", capture_size="67108864", capture_stdout="yes", capture_stderr="yes", detach="no", env="", stdin_data="", passthrough_stdin="no"]
+[   0.488][v][ytdl_hook] Starting subprocess: [yt-dlp_x86, --no-warnings, -J, --flat-playlist, --sub-format, ass/srt/best, --sub-langs, all, --write-srt, --no-playlist, --, https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8]
+[   0.488][e][ytdl_hook] Subprocess failed: init
+[   0.488][v][ytdl_hook] youtube-dl with path yt-dlp_x86 not found in PATH or not enough permissions
+[   0.489][d][global] config path: 'youtube-dl.exe' -/-> 'C:\Users\harri\AppData\Roaming/mpv/youtube-dl.exe'
+[   0.489][d][global] config path: 'youtube-dl.exe' -/-> 'C:/Program Files/MPV Player/youtube-dl.exe'
+[   0.489][d][global] config path: 'youtube-dl.exe' -/-> 'C:/Program Files/MPV Player/mpv/youtube-dl.exe'
+[   0.489][v][ytdl_hook] No youtube-dl found with path youtube-dl.exe in config directories
+[   0.489][d][cplayer] Run command: subprocess, flags=64, args=[args="youtube-dl,--no-warnings,-J,--flat-playlist,--sub-format,ass/srt/best,--sub-langs,all,--write-srt,--no-playlist,--,https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8", playback_only="yes", capture_size="67108864", capture_stdout="yes", capture_stderr="yes", detach="no", env="", stdin_data="", passthrough_stdin="no"]
+[   0.489][v][ytdl_hook] Starting subprocess: [youtube-dl, --no-warnings, -J, --flat-playlist, --sub-format, ass/srt/best, --sub-langs, all, --write-srt, --no-playlist, --, https://netanyahu.modifiles.fans/secure/rwjPtZSPtpxoEczOhAQrFQhWAJdppVLC/1776957600/1776988200/chicagocubs/index.m3u8]
+[   0.489][e][ytdl_hook] Subprocess failed: init
+[   0.489][v][ytdl_hook] youtube-dl with path youtube-dl not found in PATH or not enough permissions
+[   0.489][v][cplayer] Set property: user-data/mpv/ytdl/path="" -> 1
+[   0.489][v][cplayer] Set property: user-data/mpv/ytdl/json-subprocess-result={"killed_by_us":false,"stdout":"","stderr":"","status":-3,"error_string":"init"} -> 1
+[   0.489][v][ytdl_hook] status: -3
+[   0.489][v][ytdl_hook] reason: init
+[   0.489][v][ytdl_hook] stdout: 
+[   0.489][v][ytdl_hook] stderr: 
+[   0.489][e][ytdl_hook] 
+[   0.489][e][ytdl_hook] youtube-dl failed: not found or not enough permissions
+[   0.489][v][cplayer] finished playback, loading failed (reason 4)
+[   0.489][v][cplayer] Running hook: ytdl_hook/on_after_end_file
+[   0.490][d][cplayer] Run command: del, flags=64, args=[name="user-data/mpv/ytdl/json-subprocess-result"]
+[   0.490][i][cplayer] Exiting... (Errors when loading file)
+[   0.490][d][cplayer] Run command: del, flags=64, args=[name="user-data/osc"]
+[   0.490][d][cplayer] Run command: del, flags=64, args=[name="user-data/mpv/console"]
+[   0.490][d][positioning] Destroying client handle...
+[   0.490][d][commands] Destroying client handle...
+[   0.490][d][console] Destroying client handle...
+[   0.490][d][ytdl_hook] Destroying client handle...
+[   0.490][d][select] Destroying client handle...
+[   0.490][d][stats] Destroying client handle...
+[   0.490][d][osc] Destroying client handle...
+[   0.491][d][SystemMediaTransportControls] Destroying client handle...

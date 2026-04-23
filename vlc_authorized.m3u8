@@ -1,0 +1,5 @@
+#EXTM3U
+#EXTVLCOPT:http-referrer=https://pooembed.eu/embed-noads/nhl/2026-04-22/pit-phi
+#EXTVLCOPT:http-origin=https://pooembed.eu
+#EXTINF:-1, Authorized Turbo Stream
+https://netanyahu.modifiles.fans/secure/xjOhDXrwGXFICSXmlxNuckwDkKrYDKvB/1776888000/1776916800/philadelphiaflyers/index.m3u8
