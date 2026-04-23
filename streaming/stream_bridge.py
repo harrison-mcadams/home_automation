@@ -6,7 +6,7 @@ import time
 from flask import Flask, request, render_template_string, jsonify
 
 # Configuration
-PORT = 5000
+PORT = 5050
 ACTIVE_STREAM_PROC = None
 
 app = Flask(__name__)
