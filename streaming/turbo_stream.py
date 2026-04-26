@@ -10,6 +10,12 @@ import queue
 import base64
 import signal
 from http.server import HTTPServer, BaseHTTPRequestHandler
+try:
+    from http.server import ThreadingHTTPServer
+except ImportError:
+    from socketserver import ThreadingMixIn
+    class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+        pass
 from playwright_extract import extract_stream
 
 # Global state
@@ -45,15 +51,25 @@ class StreamProxyHandler(BaseHTTPRequestHandler):
                 try:
                     content = body.decode('utf-8', errors='ignore')
                     new_lines = []
-                    base_url = target_url.rsplit('/', 1)[0] + '/'
+                    parsed_target = urllib.parse.urlparse(target_url)
                     for line in content.splitlines():
                         line = line.strip()
                         if line and not line.startswith('#'):
-                            seg_url = urllib.parse.urljoin(base_url, line)
+                            # Resolve relative paths
+                            seg_url = urllib.parse.urljoin(target_url, line)
+                            
+                            # CRITICAL FIX: Preserve query tokens for relative segments
+                            # If the joined URL doesn't have its own query but the manifest did, append it
+                            parsed_seg = urllib.parse.urlparse(seg_url)
+                            if not parsed_seg.query and parsed_target.query:
+                                join_char = '&' if '?' in seg_url else '?'
+                                seg_url += join_char + parsed_target.query
+                            
                             new_lines.append(f"http://127.0.0.1:{self.server.server_port}/proxy?url={urllib.parse.quote(seg_url)}")
                         else: new_lines.append(line)
                     body = "\n".join(new_lines).encode('utf-8')
-                except: pass
+                except Exception as e:
+                    print(f"(!) Manifest rewrite error: {e}", file=sys.stderr)
             self.send_header('Content-Length', len(body))
             self.end_headers()
             self.wfile.write(body)
@@ -63,9 +79,9 @@ class StreamProxyHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
 def start_proxy_server():
-    server = HTTPServer(('127.0.0.1', 0), StreamProxyHandler)
+    server = ThreadingHTTPServer(('127.0.0.1', 0), StreamProxyHandler)
     port = server.server_port
-    print(f"[*] Proxy Server started on port {port}", file=sys.stderr)
+    print(f"[*] Threaded Proxy Server started on port {port}", file=sys.stderr)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return port
 
@@ -83,8 +99,10 @@ def main_loop(page, player_proc=None):
             q = task['response_queue']
             try:
                 target_frame = page.main_frame
+                # Heuristic: find the frame that actually contains the media/sensitive keywords
+                keywords = ["pooembed", "modifiles", "netanyahu", "stream", "player"]
                 for frame in page.frames:
-                    if "pooembed" in frame.url or "modifiles" in frame.url:
+                    if any(kw in frame.url.lower() for kw in keywords):
                         target_frame = frame
                         break
                 result = target_frame.evaluate('''async (targetUrl) => {
