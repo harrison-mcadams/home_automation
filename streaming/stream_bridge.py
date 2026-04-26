@@ -3,6 +3,7 @@ import os
 import subprocess
 import signal
 import time
+import socket
 from flask import Flask, request, render_template_string, jsonify
 
 # Configuration
@@ -10,6 +11,20 @@ PORT = 5050
 ACTIVE_STREAM_PROC = None
 
 app = Flask(__name__)
+
+def get_local_ips():
+    """Discover all local IP addresses for this machine."""
+    ips = ["127.0.0.1"]
+    try:
+        # Get all interfaces (works on most Unix/Windows)
+        hostname = socket.gethostname()
+        addr_infos = socket.getaddrinfo(hostname, None)
+        for info in addr_infos:
+            ip = info[4][0]
+            if ":" not in ip and ip not in ips: # IPv4 only
+                ips.append(ip)
+    except: pass
+    return ips
 
 # Premium Dark-Mode UI with Glassmorphism
 BASE_TEMPLATE = '''
@@ -191,8 +206,6 @@ def index():
 @app.route('/play', methods=['POST', 'GET'])
 def play():
     global ACTIVE_STREAM_PROC
-    
-    # Support both GET (for simple shortcuts) and POST (for dashboard)
     url = None
     if request.method == 'POST':
         data = request.get_json()
@@ -203,19 +216,22 @@ def play():
     if not url:
         return jsonify({"success": False, "error": "No URL provided"}), 400
 
-    # Kill existing stream if running
     if ACTIVE_STREAM_PROC and ACTIVE_STREAM_PROC.poll() is None:
         try:
-            # On Windows, we use taskkill to ensure the whole process tree (including Chrome) dies
-            subprocess.run(['taskkill', '/F', '/T', '/PID', str(ACTIVE_STREAM_PROC.pid)], check=False)
+            # Cross-platform termination
+            if os.name == 'nt':
+                subprocess.run(['taskkill', '/F', '/T', '/PID', str(ACTIVE_STREAM_PROC.pid)], check=False)
+            else:
+                os.killpg(os.getpgid(ACTIVE_STREAM_PROC.pid), signal.SIGTERM)
         except: pass
 
     try:
-        # Launch turbo_stream.py
-        # We use a new process group to ensure cleanup works
         script_path = os.path.join(os.path.dirname(__file__), "turbo_stream.py")
-        ACTIVE_STREAM_PROC = subprocess.Popen([sys.executable, script_path, url])
-        
+        # Use start_new_session to allow cleanup on Unix/Mac
+        ACTIVE_STREAM_PROC = subprocess.Popen(
+            [sys.executable, script_path, url], 
+            start_new_session=(os.name != 'nt')
+        )
         return jsonify({"success": True, "message": "Stream initiated"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -225,11 +241,22 @@ def kill():
     global ACTIVE_STREAM_PROC
     if ACTIVE_STREAM_PROC and ACTIVE_STREAM_PROC.poll() is None:
         try:
-            subprocess.run(['taskkill', '/F', '/T', '/PID', str(ACTIVE_STREAM_PROC.pid)], check=False)
+            if os.name == 'nt':
+                subprocess.run(['taskkill', '/F', '/T', '/PID', str(ACTIVE_STREAM_PROC.pid)], check=False)
+            else:
+                os.killpg(os.getpgid(ACTIVE_STREAM_PROC.pid), signal.SIGTERM)
             ACTIVE_STREAM_PROC = None
         except: pass
     return jsonify({"success": True})
 
 if __name__ == '__main__':
-    # Use 0.0.0.0 to make it accessible on the local network
+    print("\n" + "="*40)
+    print(" TURBO BRIDGE STARTUP ")
+    print("="*40)
+    print(f"[*] Port: {PORT}")
+    print("[*] Available on these addresses:")
+    for ip in get_local_ips():
+        print(f"    - http://{ip}:{PORT}")
+    print("="*40 + "\n")
+    
     app.run(host='0.0.0.0', port=PORT, debug=False)
