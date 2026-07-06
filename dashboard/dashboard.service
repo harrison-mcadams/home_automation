@@ -3,10 +3,10 @@ Description=Pi Status Dashboard Service
 After=network.target
 
 [Service]
-User=pi
-WorkingDirectory=/home/pi/home_automation/dashboard
-Environment="PATH=/home/pi/home_automation/venv/bin"
-ExecStart=/home/pi/home_automation/venv/bin/python app.py --port 8888
+User=spoon
+WorkingDirectory=/home/spoon/home_automation/dashboard
+Environment="PATH=/home/spoon/home_automation/venv/bin"
+ExecStart=/home/spoon/home_automation/venv/bin/python app.py --port 8888
 Restart=always
 RestartSec=5
 
