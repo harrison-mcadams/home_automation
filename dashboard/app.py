@@ -294,8 +294,19 @@ def get_local_ips():
         ips["local"] = "127.0.0.1"
     return ips
 
-def ping_latency(host):
-    """Measure ping latency to a host in milliseconds."""
+def ping_latency(host, port=53):
+    """Measure latency to a host using TCP socket connection (port 53 for internet/gateway) or ICMP ping as fallback."""
+    # Try TCP connection first (no raw socket privilege needed, handles firewalls better)
+    try:
+        start_time = time.time()
+        s = socket.create_connection((host, port), timeout=1.0)
+        latency = int((time.time() - start_time) * 1000)
+        s.close()
+        return latency
+    except Exception:
+        pass
+
+    # Fallback to ICMP ping (requires SUID/caps, may fail for standard user on some OS versions)
     param = '-n' if sys.platform.lower().startswith('win') else '-c'
     timeout_param = '-w' if sys.platform.lower().startswith('win') else '-W'
     timeout_val = '1000' if sys.platform.lower().startswith('win') else '1'
@@ -466,7 +477,7 @@ def api_status():
         proj_target = project["target"]
         proj_desc = project.get("description", "")
         
-        status_data = {"id": proj_id, "name": proj_name, "description": proj_desc, "type": proj_type}
+        status_data = {"id": proj_id, "name": proj_name, "description": proj_desc, "type": proj_type, "service_name": project.get("service_name")}
         
         if proj_type == "systemd":
             res = check_systemd_status(proj_target)
@@ -537,10 +548,9 @@ def api_control():
         if not project:
             return jsonify({"status": "error", "message": f"Service '{target}' is not configured"}), 404
             
-        if project["type"] != "systemd":
-            return jsonify({"status": "error", "message": f"Service '{target}' is not a systemd service"}), 400
-            
-        service_name = project["target"]
+        service_name = project.get("service_name") or (project["target"] if project["type"] == "systemd" else None)
+        if not service_name:
+            return jsonify({"status": "error", "message": f"Service '{target}' does not support systemd restart"}), 400
         
         # Security sanity check: keep only alpha-numeric, dots, dashes, underscores
         clean_name = "".join(c for c in service_name if c.isalnum() or c in ".-_")

@@ -3,8 +3,9 @@
     {
       "id": "learn",
       "name": "Learn Project",
-      "type": "systemd",
-      "target": "learn.service",
+      "type": "port",
+      "target": "8082",
+      "service_name": "learn.service",
       "description": "Continuous learning background task"
     },
     {
@@ -12,6 +13,7 @@
       "name": "Running Tracker",
       "type": "port",
       "target": "8088",
+      "service_name": "running.service",
       "description": "Activity sync & running tracker"
     },
     {
@@ -19,6 +21,7 @@
       "name": "Zenify",
       "type": "port",
       "target": "3000",
+      "service_name": "zenify.service",
       "description": "Focus and mindfulness timer"
     },
     {
@@ -34,6 +37,7 @@
       "name": "Home Automation",
       "type": "http",
       "target": "http://localhost:5000/health",
+      "service_name": "rf_bridge_service.service",
       "description": "RF Bridge and Gesture Controller API"
     }
   ]

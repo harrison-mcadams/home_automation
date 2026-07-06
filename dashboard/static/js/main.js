@@ -294,9 +294,9 @@ function updateProjectsStatus(projects) {
             latencyTag = `<span class="proj-badge">systemd</span>`;
         }
 
-        // Restart button for systemd services
+        // Restart button if service_name is specified
         let restartButton = '';
-        if (project.type === 'systemd') {
+        if (project.type === 'systemd' || project.service_name) {
             restartButton = `
                 <button class="btn-restart" title="Restart Service" onclick="restartService('${project.id}')">
                     <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
