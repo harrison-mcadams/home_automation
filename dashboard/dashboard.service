@@ -6,7 +6,7 @@ After=network.target
 User=pi
 WorkingDirectory=/home/pi/home_automation/dashboard
 Environment="PATH=/home/pi/home_automation/venv/bin"
-ExecStart=/home/pi/home_automation/venv/bin/python app.py --port 8000
+ExecStart=/home/pi/home_automation/venv/bin/python app.py --port 8888
 Restart=always
 RestartSec=5
 
