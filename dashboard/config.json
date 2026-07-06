@@ -10,8 +10,8 @@
     {
       "id": "running",
       "name": "Running Tracker",
-      "type": "systemd",
-      "target": "running.service",
+      "type": "port",
+      "target": "8088",
       "description": "Activity sync & running tracker"
     },
     {
