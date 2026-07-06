@@ -1,0 +1,14 @@
+[Unit]
+Description=Pi Status Dashboard Service
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/home_automation/dashboard
+Environment="PATH=/home/pi/home_automation/venv/bin"
+ExecStart=/home/pi/home_automation/venv/bin/python app.py --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi Status Control Center</title>
+    <!-- Google Fonts: Outfit for sleek, modern sci-fi readability -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Lucide Icons for premium crisp SVG iconography -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="dashboard-wrapper">
+        <!-- HEADER BLOCK -->
+        <header class="main-header">
+            <div class="brand">
+                <div class="brand-logo">
+                    <i data-lucide="cpu" class="neon-icon-blue logo-spin"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>PI CONTROL CENTER</h1>
+                    <p class="subtitle">Raspberry Pi Status & Health Monitor</p>
+                </div>
+            </div>
+            
+            <!-- Global Status Ring/Banner -->
+            <div id="global-status-banner" class="status-banner status-all-ok">
+                <span class="pulse-dot"></span>
+                <span class="status-text">ALL SYSTEMS OPERATIONAL</span>
+            </div>
+
+            <!-- Beautiful Digital Clock -->
+            <div class="clock-panel">
+                <div id="clock-time" class="clock-time">00:00:00</div>
+                <div id="clock-date" class="clock-date">LOADING DATE...</div>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT GRID -->
+        <main class="dashboard-grid">
+            
+            <!-- COLUMN 1: SYSTEM HEALTH (GAUGES & BARS) -->
+            <section class="grid-card system-health-card">
+                <div class="card-header">
+                    <i data-lucide="activity" class="card-icon"></i>
+                    <h2>System Performance</h2>
+                </div>
+                
+                <div class="gauges-container">
+                    <!-- CPU TEMP GAUGE -->
+                    <div class="gauge-box">
+                        <div class="progress-ring-wrapper">
+                            <svg class="progress-ring" width="120" height="120">
+                                <circle class="progress-ring-bg" stroke="rgba(255,255,255,0.05)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60"/>
+                                <circle id="temp-ring" class="progress-ring-bar ring-temp" stroke="#00e5ff" stroke-width="8" stroke-dasharray="314.16" stroke-dashoffset="314.16" stroke-linecap="round" fill="transparent" r="50" cx="60" cy="60"/>
+                            </svg>
+                            <div class="gauge-value">
+                                <span id="temp-val" class="number">--</span><span class="unit">°C</span>
+                            </div>
+                        </div>
+                        <span class="gauge-label">CPU Temp</span>
+                    </div>
+
+                    <!-- CPU USAGE GAUGE -->
+                    <div class="gauge-box">
+                        <div class="progress-ring-wrapper">
+                            <svg class="progress-ring" width="120" height="120">
+                                <circle class="progress-ring-bg" stroke="rgba(255,255,255,0.05)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60"/>
+                                <circle id="cpu-ring" class="progress-ring-bar ring-cpu" stroke="#a259ff" stroke-width="8" stroke-dasharray="314.16" stroke-dashoffset="314.16" stroke-linecap="round" fill="transparent" r="50" cx="60" cy="60"/>
+                            </svg>
+                            <div class="gauge-value">
+                                <span id="cpu-val" class="number">--</span><span class="unit">%</span>
+                            </div>
+                        </div>
+                        <span class="gauge-label">CPU Load</span>
+                    </div>
+                </div>
+
+                <!-- PROGRESS BARS FOR MEMORY & DISK -->
+                <div class="stats-bars">
+                    <!-- Memory Bar -->
+                    <div class="bar-group">
+                        <div class="bar-info">
+                            <span class="label">Memory (RAM)</span>
+                            <span id="ram-text" class="value">-- GB / -- GB (--%)</span>
+                        </div>
+                        <div class="bar-bg">
+                            <div id="ram-fill" class="bar-fill fill-ram" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Swap Bar -->
+                    <div class="bar-group">
+                        <div class="bar-info">
+                            <span class="label">Swap Memory</span>
+                            <span id="swap-text" class="value">-- GB / -- GB (--%)</span>
+                        </div>
+                        <div class="bar-bg">
+                            <div id="swap-fill" class="bar-fill fill-swap" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Disk Bar -->
+                    <div class="bar-group">
+                        <div class="bar-info">
+                            <span class="label">Disk Usage (Root)</span>
+                            <span id="disk-text" class="value">-- GB / -- GB (--%)</span>
+                        </div>
+                        <div class="bar-bg">
+                            <div id="disk-fill" class="bar-fill fill-disk" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Stats Box -->
+                <div class="quick-stats-box">
+                    <div class="quick-stat-item">
+                        <span class="qs-label">CPU Freq</span>
+                        <span id="cpu-freq-val" class="qs-value">-- GHz</span>
+                    </div>
+                    <div class="quick-stat-item">
+                        <span class="qs-label">Load Avg</span>
+                        <span id="load-avg-val" class="qs-value">0.00 / 0.00 / 0.00</span>
+                    </div>
+                    <div class="quick-stat-item">
+                        <span class="qs-label">Uptime</span>
+                        <span id="uptime-val" class="qs-value">--</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- COLUMN 2: DIAGNOSTICS & NETWORK -->
+            <section class="grid-card diagnostics-card">
+                <div class="card-header">
+                    <i data-lucide="shield-alert" class="card-icon"></i>
+                    <h2>Power & Diagnostics</h2>
+                </div>
+
+                <!-- Pi Specific Power Indicators -->
+                <div class="pi-diagnostics-panel">
+                    <div class="diagnostic-indicator-row">
+                        <div class="diag-label">
+                            <i data-lucide="zap" class="diag-icon"></i>
+                            <div>
+                                <span class="title">Voltage Status</span>
+                                <span class="desc">Pi power supply check</span>
+                            </div>
+                        </div>
+                        <div id="voltage-badge" class="diag-badge badge-neutral">UNKNOWN</div>
+                    </div>
+
+                    <div class="diagnostic-indicator-row">
+                        <div class="diag-label">
+                            <i data-lucide="thermometer" class="diag-icon"></i>
+                            <div>
+                                <span class="title">Thermal Throttling</span>
+                                <span class="desc">Heat throttling monitor</span>
+                            </div>
+                        </div>
+                        <div id="throttling-badge" class="diag-badge badge-neutral">UNKNOWN</div>
+                    </div>
+                </div>
+
+                <div class="card-header spacing-top">
+                    <i data-lucide="wifi" class="card-icon"></i>
+                    <h2>Network & Connectivity</h2>
+                </div>
+
+                <!-- Network Details -->
+                <div class="network-panel">
+                    <div class="ping-row">
+                        <div class="ping-box">
+                            <span class="ping-label">Internet WAN</span>
+                            <span id="ping-internet" class="ping-val ping-loading">--</span>
+                        </div>
+                        <div class="ping-box">
+                            <span class="ping-label">Gateway LAN</span>
+                            <span id="ping-gateway" class="ping-val ping-loading">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Wi-Fi Strength if connected -->
+                    <div id="wifi-box" class="wifi-meter-box" style="display: none;">
+                        <div class="wifi-label">
+                            <span class="lbl"><i data-lucide="signal" class="wifi-icon"></i> Wi-Fi Signal (<span id="wifi-iface">wlan0</span>)</span>
+                            <span id="wifi-strength" class="val">--%</span>
+                        </div>
+                        <div class="bar-bg">
+                            <div id="wifi-fill" class="bar-fill fill-wifi" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tailscale Status if active/enabled -->
+                    <div id="tailscale-box" class="wifi-meter-box" style="display: none;">
+                        <div class="wifi-label">
+                            <span class="lbl"><i data-lucide="shield" class="wifi-icon" style="color: var(--accent-blue)"></i> Tailscale Status</span>
+                            <span id="tailscale-status-val" class="val" style="color: var(--accent-green); font-weight: 600;">ACTIVE</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; justify-content: space-between; margin-top: 4px;">
+                            <span>IP: <span id="tailscale-ip" style="font-family: monospace; color: var(--text-primary)">--</span></span>
+                            <span>Node: <span id="tailscale-dns" style="color: var(--text-primary)">--</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Local IP Address display -->
+                    <div class="ip-list">
+                        <div class="ip-row">
+                            <span class="ip-label">Gateway IP</span>
+                            <span id="ip-gateway" class="ip-val">--</span>
+                        </div>
+                        <div id="ips-container" class="ips-container">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- COLUMN 3: PROJECTS STATUS GRID -->
+            <section class="grid-card projects-card">
+                <div class="card-header">
+                    <i data-lucide="layers" class="card-icon"></i>
+                    <h2>Projects Monitor</h2>
+                </div>
+
+                <div id="projects-list-container" class="projects-list-container">
+                    <!-- Loading Indicator -->
+                    <div class="projects-loading">
+                        <div class="spinner"></div>
+                        <span>Loading projects status...</span>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- SYSTEM CONTROLS FOOTER -->
+        <footer class="system-footer-controls">
+            <span class="footer-note"><i data-lucide="info" class="icon-inline"></i> Refreshing stats automatically every 3 seconds.</span>
+            <div class="footer-actions">
+                <button id="btn-reboot" class="control-btn btn-warn" onclick="openSystemModal('reboot')">
+                    <i data-lucide="refresh-cw"></i>
+                    Reboot Pi
+                </button>
+                <button id="btn-shutdown" class="control-btn btn-danger" onclick="openSystemModal('shutdown')">
+                    <i data-lucide="power"></i>
+                    Power Off Pi
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- CUSTOM CONFIRMATION OVERLAY MODAL -->
+    <div id="confirmation-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-icon-wrapper">
+                <i id="modal-icon" data-lucide="alert-triangle" class="modal-icon"></i>
+            </div>
+            <h3 id="modal-title">Confirm Action</h3>
+            <p id="modal-desc">Are you sure you want to perform this system action?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeSystemModal()">Cancel</button>
+                <button id="modal-btn-confirm" class="modal-btn modal-btn-confirm">Execute</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // Initialize Lucide icons on load
+        lucide.createIcons();
+    </script>
+</body>
+</html>

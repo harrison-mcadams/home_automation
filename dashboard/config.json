@@ -1,0 +1,40 @@
+{
+  "projects": [
+    {
+      "id": "learn",
+      "name": "Learn Project",
+      "type": "systemd",
+      "target": "learn.service",
+      "description": "Continuous learning background task"
+    },
+    {
+      "id": "running",
+      "name": "Running Tracker",
+      "type": "systemd",
+      "target": "running.service",
+      "description": "Activity sync & running tracker"
+    },
+    {
+      "id": "zenify",
+      "name": "Zenify",
+      "type": "port",
+      "target": "3000",
+      "description": "Focus and mindfulness timer"
+    },
+    {
+      "id": "puck",
+      "name": "Puck Controller",
+      "type": "dummy",
+      "target": "",
+      "description": "Smart puck remote (Pending deployment)",
+      "status_override": "Pending Setup"
+    },
+    {
+      "id": "home_automation",
+      "name": "Home Automation",
+      "type": "http",
+      "target": "http://localhost:5000/health",
+      "description": "RF Bridge and Gesture Controller API"
+    }
+  ]
+}
