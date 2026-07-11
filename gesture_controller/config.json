@@ -1,7 +1,7 @@
 {
   "use_home_assistant": true,
   "home_assistant_url": "http://puck-server.tailcfee0c.ts.net:8123",
-  "home_assistant_token": "YOUR_LONG_LIVED_ACCESS_TOKEN_HERE",
+  "home_assistant_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhMmNhOWU0NDM2NTM0NGI1YWQ2OTE0MTdmYTQ1MjY0MyIsImlhdCI6MTc4Mzc5MzM4MSwiZXhwIjoyMDk5MTUzMzgxfQ.bxcNpk6KDRiw25DJHvC0rWBMz-5aPcBO6852b3N1jNs",
   "direct_api_url": "http://puck-server.tailcfee0c.ts.net:5000/api/control",
   "targets": {
     "1": {
