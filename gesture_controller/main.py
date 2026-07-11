@@ -82,8 +82,8 @@ class GestureController:
         self.hands = self.mp_hands.Hands(
             model_complexity=complexity,  # 0=Lite, 1=Full
             max_num_hands=1,
-            min_detection_confidence=0.45,
-            min_tracking_confidence=0.35
+            min_detection_confidence=0.35,
+            min_tracking_confidence=0.30
         )
         self.mp_draw = mp.solutions.drawing_utils
         
@@ -346,14 +346,14 @@ class GestureController:
                         
             # Draw premium glassmorphic overlay card
             overlay = frame.copy()
-            cv2.rectangle(overlay, (0, 0), (w, 230), (15, 15, 20), -1)
+            cv2.rectangle(overlay, (0, 0), (w, 290), (15, 15, 20), -1)
             cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
             
-            # Larger text size
+            # Humongous text size
             cv2.putText(frame, f"CALIBRATION MODE: Target {target_idx + 1} of {len(targets_to_calibrate)}", 
-                        (40, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (138, 43, 226), 3)
+                        (40, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (138, 43, 226), 3)
             cv2.putText(frame, f"Target: {name}", 
-                        (40, 115), cv2.FONT_HERSHEY_SIMPLEX, 1.8, (255, 255, 255), 4)
+                        (40, 125), cv2.FONT_HERSHEY_SIMPLEX, 2.4, (255, 255, 255), 6)
             
             current_time = time.time()
             
@@ -363,7 +363,7 @@ class GestureController:
                 
                 # Visual countdown
                 msg = f"Point at target! Capturing in {max(0.1, rem):.1f}s..."
-                cv2.putText(frame, msg, (40, 185), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 4)
+                cv2.putText(frame, msg, (40, 215), cv2.FONT_HERSHEY_SIMPLEX, 2.2, (0, 255, 255), 5)
                 
                 if elapsed >= countdown_duration:
                     cal_state = "COLLECTING"
@@ -372,13 +372,13 @@ class GestureController:
                     
             elif cal_state == "COLLECTING":
                 progress = len(collected_vectors)
-                bar_w = int((progress / COLLECT_FRAMES) * 450)
+                bar_w = int((progress / COLLECT_FRAMES) * 500)
                 
                 # Progress visualizer
-                cv2.rectangle(frame, (40, 150), (490, 190), (50, 50, 50), -1)
-                cv2.rectangle(frame, (40, 150), (40 + bar_w, 190), (0, 255, 0), -1)
+                cv2.rectangle(frame, (40, 165), (540, 215), (50, 50, 50), -1)
+                cv2.rectangle(frame, (40, 165), (40 + bar_w, 215), (0, 255, 0), -1)
                 cv2.putText(frame, f"Capturing: {progress}/{COLLECT_FRAMES}", 
-                            (510, 182), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 0), 3)
+                            (560, 205), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
                 
                 if pointing_detected and curr_vector is not None:
                     collected_vectors.append(curr_vector)
@@ -398,8 +398,8 @@ class GestureController:
                             # Finished all
                             target_idx += 1
                 else:
-                    cv2.putText(frame, "HOLD POINT STEADY!", (w - 550, 182), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 0, 255), 4)
+                    cv2.putText(frame, "HOLD POINT STEADY!", (w - 750, 215), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 0, 255), 5)
                                 
             elif cal_state == "TRANSITION":
                 elapsed = current_time - state_start_time
@@ -407,7 +407,7 @@ class GestureController:
                 
                 # Visual transition instruction
                 msg = f"SAVED! Relax your arm. Next in {max(0.1, rem):.1f}s..."
-                cv2.putText(frame, msg, (40, 185), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 4)
+                cv2.putText(frame, msg, (40, 215), cv2.FONT_HERSHEY_SIMPLEX, 2.2, (0, 255, 0), 5)
                 
                 if elapsed >= transition_duration:
                     target_idx += 1
@@ -589,7 +589,7 @@ class GestureController:
                 if not self.headless:
                     # Glassmorphic control panel overlay
                     overlay = frame.copy()
-                    cv2.rectangle(overlay, (0, 0), (w, 230), (15, 15, 20), -1)
+                    cv2.rectangle(overlay, (0, 0), (w, 290), (15, 15, 20), -1)
                     cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
                     
                     # State indicators & colors
@@ -601,42 +601,42 @@ class GestureController:
                     state_color = state_colors.get(self.state, (255, 255, 255))
                     
                     # Draw text details
-                    cv2.putText(frame, f"SYSTEM STATE: {self.state}", (40, 60), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.8, state_color, 4)
+                    cv2.putText(frame, f"SYSTEM STATE: {self.state}", (40, 70), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 2.4, state_color, 6)
                     
                     # Show progress bars
                     if self.state == "IDLE":
                         progress = self.fist_frames / self.config["fist_threshold_frames"]
-                        bar_w = int(progress * 450)
-                        cv2.putText(frame, "Arming Fist:", (40, 130), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (200, 200, 200), 2)
-                        cv2.rectangle(frame, (300, 100), (750, 140), (40, 40, 40), -1)
-                        cv2.rectangle(frame, (300, 100), (300 + bar_w, 140), (0, 200, 255), -1)
+                        bar_w = int(progress * 500)
+                        cv2.putText(frame, "Arming Fist:", (40, 150), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (200, 200, 200), 4)
+                        cv2.rectangle(frame, (380, 110), (880, 160), (40, 40, 40), -1)
+                        cv2.rectangle(frame, (380, 110), (380 + bar_w, 160), (0, 200, 255), -1)
                     
                     elif self.state == "ARMED":
                         # Timeout remaining
                         rem = max(0.0, self.config["ready_timeout"] - (current_time - self.state_time))
-                        cv2.putText(frame, f"Time Remaining: {rem:.1f}s", (40, 130), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2)
+                        cv2.putText(frame, f"Time Remaining: {rem:.1f}s", (40, 150), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 255, 0), 4)
                         
                         # Match progress
                         if self.matched_target:
                             t_name = self.config["targets"][self.matched_target]["name"]
-                            cv2.putText(frame, f"Target: {t_name}", (40, 190), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+                            cv2.putText(frame, f"Target: {t_name}", (40, 230), cv2.FONT_HERSHEY_SIMPLEX, 1.8, (255, 255, 255), 4)
                             
                             progress = self.match_frames / self.config["pointing_threshold_frames"]
-                            bar_w = int(progress * 450)
-                            cv2.rectangle(frame, (300, 160), (750, 200), (40, 40, 40), -1)
-                            cv2.rectangle(frame, (300, 160), (300 + bar_w, 200), (0, 255, 0), -1)
+                            bar_w = int(progress * 500)
+                            cv2.rectangle(frame, (480, 190), (980, 240), (40, 40, 40), -1)
+                            cv2.rectangle(frame, (480, 190), (480 + bar_w, 240), (0, 255, 0), -1)
                         else:
-                            cv2.putText(frame, "Point at a light...", (40, 190), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 255), 3)
+                            cv2.putText(frame, "Point at a light...", (40, 230), cv2.FONT_HERSHEY_SIMPLEX, 1.8, (0, 255, 255), 4)
                             
                     elif self.state == "COOLDOWN":
                         rem = max(0.0, self.config["cooldown_duration"] - (current_time - self.state_time))
-                        cv2.putText(frame, f"Locked: {rem:.1f}s", (40, 130), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 2)
+                        cv2.putText(frame, f"Locked: {rem:.1f}s", (40, 150), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 255), 4)
                         
                     # Calculate and display local FPS
                     fps = 1.0 / (current_time - prev_time) if current_time - prev_time > 0 else 0.0
                     prev_time = current_time
-                    cv2.putText(frame, f"FPS: {int(fps)}", (w - 180, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
+                    cv2.putText(frame, f"FPS: {int(fps)}", (w - 200, 70), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (200, 200, 200), 3)
                     
                     # Draw target visualizers if ARMED and pointing
                     if self.state == "ARMED" and is_pointing and curr_vector is not None:
@@ -644,7 +644,7 @@ class GestureController:
                             index_tip = hand_lms.landmark[8]
                             cx, cy = int(index_tip.x * w), int(index_tip.y * h)
                             # Draw pointer ring
-                            cv2.circle(frame, (cx, cy), 25, (0, 255, 0) if self.matched_target else (0, 255, 255), 3)
+                            cv2.circle(frame, (cx, cy), 35, (0, 255, 0) if self.matched_target else (0, 255, 255), 4)
                     
                     cv2.imshow("Spatial Gesture Control", frame)
                     if cv2.waitKey(1) & 0xFF == ord('q'):

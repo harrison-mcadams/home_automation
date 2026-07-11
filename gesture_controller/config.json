@@ -20,9 +20,9 @@
       "direct_button": "3"
     }
   },
-  "similarity_threshold": 0.85,
-  "fist_threshold_frames": 8,
-  "pointing_threshold_frames": 8,
+  "similarity_threshold": 0.55,
+  "fist_threshold_frames": 4,
+  "pointing_threshold_frames": 3,
   "cooldown_duration": 1.5,
   "ready_timeout": 4.0
 }
