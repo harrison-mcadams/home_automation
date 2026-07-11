@@ -239,10 +239,10 @@ class GestureController:
             print(f"[Direct API] Error sending command: {e}")
 
     def calibrate(self):
-        """Interactive visual calibration routine for spatial target pointing."""
-        print("\n=== STARTING INTERACTIVE SPATIAL CALIBRATION ===")
-        print("Point at the requested targets in order and press SPACEBAR to capture the vector.")
-        print("Press 'q' at any time to abort calibration.")
+        """Hands-free interactive spatial calibration routine with countdowns."""
+        print("\n=== STARTING HANDS-FREE SPATIAL CALIBRATION ===")
+        print("Point at the requested targets when the countdown finishes.")
+        print("Press 'q' in the camera window to abort calibration.")
         
         camera = ThreadedCamera(self.source).start()
         time.sleep(1.0)
@@ -258,7 +258,13 @@ class GestureController:
         targets_to_calibrate = list(self.config["targets"].items())
         target_idx = 0
         
-        collecting = False
+        # Calibration States: "COUNTDOWN", "COLLECTING", "TRANSITION"
+        cal_state = "COUNTDOWN"
+        state_start_time = time.time()
+        
+        countdown_duration = 5.0   # Seconds to prepare pointing pose
+        transition_duration = 3.0  # Seconds to rest between targets
+        
         collected_vectors = []
         COLLECT_FRAMES = 25
         
@@ -288,40 +294,51 @@ class GestureController:
                     self.mp_draw.draw_landmarks(frame, hand_lms, self.mp_hands.HAND_CONNECTIONS)
                     
                     status = self.get_finger_status(hand_lms.landmark)
-                    # Check pointing: Index extended, Middle/Ring/Pinky closed
                     is_pointing = status[1] and not status[2] and not status[3] and not status[4]
                     
                     if is_pointing:
                         pointing_detected = True
                         curr_vector = self.get_pointing_vector(hand_lms.landmark)
                         
-                        # Draw vector visualization lines/dots
+                        # Draw visual marker at index tip
                         index_tip = hand_lms.landmark[8]
                         cx, cy = int(index_tip.x * w), int(index_tip.y * h)
                         cv2.circle(frame, (cx, cy), 15, (0, 255, 0), -1)
                         
-            # Calibration state overlay (Premium design)
-            # Semi-transparent card top
+            # Draw premium glassmorphic overlay card
             overlay = frame.copy()
-            cv2.rectangle(overlay, (0, 0), (w, 110), (10, 10, 15), -1)
-            cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+            cv2.rectangle(overlay, (0, 0), (w, 120), (15, 15, 20), -1)
+            cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
             
-            cv2.putText(frame, f"CALIBRATION MODE: Step {target_idx + 1} of {len(targets_to_calibrate)}", 
+            cv2.putText(frame, f"CALIBRATION MODE: Target {target_idx + 1} of {len(targets_to_calibrate)}", 
                         (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (138, 43, 226), 2)
             cv2.putText(frame, f"Target: {name}", 
-                        (20, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+                        (20, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
             
-            # Action Instructions
-            if not collecting:
-                msg = "Point at light & press SPACEBAR to capture"
-                cv2.putText(frame, msg, (20, 95), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 1)
-            else:
+            current_time = time.time()
+            
+            if cal_state == "COUNTDOWN":
+                elapsed = current_time - state_start_time
+                rem = countdown_duration - elapsed
+                
+                # Visual countdown
+                msg = f"Point at target! Capturing in {max(0.1, rem):.1f}s..."
+                cv2.putText(frame, msg, (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                
+                if elapsed >= countdown_duration:
+                    cal_state = "COLLECTING"
+                    collected_vectors = []
+                    print(f"👉 Now capturing vectors for: {name}...")
+                    
+            elif cal_state == "COLLECTING":
                 progress = len(collected_vectors)
                 bar_w = int((progress / COLLECT_FRAMES) * 200)
-                cv2.rectangle(frame, (20, 85), (220, 100), (50, 50, 50), -1)
-                cv2.rectangle(frame, (20, 85), (20 + bar_w, 100), (0, 255, 0), -1)
+                
+                # Progress visualizer
+                cv2.rectangle(frame, (20, 90), (220, 105), (50, 50, 50), -1)
+                cv2.rectangle(frame, (20, 90), (20 + bar_w, 105), (0, 255, 0), -1)
                 cv2.putText(frame, f"Capturing: {progress}/{COLLECT_FRAMES}", 
-                            (230, 97), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                            (230, 102), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                 
                 if pointing_detected and curr_vector is not None:
                     collected_vectors.append(curr_vector)
@@ -332,22 +349,35 @@ class GestureController:
                         calibrated_vectors[key_id] = norm_avg_vec.tolist()
                         
                         print(f"✅ Target [{name}] calibrated successfully!")
-                        collecting = False
-                        collected_vectors = []
-                        target_idx += 1
+                        
+                        # Check if more targets remain
+                        if target_idx + 1 < len(targets_to_calibrate):
+                            cal_state = "TRANSITION"
+                            state_start_time = current_time
+                        else:
+                            # Finished all
+                            target_idx += 1
                 else:
-                    cv2.putText(frame, "HOLD POINT STEADY!", (w - 250, 95), 
+                    cv2.putText(frame, "HOLD POINT STEADY!", (w - 280, 102), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                                
+            elif cal_state == "TRANSITION":
+                elapsed = current_time - state_start_time
+                rem = transition_duration - elapsed
+                
+                # Visual transition instruction
+                msg = f"SAVED! Relax your arm. Next in {max(0.1, rem):.1f}s..."
+                cv2.putText(frame, msg, (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                
+                if elapsed >= transition_duration:
+                    target_idx += 1
+                    cal_state = "COUNTDOWN"
+                    state_start_time = current_time
             
             cv2.imshow("Gesture Calibration", frame)
             
             key = cv2.waitKey(1) & 0xFF
-            if key == ord(' '):
-                if pointing_detected and not collecting:
-                    collecting = True
-                    collected_vectors = []
-                    print(f"Capturing vector for {name}...")
-            elif key == ord('q'):
+            if key == ord('q'):
                 print("❌ Calibration aborted by user.")
                 break
                 
@@ -361,6 +391,7 @@ class GestureController:
             print(f"\n🎉 Calibration successfully completed! Data saved to {CALIBRATION_FILE}\n")
         else:
             print("\n⚠️ Calibration incomplete. Data not saved.\n")
+
 
     def run(self):
         """Main detection loop using the spatial pointing algorithm."""
