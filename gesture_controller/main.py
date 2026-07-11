@@ -82,8 +82,8 @@ class GestureController:
         self.hands = self.mp_hands.Hands(
             model_complexity=complexity,  # 0=Lite, 1=Full
             max_num_hands=1,
-            min_detection_confidence=0.6,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.45,
+            min_tracking_confidence=0.35
         )
         self.mp_draw = mp.solutions.drawing_utils
         
@@ -154,7 +154,7 @@ class GestureController:
         # Convert landmarks to 3D numpy arrays
         points = [np.array([lm.x, lm.y, lm.z]) for lm in landmarks]
         
-        # 1. Thumb logic (using 3D distance from wrist 0 and Pinky MCP 17 to tip 4)
+        # 1. Thumb logic (using 3D distance from Pinky MCP 17 to tip 4)
         thumb_tip = points[4]
         thumb_ip = points[3]
         pinky_mcp = points[17]
@@ -163,9 +163,6 @@ class GestureController:
         status.append(dist_thumb_tip > dist_thumb_ip)
         
         # 2. Index, Middle, Ring, Pinky logic
-        # MCP joints: Index(5), Middle(9), Ring(13), Pinky(17)
-        # PIP joints: Index(6), Middle(10), Ring(14), Pinky(18)
-        # Tip joints: Index(8), Middle(12), Ring(16), Pinky(20)
         mcp_ids = [5, 9, 13, 17]
         pip_ids = [6, 10, 14, 18]
         tip_ids = [8, 12, 16, 20]
@@ -178,9 +175,8 @@ class GestureController:
             d_tip = np.linalg.norm(tip - mcp)
             d_pip = np.linalg.norm(pip - mcp)
             
-            # An open finger has a tip-to-MCP distance significantly larger than PIP-to-MCP.
-            # Using 1.35x as a conservative ratio for a fully extended finger.
-            is_open = d_tip > 1.35 * d_pip
+            # Relaxed ratio of 1.18x to tolerate finger foreshortening due to camera perspective
+            is_open = d_tip > 1.18 * d_pip
             status.append(is_open)
             
         return status
@@ -315,7 +311,29 @@ class GestureController:
                     self.mp_draw.draw_landmarks(frame, hand_lms, self.mp_hands.HAND_CONNECTIONS)
                     
                     status = self.get_finger_status(hand_lms.landmark)
-                    is_pointing = status[1] and not status[2] and not status[3] and not status[4]
+                    
+                    # Convert to numpy arrays for length ratio comparisons
+                    pts_3d = [np.array([lm.x, lm.y, lm.z]) for lm in hand_lms.landmark]
+                    pts_2d = [np.array([lm.x, lm.y]) for lm in hand_lms.landmark]
+                    
+                    # Compute lengths of Index, Middle, Ring fingers from MCP to Tip
+                    len_index_3d = np.linalg.norm(pts_3d[8] - pts_3d[5])
+                    len_middle_3d = np.linalg.norm(pts_3d[12] - pts_3d[9])
+                    len_ring_3d = np.linalg.norm(pts_3d[16] - pts_3d[13])
+                    
+                    len_index_2d = np.linalg.norm(pts_2d[8] - pts_2d[5])
+                    len_middle_2d = np.linalg.norm(pts_2d[12] - pts_2d[9])
+                    len_ring_2d = np.linalg.norm(pts_2d[16] - pts_2d[13])
+                    
+                    # Pointing check:
+                    # 1. Index must be open (relaxed 1.18x ratio)
+                    # 2. Index must be significantly longer than folded middle/ring in 2D and 3D
+                    index_extended = status[1]
+                    middle_closed = not status[2] or (len_index_3d > 1.35 * len_middle_3d and len_index_2d > 1.3 * len_middle_2d)
+                    ring_closed = not status[3] or (len_index_3d > 1.35 * len_ring_3d and len_index_2d > 1.3 * len_ring_2d)
+                    pinky_closed = not status[4]
+                    
+                    is_pointing = index_extended and middle_closed and ring_closed and pinky_closed
                     
                     if is_pointing:
                         pointing_detected = True
@@ -475,11 +493,31 @@ class GestureController:
                             
                         status = self.get_finger_status(hand_lms.landmark)
                         
+                        # Convert to numpy arrays for length ratio comparisons
+                        pts_3d = [np.array([lm.x, lm.y, lm.z]) for lm in hand_lms.landmark]
+                        pts_2d = [np.array([lm.x, lm.y]) for lm in hand_lms.landmark]
+                        
+                        # Compute lengths of Index, Middle, Ring fingers from MCP to Tip
+                        len_index_3d = np.linalg.norm(pts_3d[8] - pts_3d[5])
+                        len_middle_3d = np.linalg.norm(pts_3d[12] - pts_3d[9])
+                        len_ring_3d = np.linalg.norm(pts_3d[16] - pts_3d[13])
+                        
+                        len_index_2d = np.linalg.norm(pts_2d[8] - pts_2d[5])
+                        len_middle_2d = np.linalg.norm(pts_2d[12] - pts_2d[9])
+                        len_ring_2d = np.linalg.norm(pts_2d[16] - pts_2d[13])
+                        
+                        # Pointing check:
+                        # 1. Index must be open (relaxed 1.18x ratio)
+                        # 2. Index must be significantly longer than folded middle/ring in 2D and 3D
+                        index_extended = status[1]
+                        middle_closed = not status[2] or (len_index_3d > 1.35 * len_middle_3d and len_index_2d > 1.3 * len_middle_2d)
+                        ring_closed = not status[3] or (len_index_3d > 1.35 * len_ring_3d and len_index_2d > 1.3 * len_ring_2d)
+                        pinky_closed = not status[4]
+                        
+                        is_pointing = index_extended and middle_closed and ring_closed and pinky_closed
+                        
                         # Detect Fist: Index, Middle, Ring, Pinky are all closed
                         is_fist = not status[1] and not status[2] and not status[3] and not status[4]
-                        
-                        # Detect Pointing: Index is open, Middle/Ring/Pinky are closed
-                        is_pointing = status[1] and not status[2] and not status[3] and not status[4]
                         
                         if is_pointing:
                             curr_vector = self.get_pointing_vector(hand_lms.landmark)
