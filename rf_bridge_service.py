@@ -7,9 +7,11 @@ from flask import Flask, jsonify, request
 
 # Configuration
 # We expect remote_codes.json to be in the same directory as this script
-CODES_FILE = "remote_codes.json"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CODES_FILE = os.path.join(SCRIPT_DIR, "remote_codes.json")
 PICO_PORT = "/dev/ttyACM0"
 BAUD_RATE = 115200
+
 
 app = Flask(__name__)
 

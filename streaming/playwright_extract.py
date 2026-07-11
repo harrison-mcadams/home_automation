@@ -34,6 +34,7 @@ def extract_stream(url, timeout_secs=60):
     """
     target_m3u8 = None
     target_headers = {}
+    target_frame_url = None
     found_event = threading.Event() # Thread-safe signal for the main loop
     
     # Start Playwright and keep it alive (do NOT use 'with' context manager here)
@@ -85,7 +86,7 @@ def extract_stream(url, timeout_secs=60):
     
     # TRAFFIC INTERCEPTION: This is the core discovery engine
     def handle_request(request):
-        nonlocal target_m3u8, target_headers
+        nonlocal target_m3u8, target_headers, target_frame_url
         u = request.url
         u_low = u.lower()
         
@@ -104,6 +105,7 @@ def extract_stream(url, timeout_secs=60):
                 # RECOVERY: Sometimes Referer is truncated in standard headers; we pull it from the frame
                 try:
                     frame_url = request.frame.url
+                    target_frame_url = frame_url
                     if frame_url and len(frame_url) > len(target_headers.get('Referer', '')):
                          target_headers['Referer'] = frame_url
                          if 'referer' in target_headers: del target_headers['referer']
@@ -144,7 +146,8 @@ def extract_stream(url, timeout_secs=60):
                     "_browser_handle": browser, 
                     "_pw_handle": p,
                     "_context": context,
-                    "_page": page
+                    "_page": page,
+                    "frame_url": target_frame_url
                 }
             
             # RECURRING SELF-CORRECT: Every 5s, we re-check for ad-overlays that might have popped up

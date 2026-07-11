@@ -38,16 +38,27 @@ class StreamProxyHandler(BaseHTTPRequestHandler):
         try:
             result = resp_q.get(timeout=30)
             if 'error' in result: raise Exception(result['error'])
+            body = result['body']
+            content_type = result['headers'].get('content-type', '')
+            
+            # Check for PNG obfuscation shielding an MPEG-TS stream
+            if body.startswith(b'\x89PNG\r\n\x1a\n'):
+                # Search for MPEG-TS sync pattern (0x47 repeating every 188 bytes) in the first 2000 bytes
+                limit = min(2000, len(body) - 188 * 3)
+                for i in range(limit):
+                    if body[i] == 0x47 and body[i+188] == 0x47 and body[i+188*2] == 0x47 and body[i+188*3] == 0x47:
+                        print(f"[*] Stripped {i} bytes of PNG obfuscation from segment", file=sys.stderr)
+                        body = body[i:]
+                        content_type = 'video/mp2t'
+                        break
+
             self.send_response(result['status'])
             for k, v in result['headers'].items():
                 if k.lower() not in ['content-length', 'content-encoding', 'transfer-encoding', 'connection', 'content-type']:
                     self.send_header(k, v)
-            if 'content-type' in result['headers']:
-                 self.send_header('Content-Type', result['headers']['content-type'])
-            elif ".m3u8" in target_url.lower():
-                 self.send_header('Content-Type', 'application/vnd.apple.mpegurl')
-            body = result['body']
+                    
             if ".m3u8" in target_url.lower():
+                content_type = 'application/vnd.apple.mpegurl'
                 try:
                     content = body.decode('utf-8', errors='ignore')
                     new_lines = []
@@ -70,6 +81,9 @@ class StreamProxyHandler(BaseHTTPRequestHandler):
                     body = "\n".join(new_lines).encode('utf-8')
                 except Exception as e:
                     print(f"(!) Manifest rewrite error: {e}", file=sys.stderr)
+
+            if content_type:
+                self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', len(body))
             self.end_headers()
             self.wfile.write(body)
@@ -85,7 +99,7 @@ def start_proxy_server():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return port
 
-def main_loop(page, player_proc=None):
+def main_loop(page, frame_url=None, player_proc=None):
     print("[*] Nuclear Proxy active. Using browser-native fetch.", file=sys.stderr)
     while True:
         # Check if player was closed
@@ -99,12 +113,24 @@ def main_loop(page, player_proc=None):
             q = task['response_queue']
             try:
                 target_frame = page.main_frame
-                # Heuristic: find the frame that actually contains the media/sensitive keywords
-                keywords = ["pooembed", "modifiles", "netanyahu", "stream", "player"]
-                for frame in page.frames:
-                    if any(kw in frame.url.lower() for kw in keywords):
-                        target_frame = frame
-                        break
+                if frame_url:
+                    for frame in page.frames:
+                        if frame.url == frame_url:
+                            target_frame = frame
+                            break
+                    else:
+                        for frame in page.frames:
+                            if frame.url.split('?')[0] == frame_url.split('?')[0]:
+                                target_frame = frame
+                                break
+                else:
+                    # Heuristic fallback: find the frame that actually contains the media/sensitive keywords
+                    keywords = ["pooembed", "modifiles", "netanyahu", "stream", "player", "embed"]
+                    for frame in page.frames:
+                        if any(kw in frame.url.lower() for kw in keywords):
+                            target_frame = frame
+                            break
+                
                 result = target_frame.evaluate('''async (targetUrl) => {
                     try {
                         const resp = await fetch(targetUrl, { mode: 'cors' });
@@ -138,7 +164,7 @@ def cleanup():
 
 def play_native(stream_data, target_url):
     url, page = stream_data.get("url"), stream_data.get("_page")
-    if "modifiles.fans" in url.lower() or "netanyahu" in url.lower():
+    if "modifiles.fans" in url.lower() or "netanyahu" in url.lower() or "strmd.st" in url.lower():
         print("[*] Sensitive CDN detected. Engaging Nuclear Proxy...", file=sys.stderr)
         proxy_port = start_proxy_server()
         proxy_url = f"http://127.0.0.1:{proxy_port}/proxy?url={urllib.parse.quote(url)}"
@@ -148,8 +174,14 @@ def play_native(stream_data, target_url):
             p_args = [player_path, proxy_url, "--cache=yes", "--demuxer-max-bytes=150M"]
             if "mpv" in player_path.lower(): p_args.append("--fs")
             elif "vlc" in player_path.lower(): p_args.append("--fullscreen")
-            proc = subprocess.Popen(p_args)
-        main_loop(page, proc)
+            try:
+                log_path = os.path.join(os.path.dirname(__file__), "mpv_player.log")
+                log_file = open(log_path, "w", encoding="utf-8", errors="ignore")
+                proc = subprocess.Popen(p_args, stdout=log_file, stderr=log_file)
+            except Exception as ex:
+                print(f"(!) Failed to start player with logs: {ex}", file=sys.stderr)
+                proc = subprocess.Popen(p_args)
+        main_loop(page, stream_data.get("frame_url"), proc)
         return True
     if shutil.which("streamlink"):
         if play_with_streamlink(stream_data): return True

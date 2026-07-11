@@ -1,0 +1,14 @@
+[Unit]
+Description=RF Pico Bridge API Service
+After=network.target
+
+[Service]
+User=spoon
+WorkingDirectory=/home/spoon/home_automation
+Environment="PATH=/home/spoon/home_automation/venv/bin"
+ExecStart=/home/spoon/home_automation/venv/bin/python rf_bridge_service.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
