@@ -117,13 +117,13 @@ class GestureController:
             "home_assistant_token": "YOUR_LONG_LIVED_ACCESS_TOKEN_HERE",
             "direct_api_url": "http://puck-server.tailcfee0c.ts.net:5000/api/control",
             "targets": {
-                "1": {"name": "Left Wall Light", "ha_entity": "switch.rf_light_1", "direct_button": "1"},
-                "2": {"name": "Top Right Corner Light", "ha_entity": "switch.rf_light_2", "direct_button": "2"},
-                "3": {"name": "Bottom Right Corner Light", "ha_entity": "switch.rf_light_3", "direct_button": "3"}
+                "1": {"name": "Left Wall Light", "ha_entity": "switch.rf_light_4", "direct_button": "4"},
+                "2": {"name": "Top Right Corner Light", "ha_entity": "switch.rf_light_3", "direct_button": "3"},
+                "3": {"name": "Bottom Right Corner Light", "ha_entity": "switch.rf_light_1", "direct_button": "1"}
             },
-            "similarity_threshold": 0.85,
-            "fist_threshold_frames": 8,
-            "pointing_threshold_frames": 8,
+            "similarity_threshold": 0.55,
+            "fist_threshold_frames": 4,
+            "pointing_threshold_frames": 3,
             "cooldown_duration": 1.5,
             "ready_timeout": 4.0
         }
