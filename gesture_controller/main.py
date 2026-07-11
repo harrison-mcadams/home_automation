@@ -24,6 +24,9 @@ class ThreadedCamera:
     """Reads frames in a separate thread to ensure low-latency frame acquisition."""
     def __init__(self, src=0):
         self.stream = cv2.VideoCapture(src)
+        # Request 1280x720 (720p) resolution for distant hand tracking
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         (self.grabbed, self.frame) = self.stream.read()
         self.stopped = False
@@ -40,6 +43,8 @@ class ThreadedCamera:
                 self.stream.release()
                 time.sleep(2)
                 self.stream = cv2.VideoCapture(self.src)
+                self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
                 self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 (self.grabbed, self.frame) = self.stream.read()
                 if not self.grabbed:
@@ -142,30 +147,41 @@ class GestureController:
     def get_finger_status(self, landmarks):
         """
         Returns [Thumb, Index, Middle, Ring, Pinky] indicating if open.
+        Using robust 3D distance metrics relative to MCP (knuckle) joints.
         """
-        wrist = landmarks[0]
-        # Tips: Thumb(4), Index(8), Middle(12), Ring(16), Pinky(20)
-        # PIPs/IP: Thumb(3), Index(6), Middle(10), Ring(14), Pinky(18)
-        finger_tips = [8, 12, 16, 20]
-        finger_pips = [6, 10, 14, 18]
-        
         status = []
         
-        # --- Thumb logic ---
-        thumb_tip = landmarks[4]
-        thumb_ip = landmarks[3]
-        pinky_mcp = landmarks[17]
-        dist_thumb_tip = np.linalg.norm(np.array([thumb_tip.x - pinky_mcp.x, thumb_tip.y - pinky_mcp.y]))
-        dist_thumb_ip = np.linalg.norm(np.array([thumb_ip.x - pinky_mcp.x, thumb_ip.y - pinky_mcp.y]))
+        # Convert landmarks to 3D numpy arrays
+        points = [np.array([lm.x, lm.y, lm.z]) for lm in landmarks]
+        
+        # 1. Thumb logic (using 3D distance from wrist 0 and Pinky MCP 17 to tip 4)
+        thumb_tip = points[4]
+        thumb_ip = points[3]
+        pinky_mcp = points[17]
+        dist_thumb_tip = np.linalg.norm(thumb_tip - pinky_mcp)
+        dist_thumb_ip = np.linalg.norm(thumb_ip - pinky_mcp)
         status.append(dist_thumb_tip > dist_thumb_ip)
         
-        # --- Index, Middle, Ring, Pinky logic ---
-        for tip, pip in zip(finger_tips, finger_pips):
-            tip_pt = landmarks[tip]
-            pip_pt = landmarks[pip]
-            dist_tip = np.linalg.norm(np.array([tip_pt.x - wrist.x, tip_pt.y - wrist.y]))
-            dist_pip = np.linalg.norm(np.array([pip_pt.x - wrist.x, pip_pt.y - wrist.y]))
-            status.append(dist_tip > dist_pip)
+        # 2. Index, Middle, Ring, Pinky logic
+        # MCP joints: Index(5), Middle(9), Ring(13), Pinky(17)
+        # PIP joints: Index(6), Middle(10), Ring(14), Pinky(18)
+        # Tip joints: Index(8), Middle(12), Ring(16), Pinky(20)
+        mcp_ids = [5, 9, 13, 17]
+        pip_ids = [6, 10, 14, 18]
+        tip_ids = [8, 12, 16, 20]
+        
+        for mcp_id, pip_id, tip_id in zip(mcp_ids, pip_ids, tip_ids):
+            mcp = points[mcp_id]
+            pip = points[pip_id]
+            tip = points[tip_id]
+            
+            d_tip = np.linalg.norm(tip - mcp)
+            d_pip = np.linalg.norm(pip - mcp)
+            
+            # An open finger has a tip-to-MCP distance significantly larger than PIP-to-MCP.
+            # Using 1.35x as a conservative ratio for a fully extended finger.
+            is_open = d_tip > 1.35 * d_pip
+            status.append(is_open)
             
         return status
 
@@ -291,6 +307,11 @@ class GestureController:
             
             if results.multi_hand_landmarks:
                 for hand_lms in results.multi_hand_landmarks:
+                    # Ignore hand detections near the bottom of the frame (likely feet or noise)
+                    wrist = hand_lms.landmark[0]
+                    if wrist.y > 0.82:
+                        continue
+                        
                     self.mp_draw.draw_landmarks(frame, hand_lms, self.mp_hands.HAND_CONNECTIONS)
                     
                     status = self.get_finger_status(hand_lms.landmark)
@@ -443,6 +464,11 @@ class GestureController:
                 
                 if results.multi_hand_landmarks:
                     for hand_lms in results.multi_hand_landmarks:
+                        # Ignore hand detections near the bottom of the frame (likely feet or noise)
+                        wrist = hand_lms.landmark[0]
+                        if wrist.y > 0.82:
+                            continue
+                            
                         if not self.headless:
                             self.mp_draw.draw_landmarks(frame, hand_lms, self.mp_hands.HAND_CONNECTIONS)
                             
