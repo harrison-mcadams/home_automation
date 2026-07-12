@@ -5,17 +5,17 @@
   "direct_api_url": "http://puck-server.tailcfee0c.ts.net:5000/api/control",
   "targets": {
     "1": {
-      "name": "Left Wall Light",
+      "name": "Starry Lights",
       "ha_entity": "light.light_1",
       "direct_button": "4"
     },
     "2": {
-      "name": "Top Right Corner Light",
+      "name": "Front Right Lamp",
       "ha_entity": "light.light_2",
       "direct_button": "3"
     },
     "3": {
-      "name": "Bottom Right Corner Light",
+      "name": "Back Right Lamp",
       "ha_entity": "light.light_3",
       "direct_button": "1"
     }

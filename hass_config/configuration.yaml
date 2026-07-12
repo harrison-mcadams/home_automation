@@ -12,7 +12,7 @@ scene: !include scenes.yaml
 # Input Selects for Dynamic Routing Layer
 input_select:
   light_1_target:
-    name: "Light 1 Target (Left Wall)"
+    name: "Starry Lights Target"
     options:
       - "None"
       - "RF Switch 1"
@@ -24,7 +24,7 @@ input_select:
     icon: mdi:swap-horizontal
 
   light_2_target:
-    name: "Light 2 Target (Top Right)"
+    name: "Front Right Lamp Target"
     options:
       - "None"
       - "RF Switch 1"
@@ -36,7 +36,7 @@ input_select:
     icon: mdi:swap-horizontal
 
   light_3_target:
-    name: "Light 3 Target (Bottom Right)"
+    name: "Back Right Lamp Target"
     options:
       - "None"
       - "RF Switch 1"
@@ -84,7 +84,7 @@ light:
   - platform: template
     lights:
       light_1:
-        friendly_name: "Light 1"
+        friendly_name: "Starry Lights"
         unique_id: light_1
         value_template: >-
           {% set friendly_name = states('input_select.light_1_target') %}
@@ -129,7 +129,7 @@ light:
               {{ mapping.get(friendly_name, 'none') }}
 
       light_2:
-        friendly_name: "Light 2"
+        friendly_name: "Front Right Lamp"
         unique_id: light_2
         value_template: >-
           {% set friendly_name = states('input_select.light_2_target') %}
@@ -174,7 +174,7 @@ light:
               {{ mapping.get(friendly_name, 'none') }}
 
       light_3:
-        friendly_name: "Light 3"
+        friendly_name: "Back Right Lamp"
         unique_id: light_3
         value_template: >-
           {% set friendly_name = states('input_select.light_3_target') %}
