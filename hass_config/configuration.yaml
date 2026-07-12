@@ -9,35 +9,211 @@ automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 
-# Modern Command Line syntax
-# Ref: https://www.home-assistant.io/integrations/command_line/
+# Input Selects for Dynamic Routing Layer
+input_select:
+  light_1_target:
+    name: "Light 1 Target (Left Wall)"
+    options:
+      - "None"
+      - "RF Switch 1"
+      - "RF Switch 2"
+      - "RF Switch 3"
+      - "RF Switch 4"
+      - "RF Switch 5"
+    initial: "RF Switch 4"
+    icon: mdi:swap-horizontal
+
+  light_2_target:
+    name: "Light 2 Target (Top Right)"
+    options:
+      - "None"
+      - "RF Switch 1"
+      - "RF Switch 2"
+      - "RF Switch 3"
+      - "RF Switch 4"
+      - "RF Switch 5"
+    initial: "RF Switch 3"
+    icon: mdi:swap-horizontal
+
+  light_3_target:
+    name: "Light 3 Target (Bottom Right)"
+    options:
+      - "None"
+      - "RF Switch 1"
+      - "RF Switch 2"
+      - "RF Switch 3"
+      - "RF Switch 4"
+      - "RF Switch 5"
+    initial: "RF Switch 1"
+    icon: mdi:swap-horizontal
+
+# Modern Command Line syntax for RF Switches
 command_line:
   - switch:
-      name: "RF Light 1"
-      unique_id: rf_light_1
+      name: "RF Switch 1"
+      unique_id: rf_switch_1
       command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "1 ON"}'''
       command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "1 OFF"}'''
 
   - switch:
-      name: "RF Light 2"
-      unique_id: rf_light_2
+      name: "RF Switch 2"
+      unique_id: rf_switch_2
       command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "2 ON"}'''
       command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "2 OFF"}'''
 
   - switch:
-      name: "RF Light 3"
-      unique_id: rf_light_3
+      name: "RF Switch 3"
+      unique_id: rf_switch_3
       command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "3 ON"}'''
       command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "3 OFF"}'''
 
   - switch:
-      name: "RF Light 4"
-      unique_id: rf_light_4
+      name: "RF Switch 4"
+      unique_id: rf_switch_4
       command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "4 ON"}'''
       command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "4 OFF"}'''
 
   - switch:
-      name: "RF Light 5"
-      unique_id: rf_light_5
+      name: "RF Switch 5"
+      unique_id: rf_switch_5
       command_on: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "5 ON"}'''
       command_off: 'curl -X POST http://127.0.0.1:5000/api/control -H ''Content-Type: application/json'' -d ''{"button": "5 OFF"}'''
+
+# Template Lights (1-3)
+light:
+  - platform: template
+    lights:
+      light_1:
+        friendly_name: "Light 1"
+        unique_id: light_1
+        value_template: >-
+          {% set friendly_name = states('input_select.light_1_target') %}
+          {% set mapping = {
+            'RF Switch 1': 'switch.rf_switch_1',
+            'RF Switch 2': 'switch.rf_switch_2',
+            'RF Switch 3': 'switch.rf_switch_3',
+            'RF Switch 4': 'switch.rf_switch_4',
+            'RF Switch 5': 'switch.rf_switch_5'
+          } %}
+          {% set target = mapping.get(friendly_name, 'none') %}
+          {% if target != 'none' %}
+            {{ is_state(target, 'on') }}
+          {% else %}
+            false
+          {% endif %}
+        turn_on:
+          service: switch.turn_on
+          target:
+            entity_id: >-
+              {% set friendly_name = states('input_select.light_1_target') %}
+              {% set mapping = {
+                'RF Switch 1': 'switch.rf_switch_1',
+                'RF Switch 2': 'switch.rf_switch_2',
+                'RF Switch 3': 'switch.rf_switch_3',
+                'RF Switch 4': 'switch.rf_switch_4',
+                'RF Switch 5': 'switch.rf_switch_5'
+              } %}
+              {{ mapping.get(friendly_name, 'none') }}
+        turn_off:
+          service: switch.turn_off
+          target:
+            entity_id: >-
+              {% set friendly_name = states('input_select.light_1_target') %}
+              {% set mapping = {
+                'RF Switch 1': 'switch.rf_switch_1',
+                'RF Switch 2': 'switch.rf_switch_2',
+                'RF Switch 3': 'switch.rf_switch_3',
+                'RF Switch 4': 'switch.rf_switch_4',
+                'RF Switch 5': 'switch.rf_switch_5'
+              } %}
+              {{ mapping.get(friendly_name, 'none') }}
+
+      light_2:
+        friendly_name: "Light 2"
+        unique_id: light_2
+        value_template: >-
+          {% set friendly_name = states('input_select.light_2_target') %}
+          {% set mapping = {
+            'RF Switch 1': 'switch.rf_switch_1',
+            'RF Switch 2': 'switch.rf_switch_2',
+            'RF Switch 3': 'switch.rf_switch_3',
+            'RF Switch 4': 'switch.rf_switch_4',
+            'RF Switch 5': 'switch.rf_switch_5'
+          } %}
+          {% set target = mapping.get(friendly_name, 'none') %}
+          {% if target != 'none' %}
+            {{ is_state(target, 'on') }}
+          {% else %}
+            false
+          {% endif %}
+        turn_on:
+          service: switch.turn_on
+          target:
+            entity_id: >-
+              {% set friendly_name = states('input_select.light_2_target') %}
+              {% set mapping = {
+                'RF Switch 1': 'switch.rf_switch_1',
+                'RF Switch 2': 'switch.rf_switch_2',
+                'RF Switch 3': 'switch.rf_switch_3',
+                'RF Switch 4': 'switch.rf_switch_4',
+                'RF Switch 5': 'switch.rf_switch_5'
+              } %}
+              {{ mapping.get(friendly_name, 'none') }}
+        turn_off:
+          service: switch.turn_off
+          target:
+            entity_id: >-
+              {% set friendly_name = states('input_select.light_2_target') %}
+              {% set mapping = {
+                'RF Switch 1': 'switch.rf_switch_1',
+                'RF Switch 2': 'switch.rf_switch_2',
+                'RF Switch 3': 'switch.rf_switch_3',
+                'RF Switch 4': 'switch.rf_switch_4',
+                'RF Switch 5': 'switch.rf_switch_5'
+              } %}
+              {{ mapping.get(friendly_name, 'none') }}
+
+      light_3:
+        friendly_name: "Light 3"
+        unique_id: light_3
+        value_template: >-
+          {% set friendly_name = states('input_select.light_3_target') %}
+          {% set mapping = {
+            'RF Switch 1': 'switch.rf_switch_1',
+            'RF Switch 2': 'switch.rf_switch_2',
+            'RF Switch 3': 'switch.rf_switch_3',
+            'RF Switch 4': 'switch.rf_switch_4',
+            'RF Switch 5': 'switch.rf_switch_5'
+          } %}
+          {% set target = mapping.get(friendly_name, 'none') %}
+          {% if target != 'none' %}
+            {{ is_state(target, 'on') }}
+          {% else %}
+            false
+          {% endif %}
+        turn_on:
+          service: switch.turn_on
+          target:
+            entity_id: >-
+              {% set friendly_name = states('input_select.light_3_target') %}
+              {% set mapping = {
+                'RF Switch 1': 'switch.rf_switch_1',
+                'RF Switch 2': 'switch.rf_switch_2',
+                'RF Switch 3': 'switch.rf_switch_3',
+                'RF Switch 4': 'switch.rf_switch_4',
+                'RF Switch 5': 'switch.rf_switch_5'
+              } %}
+              {{ mapping.get(friendly_name, 'none') }}
+        turn_off:
+          service: switch.turn_off
+          target:
+            entity_id: >-
+              {% set friendly_name = states('input_select.light_3_target') %}
+              {% set mapping = {
+                'RF Switch 1': 'switch.rf_switch_1',
+                'RF Switch 2': 'switch.rf_switch_2',
+                'RF Switch 3': 'switch.rf_switch_3',
+                'RF Switch 4': 'switch.rf_switch_4',
+                'RF Switch 5': 'switch.rf_switch_5'
+              } %}
+              {{ mapping.get(friendly_name, 'none') }}

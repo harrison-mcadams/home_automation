@@ -117,9 +117,9 @@ class GestureController:
             "home_assistant_token": "YOUR_LONG_LIVED_ACCESS_TOKEN_HERE",
             "direct_api_url": "http://puck-server.tailcfee0c.ts.net:5000/api/control",
             "targets": {
-                "1": {"name": "Left Wall Light", "ha_entity": "switch.rf_light_4", "direct_button": "4"},
-                "2": {"name": "Top Right Corner Light", "ha_entity": "switch.rf_light_3", "direct_button": "3"},
-                "3": {"name": "Bottom Right Corner Light", "ha_entity": "switch.rf_light_1", "direct_button": "1"}
+                "1": {"name": "Left Wall Light", "ha_entity": "light.light_1", "direct_button": "4"},
+                "2": {"name": "Top Right Corner Light", "ha_entity": "light.light_2", "direct_button": "3"},
+                "3": {"name": "Bottom Right Corner Light", "ha_entity": "light.light_3", "direct_button": "1"}
             },
             "similarity_threshold": 0.55,
             "fist_threshold_frames": 4,
@@ -206,8 +206,8 @@ class GestureController:
                 ha_url = self.config["home_assistant_url"]
                 ha_token = self.config["home_assistant_token"]
                 entity_id = target["ha_entity"]
-                
-                url = f"{ha_url}/api/services/switch/toggle"
+                domain = entity_id.split('.')[0] if '.' in entity_id else "switch"
+                url = f"{ha_url}/api/services/{domain}/toggle"
                 headers = {
                     "Authorization": f"Bearer {ha_token}",
                     "Content-Type": "application/json"

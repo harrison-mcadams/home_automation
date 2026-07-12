@@ -6,17 +6,17 @@
   "targets": {
     "1": {
       "name": "Left Wall Light",
-      "ha_entity": "switch.rf_light_4",
+      "ha_entity": "light.light_1",
       "direct_button": "4"
     },
     "2": {
       "name": "Top Right Corner Light",
-      "ha_entity": "switch.rf_light_3",
+      "ha_entity": "light.light_2",
       "direct_button": "3"
     },
     "3": {
       "name": "Bottom Right Corner Light",
-      "ha_entity": "switch.rf_light_1",
+      "ha_entity": "light.light_3",
       "direct_button": "1"
     }
   },
