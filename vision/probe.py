@@ -123,7 +123,10 @@ def run_probe(
                 frames.append(packet.image)
         elapsed = time.monotonic() - start
         report["camera"] = cam.describe()
-        report["camera"]["measured_fps"] = round((cam.frames_read - start_index) / elapsed, 1)
+        # A file can run out during the settle wait, and Windows' clock is coarse: guard both.
+        report["camera"]["measured_fps"] = (
+            round((cam.frames_read - start_index) / elapsed, 1) if elapsed > 0 else 0.0
+        )
         snapshot = cam.read().image
 
     report["image"] = {

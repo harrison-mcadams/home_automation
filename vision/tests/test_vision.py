@@ -153,3 +153,15 @@ def test_network_stream_source(video_file):
 def test_markers_svg_is_real_size():
     svg = markers_svg([0, 1], size_mm=40)
     assert 'width="200mm"' in svg and "id 1, 40 mm" in svg
+
+
+def test_probe_survives_file_ending_during_settle(tmp_path):
+    """Regression: a short clip that ends before sampling must not divide by zero."""
+    clip = tmp_path / "short.avi"
+    writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"MJPG"), 20, (640, 360))
+    for _ in range(5):
+        writer.write(make_scene(width=640, height=360))
+    writer.release()
+    report = run_probe(str(clip), tmp_path / "p", settle_seconds=1.0, sample_seconds=0.5)
+    assert report["camera"]["delivered_width"] == 640
+    assert report["camera"]["measured_fps"] >= 0

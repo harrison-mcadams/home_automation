@@ -19,7 +19,7 @@ def test_verdict_grades_by_pixels_across_smallest_piece():
 def test_one_command_probe_and_record(tmp_path, monkeypatch):
     clip = tmp_path / "game.avi"
     writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"MJPG"), 20, (1280, 720))
-    for _ in range(40):
+    for _ in range(100):  # 5 s: outlasts the probe's 2 s settle and 3 s sample
         writer.write(make_scene())
     writer.release()
 
