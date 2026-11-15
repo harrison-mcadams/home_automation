@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14231d">
+<title>Spirit Island Guide</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header id="top">
+  <div class="row1">
+    <div id="where"><span id="round">Setup</span> <span id="phase"></span></div>
+    <div id="conn" title="Live connection">●</div>
+  </div>
+  <div class="chips">
+    <div class="chip" id="chip-terror"><b>Terror</b><span>1</span></div>
+    <div class="chip" id="chip-fear"><b>Fear</b><span>0/0</span></div>
+    <div class="chip" id="chip-blight"><b>Blight left</b><span>0</span></div>
+    <div class="chip" id="chip-deck"><b>Invader deck</b><span>12</span></div>
+  </div>
+  <div class="slots">
+    <div class="slot"><b>Ravage</b><span id="slot-ravage">-</span></div>
+    <div class="slot"><b>Build</b><span id="slot-build">-</span></div>
+    <div class="slot"><b>Explore</b><span id="slot-explore">-</span></div>
+  </div>
+  <div id="phasebar"></div>
+</header>
+
+<main>
+  <section id="guide" class="card">
+    <div id="g-phase" class="eyebrow"></div>
+    <h1 id="g-title"></h1>
+    <ol id="g-do"></ol>
+    <div id="g-helper"></div>
+    <p id="g-why" class="why"></p>
+    <ul id="g-tips" class="tips"></ul>
+  </section>
+
+  <nav class="tabs">
+    <button data-tab="island" class="on">Island</button>
+    <button data-tab="learn">Learn</button>
+    <button data-tab="log">Log</button>
+    <button data-tab="settings">Game</button>
+  </nav>
+  <section id="tab-island" class="tab card"></section>
+  <section id="tab-learn" class="tab card hidden"></section>
+  <section id="tab-log" class="tab card hidden"></section>
+  <section id="tab-settings" class="tab card hidden"></section>
+</main>
+
+<footer id="bar">
+  <button id="btn-undo" class="ghost">Undo</button>
+  <button id="btn-fear" class="fear">+1 Fear</button>
+  <button id="btn-next" class="primary">Next ›</button>
+</footer>
+<div id="toast" class="hidden"></div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
