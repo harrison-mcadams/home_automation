@@ -2,11 +2,14 @@
 
     python -m spirit_island.capture_kit                        # USB camera 0
     python -m spirit_island.capture_kit --marker-mm 40         # with printed markers on the table
+    python -m spirit_island.capture_kit --phone --marker-mm 40 # Android phone on USB (adb)
     python -m spirit_island.capture_kit --source http://<phone>:8080/video \\
-        --still-url http://<phone>:8080/photo.jpg              # an old phone as the camera
+        --still-url http://<phone>:8080/photo.jpg              # a phone over Wi-Fi
+
+Runs the same on Windows, macOS and Linux.
 
 Steps:
-  1. Aim: a live preview runs at http://<this-mac>.local:8090 while you position
+  1. Aim: a live preview runs at http://<this-computer>:8090 while you position
      the camera. Press Enter when it looks right.
   2. Probe: measures what the camera really delivers (resolution, frame rate,
      sharpness, pixels per mm) and says whether that is enough to see pieces.
@@ -96,6 +99,8 @@ def record(source, still_url, out_dir: Path, width, height, video_fps, still_eve
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--source", default="0", help="USB camera index, stream URL or video file (default 0)")
+    p.add_argument("--phone", nargs="?", const=8080, type=int, metavar="PORT",
+                   help="use an Android phone on USB: adb-forward its camera app (default port 8080)")
     p.add_argument("--still-url", help="full-resolution photo URL for phone cameras, e.g. http://phone:8080/photo.jpg")
     p.add_argument("--marker-mm", type=float, help="side of the printed ArUco markers in view, in mm")
     p.add_argument("--fov-width-mm", type=float, help="or: width of the area the camera sees, in mm")
@@ -108,6 +113,17 @@ def main(argv=None) -> int:
     p.add_argument("--out", help="session folder (default spirit_island/recordings/<date-time>)")
     args = p.parse_args(argv)
 
+    if args.phone:
+        from vision import phone
+
+        try:
+            base = phone.forward(args.phone)
+        except phone.PhoneError as exc:
+            print(f"Problem with the phone: {exc}\nTry `python -m vision.phone` for a step-by-step check.")
+            return 1
+        args.source = phone.urls(base)["video"]
+        args.still_url = args.still_url or phone.urls(base)["photo"]
+        print(f"Using the phone on USB: video {args.source}, stills {args.still_url}")
     source = parse_source(args.source)
     session = Path(args.out) if args.out else RECORDINGS / datetime.now().strftime("%Y%m%d-%H%M%S")
     session.mkdir(parents=True, exist_ok=True)
