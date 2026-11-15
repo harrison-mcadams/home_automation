@@ -16,10 +16,12 @@ Windows, macOS and Linux as long as `adb` (Android platform-tools) is installed.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Optional
 
 DEFAULT_PORT = 8080
@@ -29,8 +31,21 @@ class PhoneError(RuntimeError):
     pass
 
 
+def _sdk_adb_candidates() -> list[Path]:
+    """Where Android Studio / the SDK manager usually put adb, for when it isn't on PATH."""
+    roots = [os.environ.get("ANDROID_HOME"), os.environ.get("ANDROID_SDK_ROOT")]
+    if os.environ.get("LOCALAPPDATA"):
+        roots.append(str(Path(os.environ["LOCALAPPDATA"]) / "Android" / "Sdk"))  # Windows
+    roots.append(str(Path.home() / "Library" / "Android" / "sdk"))  # macOS
+    roots.append(str(Path.home() / "Android" / "Sdk"))  # Linux
+    names = ["adb.exe", "adb"] if os.name == "nt" else ["adb"]
+    return [Path(r) / "platform-tools" / n for r in roots if r for n in names]
+
+
 def find_adb() -> str:
     adb = shutil.which("adb")
+    if not adb:
+        adb = next((str(p) for p in _sdk_adb_candidates() if p.is_file()), None)
     if not adb:
         raise PhoneError(
             "adb not found. Install Android platform-tools "

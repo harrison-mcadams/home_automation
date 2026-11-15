@@ -41,3 +41,13 @@ def test_forward_explains_unauthorized_phone(fake_adb):
     run.devices = "List of devices attached\n1A2B3C4D       unauthorized usb:1-1 transport_id:1\n"
     with pytest.raises(phone.PhoneError, match="USB debugging"):
         phone.forward(adb="adb")
+
+
+def test_find_adb_falls_back_to_sdk_folder(tmp_path, monkeypatch):
+    tools = tmp_path / "platform-tools"
+    tools.mkdir()
+    name = "adb.exe" if phone.os.name == "nt" else "adb"
+    (tools / name).write_text("")
+    monkeypatch.setattr(phone.shutil, "which", lambda _: None)
+    monkeypatch.setenv("ANDROID_HOME", str(tmp_path))
+    assert phone.find_adb() == str(tools / name)
