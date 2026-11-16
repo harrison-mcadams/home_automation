@@ -172,8 +172,15 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
             "mean_bgr": list(b.mean_bgr),
             "change_score": b.score,
         }
-        # Far bigger than any piece: a hand, a moved object, or the board itself moved.
-        (large if b.area > max_piece_frac * board_area else pieces).append(entry)
+        # Thin slivers are misalignment along an edge, not a piece: pieces are compact
+        # and at least a couple of percent of the board's size across.
+        if b.area > max_piece_frac * board_area:
+            large.append(entry)  # far bigger than any piece: a hand, a moved object, or the board moved
+            continue
+        short, long_ = sorted(b.bbox[2:4])
+        if short < 0.025 * np.sqrt(board_area) or long_ > 3 * short:
+            continue
+        pieces.append(entry)
     return {
         "registered": True,
         "inliers": reg.inliers,

@@ -116,3 +116,12 @@ def test_cli_reference_then_find(scene, tmp_path):
     assert len(result["pieces"]) == 1
     assert (out / "pieces.jpg").exists()
     assert detect.main(["outline", "--image", str(tok_img), "--out", str(tmp_path / "o")]) == 0
+
+
+def test_thin_edge_sliver_is_not_a_piece(scene):
+    reference, _, _ = scene
+    mask = find_board(reference).mask
+    image = reference.copy()
+    cv2.rectangle(image, (1500, 900), (1512, 1000), (20, 20, 20), -1)  # 12 x 100 px dark strip
+    result = detect.detect_pieces(reference, mask, image)
+    assert result["registered"] and result["pieces"] == []
