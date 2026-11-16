@@ -1,0 +1,29 @@
+/* Drawn board (board_map.js), shared by the TV and phone pages. */
+.boardmap { width: 100%; height: 100%; display: block; }
+.boardmap .land { stroke: #f4ecd6; stroke-width: 4; stroke-linejoin: round; transition: fill .8s;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .45)); }
+.boardmap .land.hit { stroke: #ffd968; stroke-width: 9; animation: bm-pulse 1.6s ease-in-out infinite; }
+@keyframes bm-pulse { 50% { stroke-width: 4; stroke: #fff3c4; } }
+.boardmap .lnum { font: 800 46px system-ui, sans-serif; fill: rgba(255, 255, 255, .28); text-anchor: middle;
+  dominant-baseline: central; pointer-events: none; }
+.boardmap .piece { transition: transform .9s cubic-bezier(.3, 1.3, .5, 1), opacity .6s; }
+.boardmap .piece.enter { opacity: 0; }
+.boardmap .piece.enter .bob > * { transform: scale(.2); }
+.boardmap .piece .bob > * { transition: transform .6s cubic-bezier(.3, 1.6, .5, 1); transform-box: fill-box; transform-origin: center; }
+.boardmap .piece.leave { opacity: 0; }
+.boardmap .piece.leave .bob > * { transform: scale(1.8); }
+.boardmap .bob { animation: bm-bob 4s ease-in-out infinite; }
+@keyframes bm-bob { 50% { transform: translateY(-3px); } }
+.boardmap .inv { fill: #f1eee6; stroke: #2a2a2a; stroke-width: 2.5; }
+.boardmap .dahan { fill: #e6cf9a; stroke: #6b4f22; stroke-width: 3; }
+.boardmap .blight { fill: #3a2c25; stroke: #e08a5f; stroke-width: 3; }
+.boardmap .presence { stroke: #fff; stroke-width: 4; }
+.boardmap .presence { animation: bm-glow 3s ease-in-out infinite; }
+@keyframes bm-glow { 50% { stroke-width: 7; } }
+.boardmap .unknown { fill: none; stroke: rgba(255, 255, 255, .6); stroke-width: 3; stroke-dasharray: 5 4; }
+
+/* Real board art underneath: lands are see-through and only outline when affected. */
+.boardmap.art .boardart { filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .6)); }
+.boardmap.art .land { fill: transparent !important; stroke: transparent; filter: none; }
+.boardmap.art .land.hit { stroke: #ffd968; fill: rgba(255, 217, 104, .18) !important; }
+.boardmap.art .lnum { display: none; }

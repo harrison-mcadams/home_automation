@@ -1,0 +1,5 @@
+# Camera capture kit (vision/ and spirit_island/). Install with:
+#   python3 -m pip install -r vision/requirements.txt
+opencv-python>=4.8   # includes cv2.aruco; use opencv-python-headless on servers without a display
+numpy>=1.24
+pytest>=7            # tests only

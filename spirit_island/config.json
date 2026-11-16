@@ -1,0 +1,8 @@
+{
+  "host": "0.0.0.0",
+  "port": 5055,
+  "data_dir": "games",
+  "board_camera_url": "http://localhost:8091",
+  "board_reference": "C:/Users/harri/Desktop/home_automation_capture/spirit_island/recordings/detect_dev/reference2",
+  "public_urls": ["http://100.98.2.44:5055", "http://192.168.1.169:5055"]
+}

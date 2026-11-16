@@ -1,0 +1,4 @@
+# Spirit Island dashboard. Install with:
+#   python -m pip install -r spirit_island/requirements.txt
+flask>=2.3
+pytest>=7            # tests only
