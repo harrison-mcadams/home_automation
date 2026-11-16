@@ -165,39 +165,74 @@ def _spirits(s):
     }
 
 
+def _comp(name, caption, wide=False):
+    pic = {"src": f"components/{name}.jpg", "caption": caption}
+    if wide:
+        pic["wide"] = True
+    return pic
+
+
 def _invader_board(s):
     f = s["fear"]
     return {
         "title": "Set up the invader board",
         "do": [
-            f"Fear pool: put {f['pool_size']} fear markers in the fear pool (4 per player).",
-            f"Fear deck: shuffle the fear cards and build a deck of {sum(f['deck'])}: "
+            "The invader board is the long board with spaces for the fear pool, the blight card, and "
+            "the invader cards (Ravage, Build, Explore). Put it beside the island.",
+            f"Fear pool: put {f['pool_size']} fear markers (small round tokens) in the fear pool "
+            "(4 per player).",
+            f"Fear deck: shuffle the fear cards (grey backs, 'FEAR') and build a deck of {sum(f['deck'])}: "
             f"{f['deck'][0]} cards, the Terror Level II divider, {f['deck'][1]} cards, the Terror "
             f"Level III divider, then {f['deck'][2]} cards at the bottom.",
-            f"Blight: put the blight card healthy-side up with {s['blight']['pool']} blight on it "
+            f"Blight card: put one, Healthy Island side up, with {s['blight']['pool']} blight on it "
             "(2 per player plus 1).",
-            "Invader deck: sort invader cards by stage (the I, II, III on the back). Remove one "
-            "random card of each stage without looking. Shuffle each stage and stack them with "
-            "Stage III at the bottom, Stage II in the middle, Stage I on top: 3 + 4 + 5 = 12 cards.",
+            "Invader deck: sort invader cards by the I, II, III on the back. Remove one random card of "
+            "each stage without looking. Stack them face down: Stage III at the bottom, Stage II in "
+            "the middle, Stage I on top: 3 + 4 + 5 = 12 cards.",
         ],
         "why": "The fear deck is your victory clock; the invader deck is your defeat clock.",
         "tips": ["An adversary changes these numbers. If you use one, follow its setup and correct the "
                  "pools in Settings."] if s["adversary"]["name"] != "None" else [],
+        "pictures": [
+            _comp("fear_back", "Fear card (back)"),
+            _comp("terror_2", "Terror Level II divider"),
+            _comp("terror_3", "Terror Level III divider"),
+            _comp("blight_healthy", "Blight card, Healthy side"),
+            _comp("stage1_back", "Invader card, Stage I back"),
+            _comp("stage2_back", "Stage II back"),
+            _comp("stage3_back", "Stage III back"),
+        ],
     }
 
 
+# Starting pieces printed on the balanced side of each board, read off the board scans.
+STARTING_PIECES = {
+    "C": {1: "1 Dahan", 2: "1 city", 3: "2 Dahan", 5: "2 Dahan, 1 blight", 6: "1 Dahan", 7: "1 town"},
+}
+
+
 def _pieces(s):
+    rows = []
+    for b in s["boards"]:
+        if b in STARTING_PIECES:
+            rows.append(f"Board {b}: " + "; ".join(f"land {n}: {what}" for n, what in
+                                                     sorted(STARTING_PIECES[b].items())) + ". Other lands start empty.")
     return {
         "title": "Place the starting pieces",
         "do": [
-            "Each land shows small icons for its starting pieces: Dahan, towns, cities and sometimes "
-            "blight. Put those pieces on each land now.",
+            "Each land shows small black icons next to its number: those are its starting pieces "
+            "(see the board picture).",
+            "The pieces: Dahan are plain cream wooden discs. Explorers are small white figures, towns "
+            "small white houses, cities taller white towers. Blight is the dark grey-blue bumpy piece.",
+        ] + rows + [
+            "Paw and spiral icons belong to the Branch & Claw expansion; skip them unless you play with it.",
             "Blight placed during setup comes from the box, not from the blight card.",
-            "Put the rest of the pieces in easy reach.",
         ],
         "why": "This is the island as the invaders first find it.",
         "tips": ["To have the app track the board, enter each land's pieces in the Island panel. "
                  "It is optional: the step-by-step guide works without it."],
+        "pictures": [_comp(f"board_{b}", f"Board {b}: starting-piece icons by each land number", True)
+                     for b in s["boards"]],
     }
 
 
@@ -205,11 +240,18 @@ def _cards(s):
     return {
         "title": "Power card decks",
         "do": [
-            "Shuffle the Minor Power deck and the Major Power deck separately and set them nearby.",
-            "Leave room for each player's discard pile next to their panel.",
+            "Shuffle the Minor Power deck (gold-brown backs) and the Major Power deck (blue lightning "
+            "backs) separately and set them nearby.",
+            "Leave room for your discard pile next to your panel.",
         ],
         "why": "As you grow you draw new powers from these decks.",
         "tips": [],
+        "pictures": [
+            _comp("minor_back", "Minor Power (back)"),
+            _comp("minor_card", "Minor Power (front)"),
+            _comp("major_back", "Major Power (back)"),
+            _comp("major_card", "Major Power (front)"),
+        ],
     }
 
 
