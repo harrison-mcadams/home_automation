@@ -181,6 +181,7 @@ MEASURED = [
     ((100, 39, 235, 26, .080, .036, 1.03, .68), "city"), ((107, 58, 245, 28, .083, .040, 1.11, .73), "city"),
     ((101, 38, 220, 22, .086, .035, 1.76, .39), "town"),
     ((21, 105, 142, 25.5, .096, .047, 1.2, .80), "energy"),  # warm sunlight, after the camera moved
+    ((23, 48, 176, 25.2, .072, .034, 1.1, .82), "dahan"),  # dim, textured dahan: must not be energy
     ((17, 105, 91, 14, .045, .020, 1.5, .60), "table"),  # dark table wood at the moved board's rim
 ]
 
@@ -224,5 +225,10 @@ def test_board_view_holds_state_through_a_hand_and_a_one_off_reading(scene, tmp_
     assert view.settle(one) == (one["board_state"], "settled")
     assert view.settle(hand)[0] == one["board_state"]
     assert view.settle(lost)[0] == one["board_state"]
-    assert view.settle(two)[0] == one["board_state"]  # a single new reading isn't trusted yet
-    assert view.settle(two) == (two["board_state"], "settled")
+    for _ in range(2):
+        view.settle(one)
+    flicker = [view.settle(r)[0] for r in (two, one, two, one)]
+    assert all(f == one["board_state"] for f in flicker)  # an alternating reading doesn't win
+    for _ in range(3):
+        shown = view.settle(two)[0]
+    assert shown == two["board_state"]  # a real change wins once it holds

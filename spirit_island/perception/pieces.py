@@ -34,8 +34,8 @@ RULES = {
     "pale_max_saturation": 70,  # white plastic S 27-58 (bluish white balance), dahan S 38-58
     "pale_min_value": 170,
     "dahan_min_value": 130,  # dahan V 202-219; leaves room for shade
-    "energy_min_texture": 22,  # printed card: texture 25-32; dahan 7-17, presence 4-17
-    "energy_min_size": 0.088,  # energy marker 0.093-0.096; dahan 0.065-0.068, presence up to 0.082
+    "energy_min_texture": 20,  # printed card: texture 25-32; dahan 7-25 (dim light), presence 4-17
+    "energy_min_size": 0.085,  # energy marker 0.093-0.096; dahan 0.065-0.072, presence up to 0.082
     # White plastic invaders. Sizes are sqrt(piece area) / sqrt(board area).
     "explorer_max_thickness": 0.030,  # spindly: 0.025-0.0265; town and city 0.035-0.040
     "city_min_size": 0.075,  # city 0.080-0.083; explorer 0.065-0.070
@@ -108,7 +108,9 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
     blo, bhi = rules["blight_hue"]
     out: dict
     blue_grey = blo <= f.hue <= bhi and f.saturation >= rules["blight_min_saturation"]
-    printed = f.texture >= rules["energy_min_texture"] or f.size >= rules["energy_min_size"]
+    # The energy marker is both printed and clearly larger than a disc; a dim dahan can get
+    # as textured (up to 25), so size must agree.
+    printed = f.texture >= rules["energy_min_texture"] and f.size >= rules["energy_min_size"]
     if f.value <= rules["dark_max_value"] and (f.saturation < rules["blight_min_saturation"] or blue_grey):
         # Dark and grey or blue-grey. Dark *brown* is table wood showing at a moved board's rim.
         out = {"type": "blight", "why": f"dark (value {f.value})"}

@@ -4,7 +4,7 @@
     # then open http://<this computer>:8091 on a phone, tablet or TV browser
 
 Every few seconds it takes a full-resolution photo, finds the pieces (see detect.py)
-and updates the page. The counts only change once two photos in a row agree, and are
+and updates the page. The counts only change once most recent photos agree, and are
 held while a hand is over the board. It only reads from the camera, so it can run next to the
 live preview. `--image a.jpg --image b.jpg` cycles through saved photos instead,
 for trying it without the camera.
@@ -78,7 +78,7 @@ def land_rows(result: dict) -> str:
 
 class BoardView:
     def __init__(self, reference_dir: Path, grab, every: float = 5.0, max_side: int = 1600,
-                 confirm: int = 2, save_dir: Path | None = None):
+                 confirm: int = 3, save_dir: Path | None = None):
         self.reference = cv2.imread(str(reference_dir / "reference.jpg"))
         self.board_mask = cv2.imread(str(reference_dir / "board_mask.png"), cv2.IMREAD_GRAYSCALE)
         if self.reference is None or self.board_mask is None:
@@ -96,8 +96,8 @@ class BoardView:
         self.stopping = threading.Event()
         self.confirm = confirm
         self.stable: dict | None = None
-        self.candidate: dict | None = None
-        self.agree = 0
+        self.window = max(confirm, 2 * confirm - 1)
+        self.recent: list[str] = []
         self.save_dir = save_dir
         self.last_seen: dict | None = None
 
@@ -130,22 +130,22 @@ class BoardView:
         """The board state to show, and why.
 
         One photo can be wrong: a hand over the board, pieces being moved, or a reading
-        right on a threshold that flips between photos. So a new state is only shown once
-        two clear photos in a row agree; until then the last settled state stays up.
+        right on a threshold that flips between photos. So the page shows the reading that
+        most of the last few clear photos agree on (`confirm` of the last `window`), and
+        keeps the last settled state otherwise.
         """
         if not result["registered"]:
             return self.stable, "holding: the board is hidden or moved too far to line up (a hand?)"
         if result.get("large_changes"):
             return self.stable, "holding: something large is over the board (a hand?)"
         seen = result["board_state"]
-        if seen == self.candidate:
-            self.agree += 1
-        else:
-            self.candidate, self.agree = seen, 1
-        if self.agree >= self.confirm or self.stable is None:
-            self.stable = seen
-            return seen, "settled"
-        return self.stable, "changing: waiting for the next photo to confirm"
+        self.recent = (self.recent + [json.dumps(seen, sort_keys=True)])[-self.window:]
+        best = max(set(self.recent), key=self.recent.count)
+        if self.stable is None or self.recent.count(best) >= self.confirm:
+            self.stable = json.loads(best)
+        if seen == self.stable:
+            return self.stable, "settled"
+        return self.stable, "changing: the latest photo differs, waiting for more to agree"
 
     def keep_photo(self, image, public: dict) -> None:
         """Save the raw photo when the reading changes, for checking afterwards (newest 60 kept)."""
@@ -228,7 +228,8 @@ def main(argv=None) -> int:
     p.add_argument("--every", type=float, default=5.0, help="seconds between photos")
     p.add_argument("--port", type=int, default=8091)
     p.add_argument("--host", default="0.0.0.0")
-    p.add_argument("--confirm", type=int, default=2, help="photos in a row that must agree before the state changes")
+    p.add_argument("--confirm", type=int, default=3,
+                   help="how many of the last 2N-1 photos must agree before the shown state changes")
     p.add_argument("--save", help="folder to keep the raw photo whenever the reading changes")
     args = p.parse_args(argv)
 
