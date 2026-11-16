@@ -40,27 +40,36 @@ def scan_lands(letter: str, boards_dir: Path = BOARDS):
     return land_map.segment_lands(img, mask, {k: tuple(v) for k, v in seeds.items()})
 
 
+def _outline_from_mask(mask: np.ndarray):
+    """A BoardOutline for the saved summary and the outline picture."""
+    from .perception.board import BoardOutline, _quad_from_contour
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    c = max(contours, key=cv2.contourArea)
+    return BoardOutline(contour=c, quad=_quad_from_contour(c), mask=mask,
+                        area_frac=float((mask > 0).mean()))
+
+
 def teach(image: np.ndarray, out_root: Path, boards_dir: Path = BOARDS, expect: str | None = None) -> dict:
     board = find_board(image)
-    if board is None:
-        raise SystemExit("No board found in the photo. Is the whole board in view?")
     grow = max(3, int(0.01 * max(image.shape[:2])))
-    mask = cv2.dilate(board.mask, np.ones((grow, grow), np.uint8))
-    found = match_board(image, mask, boards_dir)
+    # The table's outline finder can grab the whole frame (wood grain, cards); then just
+    # match the art across the whole photo.
+    hint = board.mask if board is not None and board.area_frac < 0.5 else None
+    found = match_board(image, hint, boards_dir)
     if not found:
         raise SystemExit("Couldn't tell which board this is (glare, or pieces covering it?).")
     letter, H, _scan, scores = found
     if expect and letter != expect:
         raise SystemExit(f"That looks like board {letter}, not {expect} (match scores {scores}).")
 
-    # The board's own outline, carried over from the scan, fills any holes the photo's
-    # outline has (glare, a shadow across the board).
+    # The board's outline comes from the scan, carried onto the photo: exact, with no
+    # holes from glare and nothing from the table around it.
     scan = cv2.imread(str(boards_dir / f"{letter}.png"), cv2.IMREAD_UNCHANGED)
-    if scan is not None and scan.shape[2] == 4:
-        h, w = image.shape[:2]
-        alpha = ((scan[..., 3] > 128) * 255).astype(np.uint8)
-        outline = cv2.warpPerspective(alpha, np.linalg.inv(H), (w, h), flags=cv2.INTER_NEAREST)
-        mask = cv2.max(mask, cv2.dilate(outline, np.ones((grow, grow), np.uint8)))
+    h, w = image.shape[:2]
+    alpha = ((scan[..., 3] > 128) * 255).astype(np.uint8) if scan.shape[2] == 4 else         np.full(scan.shape[:2], 255, np.uint8)
+    outline = cv2.warpPerspective(alpha, np.linalg.inv(H), (w, h), flags=cv2.INTER_NEAREST)
+    mask = cv2.dilate(outline, np.ones((grow, grow), np.uint8))
+    board = _outline_from_mask(outline)
 
     ref_dir = out_root / letter
     ref_dir.mkdir(parents=True, exist_ok=True)
