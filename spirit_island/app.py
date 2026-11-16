@@ -192,6 +192,12 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
         if start_vision:
             store.vision.start()
 
+    # Scripts and styles carry the server's start id, so a restart always loads fresh copies
+    # instead of whatever the browser cached.
+    @app.context_processor
+    def asset_version():
+        return {"v": BOOT_ID}
+
     @app.get("/")
     @app.get("/phone")
     def index():
