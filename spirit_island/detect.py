@@ -165,8 +165,9 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         region = cv2.bitwise_and(region, now_mask)
     rim = max(5, int(0.012 * np.sqrt(max(1, int((region > 0).sum())))))
     region = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * rim + 1, 2 * rim + 1)))
-    blobs, change_mask = find_changes(reference, aligned, region, **kwargs)
     board_area = max(1, int((region > 0).sum()))
+    kwargs.setdefault("min_split_thickness", 1.2 * min_thickness * np.sqrt(board_area))
+    blobs, change_mask = find_changes(reference, aligned, region, **kwargs)
     H_inv = np.linalg.inv(reg.homography)
     pieces, large = [], []
     for b in blobs:

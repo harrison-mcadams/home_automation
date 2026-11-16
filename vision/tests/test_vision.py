@@ -229,11 +229,12 @@ def test_touching_objects_are_split_but_one_lumpy_object_is_not():
     reference = make_scene(width=800, height=600, seed=3)
     image = reference.copy()
     cv2.circle(image, (250, 300), 40, (230, 230, 230), -1)  # a city...
-    cv2.circle(image, (320, 300), 32, (230, 230, 230), -1)  # ...with a town touching it
+    cv2.circle(image, (308, 300), 32, (225, 225, 225), -1)  # ...with a town pressed against it:
+    cv2.circle(image, (308, 300), 32, (90, 90, 90), 2)  # no neck in the mask, only a shadow line
     cv2.ellipse(image, (600, 300), (60, 32), 30, 0, 360, (40, 40, 200), -1)  # one elongated piece
     blobs, _ = find_changes(reference, image, min_area_frac=0.001)
     xs = sorted(round(b.centroid[0], -1) for b in blobs)
     assert len(blobs) == 3, [(b.centroid, b.area) for b in blobs]
-    assert abs(xs[0] - 250) <= 20 and abs(xs[1] - 320) <= 20 and abs(xs[2] - 600) <= 20
+    assert abs(xs[0] - 250) <= 20 and abs(xs[1] - 310) <= 20 and abs(xs[2] - 600) <= 20
     unsplit, _ = find_changes(reference, image, min_area_frac=0.001, split=False)
     assert len(unsplit) == 2

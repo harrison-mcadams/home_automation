@@ -47,40 +47,84 @@ def change_map(
     return np.sqrt((diff**2).sum(axis=2))
 
 
-def split_touching(mask: np.ndarray, dist: np.ndarray, core_ratio: float = 0.55,
-                   min_core_frac: float = 0.35) -> np.ndarray:
-    """Label blobs, splitting ones made of several touching objects (two pieces side by side).
+def split_touching(
+    mask: np.ndarray,
+    dist: np.ndarray,
+    image: np.ndarray,
+    min_part_thickness: float = 0.0,
+    min_part_frac: float = 0.15,
+    seed_ratio: float = 0.5,
+) -> np.ndarray:
+    """Label blobs, splitting a blob made of several touching objects.
 
-    Each object has a thick core (high distance-to-edge); the neck between two touching
-    objects is thinner. Cores are seeds for a watershed over the distance map. A core
-    only counts if it is at least `min_core_frac` as thick as the blob's thickest point,
-    so one lumpy object is not cut up.
+    Touching pieces often leave almost no neck in the change mask, so shape alone
+    can't separate them. Instead: seed at each thick spot of the blob (well-separated
+    local maxima of the distance map), then let a watershed over the *photo's* edges
+    draw the boundary along the visible line between the pieces. A split is undone if
+    any part comes out thinner than `min_part_thickness` (working px) or smaller than
+    `min_part_frac` of the blob, so one lumpy piece (an explorer's figure and base)
+    stays whole.
     """
-    count, cc = cv2.connectedComponents(mask, connectivity=8)
-    markers = np.zeros(mask.shape, np.int32)
+    gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    grad = cv2.normalize(cv2.magnitude(gx, gy), None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    local_max = (dist >= cv2.dilate(dist, np.ones((5, 5), np.uint8))) & (dist > 0)
+
+    count, cc, stats, _ = cv2.connectedComponentsWithStats(mask, 8)
+    labels = np.zeros(mask.shape, np.int32)
     next_label = 1
     for i in range(1, count):
-        sel = cc == i
-        peak = float(dist[sel].max())
-        core = (sel & (dist > core_ratio * peak)).astype(np.uint8)
-        n, core_lab = cv2.connectedComponents(core, connectivity=8)
-        kept = [j for j in range(1, n) if float(dist[core_lab == j].max()) >= min_core_frac * peak]
-        if len(kept) <= 1:
-            markers[sel] = next_label
+        x, y, w, h, area = stats[i]
+        pad = 3
+        x0, y0 = max(0, x - pad), max(0, y - pad)
+        x1, y1 = min(mask.shape[1], x + w + pad), min(mask.shape[0], y + h + pad)
+        sel = cc[y0:y1, x0:x1] == i
+        d = dist[y0:y1, x0:x1]
+        peak = float(d[sel].max())
+
+        ys, xs = np.nonzero(sel & local_max[y0:y1, x0:x1] & (d >= seed_ratio * peak))
+        order = np.argsort(-d[ys, xs])
+        seeds = []
+        for k in order:
+            px, py, r = int(xs[k]), int(ys[k]), float(d[ys[k], xs[k]])
+            if all(np.hypot(px - sx, py - sy) > max(r, sr) for sx, sy, sr in seeds):
+                seeds.append((px, py, r))
+
+        parts = None
+        if len(seeds) > 1:
+            markers = np.zeros(sel.shape, np.int32)
+            markers[~sel] = len(seeds) + 1  # background
+            for n, (sx, sy, r) in enumerate(seeds, 1):
+                disc = np.zeros(sel.shape, np.uint8)
+                cv2.circle(disc, (sx, sy), max(1, int(r / 2)), 1, -1)
+                markers[(disc > 0) & sel] = n
+            g = grad[y0:y1, x0:x1]
+            cv2.watershed(cv2.merge([g, g, g]), markers)
+            parts = []
+            for n in range(1, len(seeds) + 1):
+                part = (markers == n) & sel
+                part_dist = cv2.distanceTransform(part.astype(np.uint8), cv2.DIST_L2, 5)
+                if part.sum() < min_part_frac * area or part_dist.max() < min_part_thickness:
+                    parts = None  # a bad cut: keep the blob whole
+                    break
+                parts.append(part)
+
+        region = labels[y0:y1, x0:x1]
+        if parts:
+            assigned = np.zeros(sel.shape, bool)
+            for part in parts:
+                region[part] = next_label
+                assigned |= part
+                next_label += 1
+            # Watershed boundary pixels go to the nearest part.
+            leftover = sel & ~assigned
+            if leftover.any():
+                region[leftover] = next_label - 1
+        else:
+            region[sel] = next_label
             next_label += 1
-            continue
-        for j in kept:
-            markers[core_lab == j] = next_label
-            next_label += 1
-    if next_label == 1:
-        return markers
-    # Unassigned pixels inside a split blob get the label of the nearest core, following the distance map.
-    relief = cv2.normalize(-dist, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-    ws_markers = markers.copy()
-    ws_markers[mask == 0] = next_label  # background seed
-    cv2.watershed(cv2.merge([relief, relief, relief]), ws_markers)
-    ws_markers[(ws_markers == next_label) | (ws_markers < 0) | (mask == 0)] = 0
-    return ws_markers
+    return labels
 
 
 def find_changes(
@@ -91,6 +135,7 @@ def find_changes(
     threshold: Optional[float] = None,
     work_side: int = 1600,
     split: bool = True,
+    min_split_thickness: float = 0.0,
 ) -> tuple[list[Blob], np.ndarray]:
     """Blobs where `aligned` differs from `reference`, inside `region` (255 = look).
 
@@ -132,7 +177,10 @@ def find_changes(
     # Thickness tells a compact object from a thin line of change along a printed
     # edge (which can be long and curved, so its bounding box looks big).
     inside_dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
-    labels = split_touching(mask, inside_dist) if split else cv2.connectedComponents(mask, connectivity=8)[1]
+    if split:
+        labels = split_touching(mask, inside_dist, new, min_part_thickness=min_split_thickness * scale)
+    else:
+        labels = cv2.connectedComponents(mask, connectivity=8)[1]
 
     blobs = []
     for i in range(1, int(labels.max()) + 1):
