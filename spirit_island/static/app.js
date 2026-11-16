@@ -107,7 +107,10 @@ const HELPERS = {
           REF.spirits.map((x) => el("option", { value: x.name, selected: x.name === p.spirit }, `${x.name} (${x.complexity})`)));
         const upd = () => { style.textContent = REF.spirits.find((x) => x.name === sp.value).style; };
         upd();
-        const boardNow = s.boards[i] || REF.boards[i];
+        // Default to the board the camera recognised for player 1, then the others in order.
+        const seen = S.vision && S.vision.detected_board;
+        const order = seen ? [seen, ...REF.boards.filter((b) => b !== seen)] : REF.boards;
+        const boardNow = s.boards[i] || order[i];
         const bd = el("select", {}, REF.boards.map((b) => el("option", { value: b, selected: b === boardNow }, `Board ${b}`)));
         inputs.push({ name, sp, bd });
         playersBox.append(el("div", { class: "player" }, el("label", {}, `Player ${i + 1} name`), name,

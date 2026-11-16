@@ -1,3 +1,4 @@
+from spirit_island.engine import rules
 import pytest
 
 from spirit_island.engine import ActionError, Game, describe
@@ -131,6 +132,8 @@ def test_card_matching_uses_terrain_and_coast():
     s = game.state
     assert g.land_matches(s, "A1", "JW") is True
     assert g.land_matches(s, "A5", "JW") is False
+    assert s["lands"]["A6"]["terrain"] == "M"      # from the printed board A layout
+    s["lands"]["A6"]["terrain"] = None
     assert g.land_matches(s, "A6", "JW") is None   # untagged
     assert g.land_matches(s, "A2", "C") is True
     assert g.land_matches(s, "A5", "C") is False
@@ -186,3 +189,11 @@ def test_bad_action_leaves_state_untouched():
     with pytest.raises(ActionError):
         game.dispatch({"type": "land", "land": "Z9", "piece": "dahan", "delta": 1})
     assert repr(game.state) == before
+
+
+def test_printed_board_terrains_fill_in_by_themselves():
+    game = setup_game()
+    lands = game.state["lands"]
+    assert "".join(lands[f"A{i}"]["terrain"] for i in range(1, 9)) == "MWJSWMSJ"
+    for b, layout in rules.BOARD_TERRAINS.items():
+        assert sorted(layout) == sorted("JJMMSSWW"), b  # two of each terrain per board

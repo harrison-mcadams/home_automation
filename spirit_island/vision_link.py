@@ -180,7 +180,8 @@ class VisionLink:
         boards = state.get("boards") or []
         if self.board and self.board in boards:
             return self.board
-        return "C" if "C" in boards else (boards[0] if boards else None)
+        seen = getattr(self.map, "letter", None)  # the board the camera recognised, if any
+        return seen if seen in boards else (boards[0] if boards else None)
 
     def settled(self) -> bool:
         with self.lock:
@@ -229,6 +230,7 @@ class VisionLink:
             "auto": self.auto,
             "pieces_seen": len(raw.get("pieces") or []),
             "has_map": self.map is not None,
+            "detected_board": getattr(self.map, "letter", None),
             "view": self.view,
             "pieces": list(self.pieces),
             "seen": seen,

@@ -292,7 +292,8 @@ class Game:
         s["blight"] = {"pool": blight, "start": blight, "card_flipped": False}
         if action.get("deck_stages"):
             s["invaders"]["deck_stages"] = [int(x) for x in action["deck_stages"]]
-        terrains = action.get("terrains") or {}
+        # Printed board layouts first, then anything tagged by hand (saved or sent).
+        terrains = {**rules.default_terrains(boards), **(action.get("terrains") or {})}
         old = s["lands"]
         s["lands"] = {}
         for lid in rules.land_ids(boards):

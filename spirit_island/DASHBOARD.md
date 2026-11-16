@@ -74,10 +74,10 @@ photos agree on. It never touches the camera itself.
   deck runs out.
 - **Undo** reverses the last tap, any number of times.
 - **Island** lists every land with counters for explorers, towns, cities, Dahan,
-  blight and presence. Tracking pieces is optional. If you do, tag each land's
-  terrain once (tap "terrain?" to cycle) and the app highlights which lands
-  ravage, build and explore, and offers one-tap **Apply** for the standard result.
-  Terrain tags are remembered for future games.
+  blight and presence. Each land's terrain is filled in from the printed layout of
+  base boards A to D (balanced side), so the app highlights which lands ravage,
+  build and explore, and offers one-tap **Apply** for the standard result. Tap a
+  terrain to change it (e.g. for the thematic side); changes are remembered.
 - **Learn** explains the words the game uses. **Game** has corrections, the
   blight card flip, ending the game and starting a new one.
 

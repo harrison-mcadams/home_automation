@@ -89,6 +89,21 @@ GLOSSARY = [
 ]
 
 
+# Terrain of lands 1 to 8 on the balanced (lettered) side of each base-game board,
+# read off the printed boards. Used to tag lands automatically; any land can still be
+# changed by hand (e.g. when playing the thematic side).
+BOARD_TERRAINS = {
+    "A": "MWJSWMSJ",
+    "B": "WMSJSWMJ",
+    "C": "JSMJWSMW",
+    "D": "WJWSMJSM",
+}
+
+
+def default_terrains(boards):
+    return {f"{b}{i}": t for b in boards if b in BOARD_TERRAINS for i, t in enumerate(BOARD_TERRAINS[b], 1)}
+
+
 def land_ids(boards):
     return [f"{b}{n}" for b in boards for n in range(1, LANDS_PER_BOARD + 1)]
 
