@@ -181,7 +181,7 @@ MEASURED = [
     ((100, 39, 235, 26, .080, .036, 1.03, .68), "city"), ((107, 58, 245, 28, .083, .040, 1.11, .73), "city"),
     ((101, 38, 220, 22, .086, .035, 1.76, .39), "town"),
     ((21, 105, 142, 25.5, .096, .047, 1.2, .80), "energy"),  # warm sunlight, after the camera moved
-    ((17, 105, 91, 14, .045, .020, 1.5, .60), "unknown"),  # dark table wood at the moved board's rim
+    ((17, 105, 91, 14, .045, .020, 1.5, .60), "table"),  # dark table wood at the moved board's rim
 ]
 
 

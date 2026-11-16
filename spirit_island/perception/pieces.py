@@ -130,6 +130,10 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
         else:
             kind = "town"
         out = {"type": kind, "why": f"white plastic, thickness {f.thickness}, size {f.size}, elongation {f.elongation}"}
+    elif warm and f.value < rules["dahan_min_value"]:
+        # Darker than any cream or tan piece, brownish: the wooden table, uncovered at the
+        # rim when the board slides.
+        out = {"type": "table", "why": f"dark brown (hue {f.hue}, value {f.value}): table wood"}
     else:
         out = {"type": "unknown", "why": f"no rule matched (hue {f.hue}, sat {f.saturation}, value {f.value})"}
     out["sure"] = f.fill > rules["bad_segment_max_fill"]

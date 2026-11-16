@@ -142,7 +142,7 @@ def cmd_reference(args) -> int:
 
 
 def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarray,
-                  max_piece_frac: float = 0.03, min_thickness: float = 0.02, close_frac: float = 0.015,
+                  max_piece_frac: float = 0.03, min_thickness: float = 0.02, close_frac: float = 0.02,
                   lands: Optional[tuple] = None, **kwargs) -> dict:
     """Register `image` onto the reference and find what changed on the board."""
     reg = register(reference, image, reference_mask=board_mask)
@@ -216,6 +216,8 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
             pts = np.stack([(xs / scale).astype(int).clip(0, land_labels.shape[1] - 1),
                             (ys / scale).astype(int).clip(0, land_labels.shape[0] - 1)], axis=1)
             entry["land"] = piece_land(land_labels, land_names, pts)
+        if entry["type"] == "table":
+            continue  # table wood showing where the board has slid, not a piece
         if b.area > max_piece_frac * board_area:
             large.append(entry)  # far bigger than any piece: a hand, a moved object, or the board moved
             continue
