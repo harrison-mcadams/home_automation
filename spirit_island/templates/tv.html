@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spirit Island · TV</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='tv.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='board_map.css') }}">
 </head>
 <body>
 <div id="tv">
@@ -37,6 +38,8 @@
       <div id="lands"></div>
       <div id="camera">
         <img id="cam-img" alt="Latest photo of the board from the camera">
+        <div id="cam-map" class="hidden"></div>
+        <div id="cam-view"></div>
         <div id="cam-status"></div>
       </div>
     </aside>
@@ -44,11 +47,12 @@
 
   <footer id="foot">
     <span id="f-links"></span>
-    <span id="f-keys">Remote: <kbd>→</kbd> next step · <kbd>←</kbd> undo · <kbd>F</kbd> +1 fear</span>
+    <span id="f-keys">Remote: <kbd>→</kbd> next step · <kbd>←</kbd> undo · <kbd>F</kbd> +1 fear · <kbd>V</kbd> photo / drawn board</span>
     <span id="conn">●</span>
   </footer>
 </div>
 <div id="toast" class="hidden"></div>
+<script src="{{ url_for('static', filename='board_map.js') }}"></script>
 <script src="{{ url_for('static', filename='tv.js') }}"></script>
 </body>
 </html>

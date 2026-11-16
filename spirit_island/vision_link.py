@@ -65,8 +65,11 @@ def differences(seen: dict, lands: dict) -> list[dict]:
 class VisionLink:
     """Polls the board page and keeps the latest settled reading."""
 
-    def __init__(self, url: str = "http://localhost:8091", every: float = 3.0, on_change=None):
+    def __init__(self, url: str = "http://localhost:8091", every: float = 3.0, on_change=None, board_map=None):
         self.url = url.rstrip("/")
+        self.map = board_map       # BoardMap for the drawn board view, or None
+        self.pieces: list = []     # piece positions from the last settled photo
+        self.view = "board" if board_map is not None else "photo"  # what the screens show: photo | board
         self.every = every
         self.on_change = on_change  # called with no args when a new reading arrives or the link drops
         self.lock = threading.Lock()
@@ -88,6 +91,10 @@ class VisionLink:
                 changed = (self.error is not None or self.raw is None
                            or data.get("stamp") != self.raw.get("stamp"))
                 self.raw, self.error, self.last_ok = data, None, time.time()
+                # Only move the drawn pieces when the reading has settled, so a hand over
+                # the board or a half-moved piece doesn't make them jump about.
+                if data.get("status") == "ok" and data.get("settled") == "settled" and self.map is not None:
+                    self.pieces = self.map.place(data.get("pieces"))
             return changed
         except (OSError, ValueError, urllib.error.URLError) as e:
             with self.lock:
@@ -154,6 +161,9 @@ class VisionLink:
             "board": self.camera_board(state),
             "auto": self.auto,
             "pieces_seen": len(raw.get("pieces") or []),
+            "has_map": self.map is not None,
+            "view": self.view,
+            "pieces": list(self.pieces),
             "seen": seen,
             "diffs": differences(seen, state.get("lands", {})) if seen else [],
         }

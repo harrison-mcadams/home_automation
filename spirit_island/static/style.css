@@ -92,3 +92,5 @@ footer#bar button { padding: 12px 6px; font-size: 17px; }
 .camphoto { width: 100%; border-radius: 10px; margin-top: 6px; }
 pre.cmd { white-space: pre-wrap; background: var(--panel2); padding: 8px; border-radius: 8px; font-size: 13px; }
 .links a { color: var(--accent); word-break: break-all; }
+.phonemap { width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; margin-top: 6px; }
+.seg { display: flex; gap: 4px; } .seg button { padding: 6px 10px; }

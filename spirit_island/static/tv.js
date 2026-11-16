@@ -164,16 +164,44 @@ function renderLands() {
   }
 }
 
+let mapView = null, mapLoaded = false;
+async function loadMap() {
+  if (mapLoaded) return; mapLoaded = true;
+  try {
+    const r = await fetch("/api/vision/map");
+    if (!r.ok) return;
+    mapView = BoardMap.create($("cam-map"));
+    BoardMap.setMap(mapView, await r.json());
+    if (S) renderCamera();
+  } catch (e) { mapLoaded = false; }
+}
+
+function drawMap(v) {
+  if (!mapView) return;
+  const hits = hitLands(), info = {};
+  for (const l of mapView.map.lands) {
+    const lid = (v.board || "") + l.name, land = S.state.lands[lid];
+    info[l.name] = { terrain: land && land.terrain, hit: hits.has(lid) };
+  }
+  BoardMap.setLands(mapView, info);
+  BoardMap.setPieces(mapView, v.pieces || []);
+}
+
 function renderCamera() {
   const v = S.vision, img = $("cam-img"), st = $("cam-status");
   if (!v) { $("camera").classList.add("hidden"); return; }
   $("camera").classList.remove("hidden");
+  const board = v.view === "board" && v.has_map;
+  if (v.has_map) loadMap();
+  $("cam-map").classList.toggle("hidden", !board);
+  $("cam-view").replaceChildren(...(v.has_map ? [el("span", { class: board ? "" : "on" }, "Photo"), el("span", { class: board ? "on" : "" }, "Drawn board")] : []));
+  if (board) drawMap(v);
   if (!v.connected) {
     img.classList.add("hidden");
     st.replaceChildren(el("span", { class: "warn" }, "Board camera is off. "), "Start board_view to see the board here.");
     return;
   }
-  img.classList.remove("hidden");
+  img.classList.toggle("hidden", board);
   if (v.stamp && v.stamp !== lastCamStamp) { lastCamStamp = v.stamp; img.src = "/api/vision/board.jpg?" + encodeURIComponent(v.stamp); }
   const n = v.diffs.length;
   st.replaceChildren(
@@ -204,6 +232,11 @@ document.addEventListener("keydown", (e) => {
   if (k === "ArrowRight" || k === "Enter" || k === " " || k === "MediaTrackNext") { e.preventDefault(); act({ type: "next" }, "Next step"); }
   else if (k === "ArrowLeft" || k === "Backspace" || k === "MediaTrackPrevious") { e.preventDefault(); if (S.can_undo) act({ type: "undo" }, "Undone"); }
   else if (k === "f" || k === "F") { if (S.state.status === "playing") act({ type: "fear", amount: 1 }, "+1 fear"); }
+  else if ((k === "v" || k === "V") && S.vision && S.vision.has_map) {
+    fetch("/api/vision", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ view: S.vision.view === "board" ? "photo" : "board" }) })
+      .then((r) => r.json()).then(render).catch(() => toast("Can't reach the game server"));
+  }
 });
 
 // ---------- live connection ----------

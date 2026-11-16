@@ -273,9 +273,46 @@ function renderCamera() {
     box.append(el("button", { class: "primary", onclick: () => vision({ accept: "all" }) }, "Use the camera for all of them"),
       el("p", { class: "why" }, "Presence counts all colours together; energy tokens and anything unrecognised are ignored."));
   }
-  const img = el("img", { class: "camphoto", alt: "Latest board photo, pieces labelled",
-    src: "/api/vision/board.jpg?" + encodeURIComponent(v.stamp || "") });
-  box.append(el("h3", {}, "What the camera sees"), img);
+  const board = v.view === "board" && v.has_map;
+  box.append(el("h3", {}, "What the camera sees"));
+  if (v.has_map) box.append(el("div", { class: "rowline" },
+    el("div", { class: "what" }, "Show on every screen (TV too)"),
+    el("div", { class: "seg" },
+      el("button", { class: board ? "" : "primary", onclick: () => vision({ view: "photo" }) }, "Photo"),
+      el("button", { class: board ? "primary" : "", onclick: () => vision({ view: "board" }) }, "Drawn board"))));
+  if (board) {
+    if (!phoneMap.view) loadPhoneMap();
+    box.append(phoneMap.box);
+    drawPhoneMap(v);
+  } else {
+    box.append(el("img", { class: "camphoto", alt: "Latest board photo, pieces labelled",
+      src: "/api/vision/board.jpg?" + encodeURIComponent(v.stamp || "") }));
+  }
+}
+
+// The drawn board keeps one SVG alive between renders so its pieces can animate.
+const phoneMap = { box: null, view: null, loading: false };
+phoneMap.box = el("div", { class: "phonemap" });
+async function loadPhoneMap() {
+  if (phoneMap.loading) return; phoneMap.loading = true;
+  try {
+    const r = await fetch("/api/vision/map");
+    if (!r.ok) return;
+    phoneMap.view = BoardMap.create(phoneMap.box);
+    BoardMap.setMap(phoneMap.view, await r.json());
+    if (S && S.vision) drawPhoneMap(S.vision);
+  } finally { phoneMap.loading = false; }
+}
+function drawPhoneMap(v) {
+  const m = phoneMap.view;
+  if (!m) return;
+  const hits = hitLands(), info = {};
+  for (const l of m.map.lands) {
+    const lid = (v.board || "") + l.name, land = S.state.lands[lid];
+    info[l.name] = { terrain: land && land.terrain, hit: hits.has(lid) };
+  }
+  BoardMap.setLands(m, info);
+  BoardMap.setPieces(m, v.pieces || []);
 }
 
 function renderLog() {

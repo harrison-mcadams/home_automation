@@ -22,13 +22,26 @@ from .engine import ActionError, Game, describe, rules
 from .engine import game as g
 from .vision_link import VisionLink
 
+
+def load_board_map(path):
+    """The drawn-board map from the camera's reference folder, or None if it isn't there."""
+    if not path:
+        return None
+    try:
+        from .board_map import BoardMap
+        return BoardMap(path)
+    except Exception as e:  # missing folder, no OpenCV, ...: the photo view still works
+        print(f"No drawn board view ({type(e).__name__}: {e})")
+        return None
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
 
 def load_config():
     cfg = {"host": "0.0.0.0", "port": 5055, "data_dir": "games",
-           "board_camera_url": "http://localhost:8091", "public_urls": []}
+           "board_camera_url": "http://localhost:8091", "public_urls": [],
+           "board_reference": ""}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             cfg.update(json.load(f))
@@ -162,7 +175,8 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
     app.config["STORE"] = store
     url = cfg["board_camera_url"] if vision_url is None else vision_url
     if url:
-        store.vision = VisionLink(url, on_change=store.vision_changed)
+        store.vision = VisionLink(url, on_change=store.vision_changed,
+                                  board_map=load_board_map(cfg.get("board_reference")))
         if start_vision:
             store.vision.start()
 
@@ -189,10 +203,18 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
             return Response("no photo yet", status=503)
         return Response(body, mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
 
+    @app.get("/api/vision/map")
+    def vision_map():
+        m = store.vision.map if store.vision else None
+        if m is None:
+            return jsonify({"error": "no board map; set board_reference in config.json"}), 404
+        return jsonify(m.public())
+
     @app.post("/api/vision")
     def vision_control():
         """{"board": "C"} says which board the camera sees, {"auto": true} turns on
-        auto-sync, {"accept": "C3"} or {"accept": "all"} copies the camera's counts in."""
+        auto-sync, {"accept": "C3"} or {"accept": "all"} copies the camera's counts in,
+        {"view": "photo" | "board"} switches every screen between the photo and the drawn board."""
         v = store.vision
         if v is None:
             return jsonify({"error": "no board camera is linked"}), 400
@@ -201,6 +223,8 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
             v.board = body["board"] or None
         if "auto" in body:
             v.auto = bool(body["auto"])
+        if body.get("view") in ("photo", "board"):
+            v.view = body["view"] if (body["view"] == "photo" or v.map is not None) else "photo"
         accept = body.get("accept")
         if accept:
             diffs = v.public(store.game.state)["diffs"]

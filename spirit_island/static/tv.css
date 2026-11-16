@@ -119,3 +119,9 @@ body.lost #now { border-color: var(--bad); }
   #status { grid-template-columns: repeat(3, 1fr); }
   #camera { height: 40vh; }
 }
+
+#cam-map { position: absolute; inset: 0; }
+#cam-view { position: absolute; top: .8vh; right: .8vw; display: flex; gap: .3vw; font-size: 1.5vh; font-weight: 700; }
+#cam-view span { padding: .3vh .7vw; border-radius: 1vh; background: rgba(0,0,0,.55); color: var(--muted); }
+#cam-view span.on { background: var(--accent); color: #0b2412; }
+#cam-status { z-index: 2; }

@@ -16,3 +16,26 @@ def test_differences_only_lists_disagreeing_lands():
     lands["A5"]["dahan"] = 2
     diffs = differences(seen, lands)
     assert {d["land"]: d["delta"] for d in diffs} == {"A2": {"towns": 1}, "A5": {"dahan": -2}}
+
+
+def test_board_map_straightens_lands_and_places_pieces(tmp_path):
+    import json
+
+    import cv2
+    import numpy as np
+
+    from spirit_island.board_map import BoardMap
+
+    labels = np.zeros((400, 600), np.uint8)
+    labels[100:300, 100:300] = 1   # land "1" on the left
+    labels[100:300, 300:500] = 2   # land "2" on the right
+    cv2.imwrite(str(tmp_path / "lands.png"), labels)
+    (tmp_path / "lands.json").write_text(json.dumps({"names": ["1", "2"], "seeds": {}}))
+    (tmp_path / "reference.json").write_text(json.dumps({"board": {"quad": [[100, 100], [500, 100], [500, 300], [100, 300]]}}))
+    m = BoardMap(tmp_path).public()
+    assert m["width"] == 1000 and m["height"] == 500
+    left, right = (next(l for l in m["lands"] if l["name"] == n)["centre"] for n in ("1", "2"))
+    assert left[0] < 500 < right[0]
+    placed = BoardMap(tmp_path).place([{"type": "town", "land": "2", "reference_bbox": [390, 190, 20, 20]},
+                                       {"type": "unknown", "reference_bbox": [0, 0, 1, 1]}])
+    assert len(placed) == 1 and abs(placed[0]["x"] - 750) < 2 and abs(placed[0]["y"] - 250) < 2

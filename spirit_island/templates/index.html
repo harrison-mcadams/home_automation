@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#14231d">
 <title>Spirit Island Guide</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='board_map.css') }}">
 </head>
 <body>
 <header id="top">
@@ -57,6 +58,7 @@
   <button id="btn-next" class="primary">Next ›</button>
 </footer>
 <div id="toast" class="hidden"></div>
+<script src="{{ url_for('static', filename='board_map.js') }}"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
