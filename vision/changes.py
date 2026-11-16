@@ -22,6 +22,7 @@ class Blob:
     area: int  # pixels, in reference resolution
     mean_bgr: tuple[float, float, float]  # colour of the blob in the new picture
     score: float  # mean colour difference inside the blob
+    thickness: float = 0.0  # radius of the largest circle that fits inside, in reference pixels
 
 
 def change_map(
@@ -88,6 +89,9 @@ def find_changes(
 
     min_area = max(4, int(min_area_frac * int((reg > 0).sum())))
     count, labels, stats, cents = cv2.connectedComponentsWithStats(mask, 8)
+    # Thickness tells a compact object from a thin line of change along a printed
+    # edge (which can be long and curved, so its bounding box looks big).
+    inside_dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
     blobs = []
     for i in range(1, count):
         x, y, w, h, area = stats[i]
@@ -103,6 +107,7 @@ def find_changes(
                 area=int(area / scale / scale),
                 mean_bgr=mean_bgr,
                 score=round(float(diff[sel].mean()), 1),
+                thickness=round(float(inside_dist[sel].max() / scale), 1),
             )
         )
     blobs.sort(key=lambda b: b.area, reverse=True)

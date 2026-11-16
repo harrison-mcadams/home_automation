@@ -125,3 +125,18 @@ def test_thin_edge_sliver_is_not_a_piece(scene):
     cv2.rectangle(image, (1500, 900), (1512, 1000), (20, 20, 20), -1)  # 12 x 100 px dark strip
     result = detect.detect_pieces(reference, mask, image)
     assert result["registered"] and result["pieces"] == []
+
+
+def test_board_turned_and_slid_still_finds_only_the_token(scene):
+    """Like the real r5 photo: board rotated ~90 degrees, moved, and the room darker."""
+    reference, _, _ = scene
+    mask = find_board(reference).mask
+    turned = np.float32([[1500, 300], [1550, 1350], [700, 1300], [760, 330]])  # corners rotated by one
+    image, M = place(add_token(flat_board()), turned, table(seed=5))
+    image = (image.astype(np.float32) * 0.8).astype(np.uint8)
+    result = detect.detect_pieces(reference, mask, image)
+    token_xy = cv2.perspectiveTransform(np.float32([[[330, 360]]]), M).reshape(2)
+    assert result["registered"]
+    assert len(result["pieces"]) == 1, result["pieces"]
+    cx, cy = result["pieces"][0]["centroid"]
+    assert np.hypot(cx - token_xy[0], cy - token_xy[1]) < 30

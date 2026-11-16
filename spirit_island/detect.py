@@ -139,7 +139,7 @@ def cmd_reference(args) -> int:
 
 
 def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarray,
-                  max_piece_frac: float = 0.03, **kwargs) -> dict:
+                  max_piece_frac: float = 0.03, min_thickness: float = 0.025, **kwargs) -> dict:
     """Register `image` onto the reference and find what changed on the board."""
     reg = register(reference, image, reference_mask=board_mask)
     if reg is None or not reg.ok:
@@ -155,6 +155,16 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     covered[:, :edge] = 0
     covered[:, -edge:] = 0
     region = cv2.bitwise_and(board_mask, covered)
+    # Only the board itself counts, never the table around it: the board slides, so the
+    # wood next to it changes. Outline the board in *this* photo too and keep the overlap,
+    # pulled in a little from the rim.
+    current = find_board(image)
+    if current is not None:
+        now_mask = cv2.warpPerspective(current.mask, reg.homography, (reference.shape[1], reference.shape[0]),
+                                       flags=cv2.INTER_NEAREST)
+        region = cv2.bitwise_and(region, now_mask)
+    rim = max(5, int(0.012 * np.sqrt(max(1, int((region > 0).sum())))))
+    region = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * rim + 1, 2 * rim + 1)))
     blobs, change_mask = find_changes(reference, aligned, region, **kwargs)
     board_area = max(1, int((region > 0).sum()))
     H_inv = np.linalg.inv(reg.homography)
@@ -171,15 +181,13 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
             "area_px": b.area,
             "mean_bgr": list(b.mean_bgr),
             "change_score": b.score,
+            "thickness_px": b.thickness,
         }
-        # Thin slivers are misalignment along an edge, not a piece: pieces are compact
-        # and at least a couple of percent of the board's size across.
         if b.area > max_piece_frac * board_area:
             large.append(entry)  # far bigger than any piece: a hand, a moved object, or the board moved
             continue
-        short, long_ = sorted(b.bbox[2:4])
-        if short < 0.025 * np.sqrt(board_area) or long_ > 3 * short:
-            continue
+        if b.thickness < min_thickness * np.sqrt(board_area):
+            continue  # a thin line of change along a printed edge, not a piece
         pieces.append(entry)
     return {
         "registered": True,
