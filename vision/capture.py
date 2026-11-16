@@ -57,14 +57,49 @@ def fetch_still(url: str, timeout: float = 10.0) -> np.ndarray:
     so the pipeline can watch the cheap video for stillness and fetch a sharp
     still only when it needs to read the table.
     """
+    import base64
+    import urllib.parse
     import urllib.request
 
-    with urllib.request.urlopen(url, timeout=timeout) as response:
+    # urllib ignores user:password@ in a URL, so turn it into a Basic auth header
+    # (IP Webcam's optional login uses Basic auth).
+    parts = urllib.parse.urlsplit(url)
+    request = urllib.request.Request(url)
+    if parts.username:
+        clean = parts._replace(netloc=parts.hostname + (f":{parts.port}" if parts.port else ""))
+        request = urllib.request.Request(urllib.parse.urlunsplit(clean))
+        user = urllib.parse.unquote(parts.username)
+        password = urllib.parse.unquote(parts.password or "")
+        token = base64.b64encode(f"{user}:{password}".encode()).decode()
+        request.add_header("Authorization", f"Basic {token}")
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         data = response.read()
     image = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
     if image is None:
-        raise RuntimeError(f"{url} did not return a decodable image")
+        raise RuntimeError(f"{redact(url)} did not return a decodable image")
     return image
+
+
+def with_credentials(url: str, user: Optional[str], password: Optional[str]) -> str:
+    """Put user:password into a URL (OpenCV's stream reader understands this form)."""
+    if not user:
+        return url
+    import urllib.parse
+
+    parts = urllib.parse.urlsplit(url)
+    auth = urllib.parse.quote(user, safe="") + ":" + urllib.parse.quote(password or "", safe="")
+    return urllib.parse.urlunsplit(parts._replace(netloc=f"{auth}@{parts.netloc.split('@')[-1]}"))
+
+
+def redact(value):
+    """Hide any password in a URL before it is printed or saved to a report."""
+    if not isinstance(value, str) or "@" not in value or "://" not in value:
+        return value
+    scheme, rest = value.split("://", 1)
+    netloc, sep, path = rest.partition("/")
+    if "@" not in netloc:
+        return value
+    return f"{scheme}://***@{netloc.rsplit('@', 1)[1]}{sep}{path}"
 
 
 def _default_backend(source: Source) -> int:
@@ -174,7 +209,7 @@ class Camera:
     def start(self, first_frame_timeout: float = 10.0) -> "Camera":
         if not self._open():
             raise RuntimeError(
-                f"Could not open camera source {self.source!r}. "
+                f"Could not open camera source {redact(self.source)!r}. "
                 "Run `python -m vision.probe --list` to see which cameras exist."
                 + (
                     " On macOS, also check System Settings > Privacy & Security > Camera "
@@ -188,7 +223,7 @@ class Camera:
         self._thread.start()
         if self.wait_for_frame(timeout=first_frame_timeout) is None:
             self.stop()
-            raise RuntimeError(f"Camera {self.source!r} opened but delivered no frames.")
+            raise RuntimeError(f"Camera {redact(self.source)!r} opened but delivered no frames.")
         return self
 
     def stop(self) -> None:
@@ -237,7 +272,7 @@ class Camera:
                 self._new_frame.notify_all()
 
     def _reconnect(self) -> None:
-        print(f"[vision] Camera {self.source!r} stopped delivering frames, reconnecting...")
+        print(f"[vision] Camera {redact(self.source)!r} stopped delivering frames, reconnecting...")
         if self._cap is not None:
             self._cap.release()
         while not self._stopped.is_set():
@@ -291,13 +326,13 @@ class Camera:
     def describe(self) -> dict:
         """Facts about the open camera, for reports and recording metadata."""
         return {
-            "source": self.source,
+            "source": redact(self.source),
             "backend": self.backend_name,
             "requested": self.requested,
             "delivered_width": self.width,
             "delivered_height": self.height,
             "driver_reported_fps": round(self.reported_fps, 2),
-            "still_url": self.still_url,
+            "still_url": redact(self.still_url),
         }
 
 

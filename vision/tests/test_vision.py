@@ -165,3 +165,38 @@ def test_probe_survives_file_ending_during_settle(tmp_path):
     report = run_probe(str(clip), tmp_path / "p", settle_seconds=1.0, sample_seconds=0.5)
     assert report["camera"]["delivered_width"] == 640
     assert report["camera"]["measured_fps"] >= 0
+
+
+def test_fetch_still_with_basic_auth_and_redaction():
+    from vision.capture import redact, with_credentials
+
+    body = cv2.imencode(".jpg", make_scene(width=640, height=360))[1].tobytes()
+    import base64
+    expected = "Basic " + base64.b64encode(b"harrison:p@ss word").decode()
+
+    class Locked(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            if self.headers.get("Authorization") != expected:
+                self.send_response(401)
+                self.send_header("WWW-Authenticate", 'Basic realm="cam"')
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server, port = _serve(Locked)
+    try:
+        url = with_credentials(f"http://127.0.0.1:{port}/photo.jpg", "harrison", "p@ss word")
+        assert fetch_still(url).shape[:2] == (360, 640)
+        assert "p%40ss" not in redact(url) and redact(url) == f"http://***@127.0.0.1:{port}/photo.jpg"
+        with pytest.raises(Exception):
+            fetch_still(f"http://127.0.0.1:{port}/photo.jpg")
+    finally:
+        server.shutdown()
+    assert redact(0) == 0 and redact("clip.mp4") == "clip.mp4"

@@ -51,3 +51,11 @@ def test_find_adb_falls_back_to_sdk_folder(tmp_path, monkeypatch):
     monkeypatch.setattr(phone.shutil, "which", lambda _: None)
     monkeypatch.setenv("ANDROID_HOME", str(tmp_path))
     assert phone.find_adb() == str(tools / name)
+
+
+def test_urls_take_login_from_env(monkeypatch):
+    monkeypatch.setenv("PHONE_CAM_USER", "me")
+    monkeypatch.setenv("PHONE_CAM_PASSWORD", "secret")
+    assert phone.urls("http://localhost:8080")["video"] == "http://me:secret@localhost:8080/video"
+    monkeypatch.delenv("PHONE_CAM_USER")
+    assert phone.urls("http://localhost:8080")["photo"] == "http://localhost:8080/photo.jpg"

@@ -23,7 +23,7 @@ from typing import Optional
 import cv2
 
 from vision import quality
-from vision.capture import Camera, Source, fetch_still, list_cameras, open_capture, parse_source
+from vision.capture import Camera, Source, fetch_still, list_cameras, open_capture, parse_source, redact
 
 # Requested sizes, largest first. Cameras snap to the nearest mode they support.
 CANDIDATE_SIZES = [(3840, 2160), (2560, 1440), (1920, 1080), (1600, 1200), (1280, 720), (640, 480)]
@@ -97,7 +97,7 @@ def run_probe(
     source = parse_source(source)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    report: dict = {"probed_at": datetime.now().isoformat(timespec="seconds"), "source": source}
+    report: dict = {"probed_at": datetime.now().isoformat(timespec="seconds"), "source": redact(source)}
 
     is_device = isinstance(source, int)
     if sweep and is_device and width is None:
@@ -166,7 +166,7 @@ def run_probe(
         still = fetch_still(still_url)
         fetch_s = round(time.monotonic() - t0, 2)
         report["still"] = {
-            "url": still_url,
+            "url": redact(still_url),
             "width": int(still.shape[1]),
             "height": int(still.shape[0]),
             "fetch_seconds": fetch_s,

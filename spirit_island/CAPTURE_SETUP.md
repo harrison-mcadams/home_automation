@@ -51,6 +51,17 @@ no Wi-Fi and charges while it works.
 [platform-tools](https://developer.android.com/tools/releases/platform-tools)
 and make sure `adb` is on your PATH (`adb version` should work in a new terminal).
 
+**If you set a login in the app** (recommended), give it to the kit through
+environment variables so the password stays out of the repo and your command history.
+PowerShell:
+
+```powershell
+$env:PHONE_CAM_USER = "harrison"; $env:PHONE_CAM_PASSWORD = "..."
+```
+
+macOS: `export PHONE_CAM_USER=harrison PHONE_CAM_PASSWORD=...`. (Or pass
+`--phone-user` / `--phone-password`.) Reports and recordings never store it.
+
 **Each session:** plug in the phone, start the app's server, then check it:
 
 ```bash

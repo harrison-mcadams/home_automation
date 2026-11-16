@@ -29,7 +29,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from vision.capture import Camera, parse_source
+from vision.capture import Camera, parse_source, redact
 from vision.preview import PreviewServer
 from vision.probe import run_probe, summarize
 from vision.recorder import SessionRecorder, estimate_bytes_per_hour, read_notes_from_stdin
@@ -101,6 +101,8 @@ def main(argv=None) -> int:
     p.add_argument("--source", default="0", help="USB camera index, stream URL or video file (default 0)")
     p.add_argument("--phone", nargs="?", const=8080, type=int, metavar="PORT",
                    help="use an Android phone on USB: adb-forward its camera app (default port 8080)")
+    p.add_argument("--phone-user", help="camera app login, if set (or PHONE_CAM_USER env var)")
+    p.add_argument("--phone-password", help="camera app password (or PHONE_CAM_PASSWORD env var)")
     p.add_argument("--still-url", help="full-resolution photo URL for phone cameras, e.g. http://phone:8080/photo.jpg")
     p.add_argument("--marker-mm", type=float, help="side of the printed ArUco markers in view, in mm")
     p.add_argument("--fov-width-mm", type=float, help="or: width of the area the camera sees, in mm")
@@ -121,9 +123,10 @@ def main(argv=None) -> int:
         except phone.PhoneError as exc:
             print(f"Problem with the phone: {exc}\nTry `python -m vision.phone` for a step-by-step check.")
             return 1
-        args.source = phone.urls(base)["video"]
-        args.still_url = args.still_url or phone.urls(base)["photo"]
-        print(f"Using the phone on USB: video {args.source}, stills {args.still_url}")
+        phone_urls = phone.urls(base, args.phone_user, args.phone_password)
+        args.source = phone_urls["video"]
+        args.still_url = args.still_url or phone_urls["photo"]
+        print(f"Using the phone on USB: video {redact(args.source)}, stills {redact(args.still_url)}")
     source = parse_source(args.source)
     session = Path(args.out) if args.out else RECORDINGS / datetime.now().strftime("%Y%m%d-%H%M%S")
     session.mkdir(parents=True, exist_ok=True)

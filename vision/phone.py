@@ -91,18 +91,29 @@ def forward(port: int = DEFAULT_PORT, serial: Optional[str] = None, adb: Optiona
     return f"http://localhost:{port}"
 
 
-def urls(base: str) -> dict:
+def credentials(user: Optional[str] = None, password: Optional[str] = None) -> tuple:
+    """Login for the camera app, if it has one: arguments first, then the
+    PHONE_CAM_USER / PHONE_CAM_PASSWORD environment variables (keeps the
+    password out of shell history and out of the repo)."""
+    return (user or os.environ.get("PHONE_CAM_USER"), password or os.environ.get("PHONE_CAM_PASSWORD"))
+
+
+def urls(base: str, user: Optional[str] = None, password: Optional[str] = None) -> dict:
+    from vision.capture import with_credentials
+
+    user, password = credentials(user, password)
+    base = with_credentials(base, user, password)
     return {"video": f"{base}/video", "photo": f"{base}/photo.jpg", "shot": f"{base}/shot.jpg"}
 
 
-def check(base: str) -> dict:
+def check(base: str, user: Optional[str] = None, password: Optional[str] = None) -> dict:
     """Fetch a video frame and a full-resolution photo; report both sizes and timings."""
     from vision.capture import fetch_still
 
     out = {}
     for name in ("shot", "photo"):
         t0 = time.monotonic()
-        image = fetch_still(urls(base)[name], timeout=20)
+        image = fetch_still(urls(base, user, password)[name], timeout=20)
         out[name] = {"width": int(image.shape[1]), "height": int(image.shape[0]),
                      "seconds": round(time.monotonic() - t0, 2)}
     return out
@@ -112,24 +123,27 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help="the camera app's port on the phone")
     p.add_argument("--serial", help="which phone, if several are attached")
+    p.add_argument("--user", help="camera app login (or set PHONE_CAM_USER)")
+    p.add_argument("--password", help="camera app password (or set PHONE_CAM_PASSWORD)")
     args = p.parse_args(argv)
     try:
         base = forward(args.port, args.serial)
         print(f"Phone forwarded to {base}")
-        result = check(base)
+        result = check(base, args.user, args.password)
     except PhoneError as exc:
         print(f"Problem: {exc}")
         return 1
     except Exception as exc:  # camera app not running, wrong port, etc.
         print(f"Forwarded, but the camera app did not answer: {exc}\n"
-              "Open the camera app on the phone and start its server, then try again.")
+              "Open the camera app on the phone and start its server, then try again. "
+              "If the app has a login, pass --user/--password or set PHONE_CAM_USER/PHONE_CAM_PASSWORD.")
         return 1
     print(f"Video frames:  {result['shot']['width']}x{result['shot']['height']}")
     print(f"Full photos:   {result['photo']['width']}x{result['photo']['height']} "
           f"({result['photo']['seconds']} s each)")
     print("\nUse it with:")
     print(f"  python -m spirit_island.capture_kit --phone")
-    print(f"  (or --source {urls(base)['video']} --still-url {urls(base)['photo']})")
+    print(f"  (or --source {base}/video --still-url {base}/photo.jpg, plus the login if any)")
     return 0
 
 
