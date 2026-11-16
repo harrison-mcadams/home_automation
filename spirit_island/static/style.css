@@ -152,3 +152,6 @@ svg.scene { display: block; width: 100%; height: auto; }
   16% { opacity: 1; transform: none; }
   28%, 100% { opacity: 0; transform: translateX(160px); }
 }
+
+.a-spot { opacity: 0; animation: a-spot 16s linear infinite; }
+@keyframes a-spot { 0% { opacity: 0; } 2% { opacity: 1; } 9% { opacity: 1; } 11%, 100% { opacity: 0; } }

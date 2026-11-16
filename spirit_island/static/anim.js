@@ -22,7 +22,7 @@ function dropIn(node, delay, kind = "drop") {
 
 function animScene(p) {
   const svg = svgEl("svg", { viewBox: "0 0 1600 900", class: "scene", preserveAspectRatio: "xMidYMid meet" });
-  const scenes = { pool: poolScene, stack: stackScene, blight: blightScene, board: boardScene };
+  const scenes = { pool: poolScene, stack: stackScene, blight: blightScene, board: boardScene, photo: photoScene };
   (scenes[p.anim] || (() => {}))(svg, p);
   return svg;
 }
@@ -125,4 +125,23 @@ function boardScene(svg) {
   });
   svg.append(dropIn(svgEl("text", { x: 800, y: 850, "text-anchor": "middle", "font-size": 36, fill: "#a3b3a5" },
     "Invader cards slide left each round: Explore → Build → Ravage → Discard"), 4.6, "fade"));
+}
+
+// A photo with labelled areas lighting up in turn: {src, zones: [{x, y, w, h, label}]}
+// (fractions of the photo).
+function photoScene(svg, p) {
+  svg.setAttribute("viewBox", "0 0 1000 1000");
+  svg.append(svgEl("image", { href: "/assets/" + p.src, x: 0, y: 0, width: 1000, height: 1000 }));
+  const n = (p.zones || []).length;
+  (p.zones || []).forEach((z, i) => {
+    const x = z.x * 1000, y = z.y * 1000, w = z.w * 1000, h = z.h * 1000;
+    const g = svgEl("g", {},
+      svgEl("rect", { x, y, width: w, height: h, rx: 14, fill: "rgba(255,210,80,.18)", stroke: "#ffd23a", "stroke-width": 7 }),
+      svgEl("rect", { x: x + w / 2 - 120, y: y + h / 2 - 28, width: 240, height: 56, rx: 12, fill: "rgba(0,0,0,.78)" }),
+      svgEl("text", { x: x + w / 2, y: y + h / 2 + 12, "text-anchor": "middle", "font-size": 34, fill: "#fff", "font-weight": 700 }, z.label));
+    g.setAttribute("class", "a-spot");
+    g.style.animationDuration = Math.max(10, n * 1.6) + "s";
+    g.style.animationDelay = (i * 1.6) + "s";
+    svg.append(g);
+  });
 }

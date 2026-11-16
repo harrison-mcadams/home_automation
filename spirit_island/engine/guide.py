@@ -259,8 +259,9 @@ def _invader_board(s):
     return {
         "title": "Set up the invader board",
         "do": [
-            "Invader board: the long board with spaces for fear, blight and the invader cards. "
-            "Put it beside the island.",
+            "Invader board: unfold it beside the island. It has spaces for the fear pool and fear "
+            "cards, the terror level, the blight card, and the invader cards (Ravage, Build, and the "
+            "invader deck on the Explore space).",
             f"Fear pool: {f['pool_size']} fear markers (4 per player).",
             f"Fear deck: shuffle the fear cards and deal {sum(f['deck'])} face down, building from the "
             f"bottom up: {f['deck'][2]} cards, the Terror III divider, {f['deck'][1]} cards, the "
@@ -274,7 +275,18 @@ def _invader_board(s):
         "tips": ["An adversary changes these numbers. If you use one, follow its setup and correct the "
                  "pools in Settings."] if s["adversary"]["name"] != "None" else [],
         "pictures": [
-            {"anim": "board", "wide": True, "items": [0], "caption": "Invader board: where everything goes"},
+            {"anim": "photo", "src": "components/invader_board.jpg", "wide": True, "items": [0],
+             "caption": "Invader board: where everything goes",
+             "zones": [{"x": .44, "y": .03, "w": .2, "h": .1, "label": "Fear pool"},
+                       {"x": .41, "y": .26, "w": .24, "h": .24, "label": "Generated fear"},
+                       {"x": .02, "y": .02, "w": .22, "h": .31, "label": "Fear deck"},
+                       {"x": .02, "y": .35, "w": .22, "h": .29, "label": "Earned fear"},
+                       {"x": .8, "y": .02, "w": .18, "h": .29, "label": "Terror level"},
+                       {"x": .79, "y": .32, "w": .18, "h": .29, "label": "Blight card"},
+                       {"x": .85, "y": .67, "w": .12, "h": .22, "label": "Invader deck"},
+                       {"x": .69, "y": .68, "w": .13, "h": .22, "label": "Build"},
+                       {"x": .53, "y": .69, "w": .13, "h": .23, "label": "Ravage"},
+                       {"x": .28, "y": .7, "w": .22, "h": .15, "label": "Discard"}]},
             {"anim": "pool", "count": f["pool_size"], "wide": True, "items": [1],
              "caption": "Fear pool: the fear markers wait here"},
             {"anim": "stack", "wide": True, "items": [2], "caption": "The fear deck, built from the bottom up",
