@@ -120,8 +120,8 @@ def _island(s):
     }
 
 
-def _highest(s, terrain, b):
-    """'land 8 on board C' for the highest-numbered land of a terrain on board b."""
+def _highest_id(s, terrain, b):
+    """Land id (e.g. 'C8') of the highest-numbered land of a terrain on board b."""
     if not b:
         return None
     terrains = rules.default_terrains([b])
@@ -129,22 +129,54 @@ def _highest(s, terrain, b):
         if lid in terrains and info.get("terrain"):
             terrains[lid] = info["terrain"]
     lands = [lid for lid, t in terrains.items() if t == terrain]
-    if not lands:
+    return max(lands, key=lambda l: int(l[len(b):])) if lands else None
+
+
+def _highest(s, terrain, b):
+    """'land 8 on board C' for the highest-numbered land of a terrain on board b."""
+    lid = _highest_id(s, terrain, b)
+    return f"land {lid[len(b):]} on board {b}" if lid else None
+
+
+def _start_text(s, spirit, b):
+    places = rules.START_PRESENCE.get(spirit)
+    if not places or not all(_highest_id(s, t, b) for t, _ in places):
         return None
-    best = max(lands, key=lambda l: int(l[len(b):]))
-    return f"land {best[len(b):]} on board {b}"
+    parts = [f"{n} disc{'s' if n > 1 else ''} on {_highest(s, t, b)} (the highest-numbered "
+             f"{rules.TERRAINS[t]})" for t, n in places]
+    return "Starting presence: " + " and ".join(parts) + ". These come from your supply, not the tracks."
 
 
-# Starting presence printed on each panel's back, where it can be worked out for you.
-_START = {
-    "River Surges in Sunlight": lambda s, b: (
-        f"Starting presence: 1 disc on {_highest(s, 'W', b)} (the highest-numbered Wetland)."
-        if _highest(s, "W", b) else None),
-    "Vital Strength of the Earth": lambda s, b: (
-        f"Starting presence: 2 discs on {_highest(s, 'M', b)} (highest-numbered Mountain) and 1 on "
-        f"{_highest(s, 'J', b)} (highest-numbered Jungle)."
-        if _highest(s, "M", b) and _highest(s, "J", b) else None),
-}
+_SEEDS = None
+
+
+def _land_point(lid, b):
+    """Where a land sits on its board picture, as fractions of the picture's width and height."""
+    global _SEEDS
+    if _SEEDS is None:
+        import json
+        import os
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "board_seeds.json")
+        try:
+            with open(path, encoding="utf-8") as f:
+                _SEEDS = json.load(f)["boards"]
+        except OSError:
+            _SEEDS = {}
+    pt = _SEEDS.get(b, {}).get(lid[len(b):])
+    return (pt[0] / rules.SCAN_SIZE[0], pt[1] / rules.SCAN_SIZE[1]) if pt else None
+
+
+DISC_COLOURS = ["#3fa8ff", "#ff5ab0", "#ffd23a", "#9b6bff"]
+
+
+def _track_discs(spirit):
+    """Every presence-track circle except the first of each row, as picture fractions."""
+    t = rules.PRESENCE_TRACKS.get(spirit)
+    if not t:
+        return []
+    w, h = rules.PANEL_SIZE
+    return [{"x": round((t["x0"] + i * t["dx"]) / w, 4), "y": round(y / h, 4)}
+            for y, n in ((t["energy_y"], t["energy"]), (t["cards_y"], t["cards"])) for i in range(1, n)]
 
 
 def spirit_pictures(state):
@@ -154,10 +186,23 @@ def spirit_pictures(state):
         if not art:
             continue
         folder, cards = art
+        colour = DISC_COLOURS[group % len(DISC_COLOURS)]
         pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True, "group": group,
+                     "discs": _track_discs(p["spirit"]), "disc_colour": colour, "disc_size": 0.052,
                      "caption": (f"{p['name']}'s spirit panel" if len(state["players"]) > 1 else "Spirit panel")
-                                + f" (front) for {p['spirit']}. Growth choices on top, the two "
-                                "presence tracks in the middle, innate power below."})
+                                + f" (front) for {p['spirit']}: a disc on every track circle but the first."})
+        b = state["boards"][group] if group < len(state["boards"]) else None
+        places = rules.START_PRESENCE.get(p["spirit"], [])
+        discs = []
+        for t, n in places:
+            lid = _highest_id(state, t, b)
+            pt = _land_point(lid, b) if lid else None
+            if pt:
+                discs += [{"x": round(pt[0] + 0.03 * k, 4), "y": round(pt[1], 4), "land": True} for k in range(n)]
+        if discs:
+            pics.append({"src": f"components/board_{b}.jpg", "wide": True, "group": group,
+                         "discs": discs, "disc_colour": colour, "disc_size": 0.06,
+                         "caption": f"Board {b}: starting presence"})
         pics.append({"src": f"spirits/{folder}/card_back.jpg", "mark": True, "group": group,
                      "caption": "Back of your 4 starting cards: your spirit's art"})
         for c in cards:
@@ -170,7 +215,7 @@ def _spirits(s):
     starts, unknown = [], False
     for i, p in enumerate(s["players"]):
         board = s["boards"][i] if i < len(s["boards"]) else None
-        t = _START[p["spirit"]](s, board) if p["spirit"] in _START else None
+        t = _start_text(s, p["spirit"], board)
         if t and len(s["players"]) > 1:
             t = f"{p['name']}: " + t[0].lower() + t[1:]
         if t:

@@ -80,6 +80,27 @@ SPIRIT_ART = {
 }
 
 
+# Where the presence-track circles sit on the panel pictures (panel_front.jpg, 1600 x 1066):
+# the first circle of each row, the gap between circles, and how many circles per row.
+PANEL_SIZE = (1600, 1066)
+PRESENCE_TRACKS = {
+    "River Surges in Sunlight": {"x0": 682, "dx": 117.2, "energy_y": 320, "energy": 7, "cards_y": 489, "cards": 7},
+    "Lightning's Swift Strike": {"x0": 697, "dx": 116.6, "energy_y": 319, "energy": 8, "cards_y": 490, "cards": 5},
+    "Vital Strength of the Earth": {"x0": 703, "dx": 117.4, "energy_y": 321, "energy": 6, "cards_y": 489, "cards": 6},
+}
+
+# Starting presence from each panel's back: (terrain, discs) in the highest-numbered land
+# of that terrain on the player's board.
+START_PRESENCE = {
+    "River Surges in Sunlight": [("W", 1)],
+    "Lightning's Swift Strike": [("S", 2)],
+    "Vital Strength of the Earth": [("M", 2), ("J", 1)],
+}
+
+# Size of the clean board scans (assets/boards/*.png) that board_seeds.json points into.
+SCAN_SIZE = (3800, 2542)
+
+
 def picture_slug(name):
     return "".join(ch if ch.isalnum() else "_" for ch in name.lower()).strip("_")
 

@@ -72,11 +72,35 @@ function renderHeader() {
 }
 
 // ---------- guide ----------
+// Presence discs drawn over a picture: they drop onto the panel's track circles one by
+// one, then onto the starting land on the board, and the whole thing replays. The discs
+// sit in a layer laid exactly over the picture (kept in step as the picture resizes).
+function addDiscs(fig, img, p) {
+  if (!p.discs || !p.discs.length) return;
+  const layer = el("div", { class: "disc-layer" });
+  const start = p.discs[0].land ? 3.2 : 0;  // board discs land after the panel ones
+  p.discs.forEach((d, i) => {
+    const disc = el("span", { class: "disc" + (d.land ? " on-land" : "") });
+    const size = (p.disc_size || 0.05) * 100;
+    disc.style.cssText = `left:${d.x * 100}%;top:${d.y * 100}%;width:${size}%;padding-bottom:${size}%;` +
+      `background:${p.disc_colour || "#3fa8ff"};animation-delay:${start + i * 0.25}s`;
+    layer.append(disc);
+  });
+  const place = () => {
+    Object.assign(layer.style, { left: img.offsetLeft + "px", top: img.offsetTop + "px",
+                                 width: img.offsetWidth + "px", height: img.offsetHeight + "px" });
+  };
+  img.addEventListener("load", place);
+  window.addEventListener("resize", place);
+  requestAnimationFrame(place);
+  fig.append(layer);
+}
 function pictures(list) {
   return (list || []).map((p) => {
     const img = el("img", { src: "/assets/" + p.src, alt: p.caption, loading: "lazy" });
     const fig = el("figure", { class: (p.wide ? "wide" : "") + (p.mark ? " mark" : "") }, el("a", { href: "/assets/" + p.src, target: "_blank" }, img), el("figcaption", {}, p.caption));
     img.onerror = () => fig.remove();
+    addDiscs(fig, img, p);
     return fig;
   });
 }
