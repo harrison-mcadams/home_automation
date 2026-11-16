@@ -53,6 +53,15 @@ def teach(image: np.ndarray, out_root: Path, boards_dir: Path = BOARDS, expect: 
     if expect and letter != expect:
         raise SystemExit(f"That looks like board {letter}, not {expect} (match scores {scores}).")
 
+    # The board's own outline, carried over from the scan, fills any holes the photo's
+    # outline has (glare, a shadow across the board).
+    scan = cv2.imread(str(boards_dir / f"{letter}.png"), cv2.IMREAD_UNCHANGED)
+    if scan is not None and scan.shape[2] == 4:
+        h, w = image.shape[:2]
+        alpha = ((scan[..., 3] > 128) * 255).astype(np.uint8)
+        outline = cv2.warpPerspective(alpha, np.linalg.inv(H), (w, h), flags=cv2.INTER_NEAREST)
+        mask = cv2.max(mask, cv2.dilate(outline, np.ones((grow, grow), np.uint8)))
+
     ref_dir = out_root / letter
     ref_dir.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(ref_dir / "reference.jpg"), image, [cv2.IMWRITE_JPEG_QUALITY, 95])
