@@ -22,7 +22,7 @@ function dropIn(node, delay, kind = "drop") {
 
 function animScene(p) {
   const svg = svgEl("svg", { viewBox: "0 0 1600 900", class: "scene", preserveAspectRatio: "xMidYMid meet" });
-  const scenes = { pool: poolScene, stack: stackScene, blight: blightScene, board: boardScene, photo: photoScene };
+  const scenes = { pool: poolScene, stack: stackScene, blight: blightScene, board: boardScene, photo: photoScene, setup: setupScene };
   (scenes[p.anim] || (() => {}))(svg, p);
   return svg;
 }
@@ -161,4 +161,82 @@ function photoScene(svg, p) {
     g.style.animationDelay = (i * 1.6) + "s";
     svg.append(g);
   });
+}
+
+// The invader board filling up as setup goes: {step: 1 pool, 2 fear deck, 3 blight, 4 invader
+// deck, fear, deck: [n top, n mid, n bottom], blight}. Earlier steps' pieces sit in place; the
+// current step's pieces animate into their space, with a note of what's going in.
+function setupScene(svg, p) {
+  const W = 1000, H = 907, step = p.step || 1;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.append(svgEl("image", { href: "/assets/components/invader_board.jpg", x: 0, y: 0, width: W, height: H }));
+  const now = (k) => k === step;
+  const notes = [];
+  const anim = (node, k, delay, kind) => (now(k) ? dropIn(node, delay, kind) : node);
+
+  // 1. fear markers in the pool
+  if (step >= 1) {
+    const n = p.fear || 4, gap = 46;
+    for (let i = 0; i < n; i++) {
+      const x = 510 - ((n - 1) * gap) / 2 + i * gap;
+      svg.append(anim(fearToken(x, 45, 20), 1, 0.4 + i * 0.45));
+    }
+    if (now(1)) notes.push([`${n} fear markers`, 0.4]);
+  }
+  // 2. fear deck, built bottom up in the fear deck space
+  if (step >= 2) {
+    const [top, mid, bot] = p.deck || [3, 3, 3];
+    const layers = [];
+    for (let i = 0; i < bot; i++) layers.push(["fear_back", "fear card"]);
+    layers.push(["terror_3", "Terror III divider"]);
+    for (let i = 0; i < mid; i++) layers.push(["fear_back", "fear card"]);
+    layers.push(["terror_2", "Terror II divider"]);
+    for (let i = 0; i < top; i++) layers.push(["fear_back", "fear card"]);
+    layers.forEach(([src], i) => {
+      const off = i * 2.2;
+      svg.append(anim(svgEl("image", { href: `/assets/components/${src}.jpg`, x: 22 + off, y: 24 - off, width: 192, height: 268,
+        preserveAspectRatio: "xMidYMid slice" }), 2, 0.3 + i * 0.42));
+    });
+    if (now(2)) {
+      let t = 0.3;
+      notes.push([`${bot} fear cards`, t]); t += bot * 0.42;
+      notes.push(["Terror III divider", t]); t += 0.42;
+      notes.push([`${mid} fear cards`, t]); t += mid * 0.42;
+      notes.push(["Terror II divider", t]); t += 0.42;
+      notes.push([`${top} fear cards on top`, t]);
+    }
+  }
+  // 3. blight card with blight on it
+  if (step >= 3) {
+    svg.append(anim(svgEl("image", { href: "/assets/components/blight_healthy.jpg", x: 788, y: 322, width: 192, height: 270,
+      preserveAspectRatio: "xMidYMid slice" }), 3, 0.3));
+    const n = p.blight || 3;
+    for (let i = 0; i < n; i++) svg.append(anim(blightBlob(884 - ((n - 1) * 52) / 2 + i * 52, 470, 24), 3, 1.2 + i * 0.5));
+    if (now(3)) { notes.push(["Blight card, Healthy side", 0.3]); notes.push([`${n} blight on it`, 1.2]); }
+  }
+  // 4. invader deck on the Explore space, built bottom up
+  if (step >= 4) {
+    const stages = [["stage3_back", 5, "Stage III"], ["stage2_back", 4, "Stage II"], ["stage1_back", 3, "Stage I"]];
+    let i = 0, t = 0.3;
+    for (const [src, n, label] of stages) {
+      if (now(4)) {
+        const gone = svgEl("image", { href: `/assets/components/${src}.jpg`, x: 846, y: 652, width: 131, height: 200 });
+        svg.append(dropIn(gone, t, "remove"));
+        notes.push([`${label}: ${n} cards (1 to the box)`, t]);
+      }
+      for (let k = 0; k < n; k++, i++) {
+        const off = i * 1.6;
+        svg.append(anim(svgEl("image", { href: `/assets/components/${src}.jpg`, x: 846 + off, y: 652 - off, width: 131, height: 200,
+          preserveAspectRatio: "xMidYMid slice" }), 4, t + 0.25 + k * 0.28));
+      }
+      t += 0.5 + n * 0.28;
+    }
+  }
+  // what's going in, over the middle of the board
+  if (notes.length) {
+    svg.append(svgEl("rect", { x: 270, y: 200, width: 460, height: 60 + notes.length * 52, rx: 18, fill: "rgba(10,18,14,.82)",
+      stroke: "#ffd23a", "stroke-width": 3 }));
+    notes.forEach(([text, delay], i) => svg.append(dropIn(svgEl("text", { x: 500, y: 250 + i * 52, "text-anchor": "middle",
+      "font-size": 29, fill: "#f1f5ee", "font-weight": 600 }, text), delay, "fade")));
+  }
 }
