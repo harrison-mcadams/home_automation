@@ -105,21 +105,25 @@ const HELPERS = {
     // Save as you go so the TV shows the players while you fill them in.
     let timer = null;
     const autosave = (delay) => { clearTimeout(timer); timer = setTimeout(save, delay); };
-    // Default to the board the camera recognised for player 1, then the others in order.
-    const seen = S.vision && S.vision.detected_board;
-    const order = seen ? [seen, ...REF.boards.filter((b) => b !== seen)] : REF.boards;
+    // The rules deal island boards at random; Re-deal shuffles them again.
+    const randomBoard = (taken) => { const free = REF.boards.filter((b) => !taken.includes(b)); return free[Math.floor(Math.random() * free.length)]; };
     let rows = s.players.length ? s.players.map((p, i) => ({ name: p.name, spirit: p.spirit, board: s.boards[i] }))
-      : [{ name: "", spirit: REF.spirits[0].name, board: order[0] }];
+      : [{ name: "", spirit: REF.spirits[0].name, board: randomBoard([]) }];
     const current = () => inputs.map((x) => ({ name: x.name.value, spirit: x.sp.value, board: x.bd.value }));
     function addPlayer() {
       rows = current();
       const used = rows.map((r) => r.spirit), boards = rows.map((r) => r.board);
       rows.push({ name: "", spirit: (REF.spirits.find((x) => !used.includes(x.name)) || REF.spirits[0]).name,
-                  board: order.find((b) => !boards.includes(b)) });
+                  board: randomBoard(boards) });
       drawPlayers(); autosave(0);
     }
     function removePlayer(i) { rows = current(); rows.splice(i, 1); drawPlayers(); autosave(0); }
     const addBtn = el("button", { class: "add-player", onclick: addPlayer }, "+ Add player");
+    const dealBtn = el("button", { class: "add-player", onclick: () => {
+      rows = current(); const taken = [];
+      rows.forEach((r) => { r.board = randomBoard(taken); taken.push(r.board); });
+      drawPlayers(); autosave(0);
+    } }, "Re-deal boards at random");
     function drawPlayers() {
       playersBox.replaceChildren(); inputs.length = 0;
       rows.forEach((p, i) => {
@@ -143,7 +147,7 @@ const HELPERS = {
     const adv = el("select", { onchange: () => autosave(0) }, REF.adversaries.map((a) => el("option", { value: a, selected: a === s.adversary.name }, a)));
     const lvl = el("input", { type: "number", min: 0, max: 6, value: s.adversary.level, style: "width:5em" });
     const diff = el("input", { type: "number", min: 0, max: 20, value: s.adversary.difficulty, style: "width:5em" });
-    box.append(el("h3", {}, "Players"), playersBox, addBtn,
+    box.append(el("h3", {}, "Players"), playersBox, addBtn, dealBtn,
       el("label", {}, "Adversary (optional; leave None for now)"), adv,
       el("label", {}, "Adversary level and difficulty (from its panel; used for the score)"),
       el("div", { class: "btngrid" }, lvl, diff),

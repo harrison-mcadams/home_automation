@@ -85,6 +85,8 @@ def _players(s):
             "Pick how many players (1 or 2 is a great start) and give each a spirit.",
             "For a first game choose Low complexity spirits. River Surges in Sunlight and Vital "
             "Strength of the Earth are friendly to learn.",
+            "Island boards are dealt at random, one per player. Tap Re-deal on the phone for a "
+            "different draw, or pick a board by hand.",
             "Skip the adversary for your first games; it is an optional extra challenge.",
         ],
         "why": "Each spirit plays very differently. The complexity is printed on the back of its panel.",
