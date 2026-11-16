@@ -25,6 +25,7 @@ import cv2
 
 from spirit_island import detect
 from spirit_island.perception import lands as land_map
+from spirit_island.perception.memory import PieceMemory
 
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -76,6 +77,15 @@ def land_rows(result: dict) -> str:
     return "".join(rows)
 
 
+def _overlap(a, b) -> float:
+    """Intersection over union of two [x, y, w, h] boxes."""
+    ix = max(0, min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = a[2] * a[3] + b[2] * b[3] - inter
+    return inter / union if union else 0.0
+
+
 class BoardView:
     def __init__(self, reference_dir: Path, grab, every: float = 5.0, max_side: int = 1600,
                  confirm: int = 3, save_dir: Path | None = None):
@@ -100,11 +110,15 @@ class BoardView:
         self.recent: list[str] = []
         self.save_dir = save_dir
         self.last_seen: dict | None = None
+        # Remember pieces between photos so changing light can't make them vanish.
+        self.memory = PieceMemory(self.reference, self.lands)
+        self.last_large: list = []
 
     def update_once(self) -> dict:
         started = time.time()
         image = detect.rotate(self.grab(), self.rotate)
         result = detect.detect_pieces(self.reference, self.board_mask, image, lands=self.lands)
+        self.memory.update(result)
         result["board_state"] = detect.board_state(result["pieces"])
         picture = detect.draw_pieces(image, result)
         scale = min(1.0, self.max_side / max(picture.shape[:2]))
@@ -136,7 +150,13 @@ class BoardView:
         """
         if not result["registered"]:
             return self.stable, "holding: the board is hidden or moved too far to line up (a hand?)"
-        if result.get("large_changes"):
+        large = [c["reference_bbox"] for c in result.get("large_changes") or [] if c.get("reference_bbox")]
+        moving = [b for b in large if not any(_overlap(b, o) > 0.3 for o in self.last_large)]
+        self.last_large = large
+        if moving:
+            # Something big appeared or moved since the last photo: a hand, most likely.
+            # A big change that stays put (a shadow, a bag next to the board) doesn't hold
+            # the reading up; the pieces under it are kept by the piece memory.
             return self.stable, "holding: something large is over the board (a hand?)"
         seen = result["board_state"]
         self.recent = (self.recent + [json.dumps(seen, sort_keys=True)])[-self.window:]

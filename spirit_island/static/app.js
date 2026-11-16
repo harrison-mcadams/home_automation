@@ -194,7 +194,7 @@ function renderIsland() {
     `Score now: ${S.derived.score_if_won} if you won, ${S.derived.score_if_lost} if you lost.`));
   const hits = hitLands();
   const camDiff = {};
-  for (const d of (S.vision && S.vision.diffs) || []) camDiff[d.land] = d;
+  for (const d of (S.vision && S.vision.diffs) || []) if (d.confirmed) camDiff[d.land] = d;
   const order = [null, "J", "W", "S", "M"];
   const grid = el("div", { class: "lands" });
   for (const [lid, l] of Object.entries(s.lands)) {
@@ -262,16 +262,28 @@ function renderCamera() {
         boards.map((b) => el("option", { value: b, selected: b === v.board }, `Board ${b}`)))) : "",
     el("div", { class: "rowline" },
       el("div", { class: "what" }, el("b", {}, "Auto-sync"), el("div", { class: "why" },
-        "Copy settled camera counts into the game by itself during play. Undo still works.")),
+        "Copy camera changes in by itself, but only ones that held for a few readings and fit the current step. Unusual ones wait for you. Undo still works.")),
       el("button", { class: v.auto ? "primary" : "", onclick: () => vision({ auto: !v.auto }) }, v.auto ? "On" : "Off")));
 
+  if (v.blind) box.append(el("p", { class: "badge bad" },
+    "The camera can't see the pieces well right now (the light has probably changed). The tracked board is kept as it is."));
   if (!boards.length) box.append(el("p", {}, "Choose players first, so the camera's lands have names."));
   else if (!v.diffs.length) box.append(el("p", { class: "badge ok" }, "The camera agrees with the tracker."));
   else {
-    box.append(el("h3", {}, `${v.diffs.length} land(s) where the camera sees something different`));
-    for (const d of v.diffs) box.append(landRow(d.land, diffText(d), el("button", { onclick: () => vision({ accept: d.land }) }, "Use camera")));
-    box.append(el("button", { class: "primary", onclick: () => vision({ accept: "all" }) }, "Use the camera for all of them"),
-      el("p", { class: "why" }, "Presence counts all colours together; energy tokens and anything unrecognised are ignored."));
+    box.append(el("h3", {}, `${v.diffs.length} land(s) where the camera sees something different`),
+      el("p", { class: "why" }, "The tracker is the truth; these are the camera's suggestions."));
+    const VERDICT = { expected: ["ok", "expected"], plausible: ["", "possible"], unusual: ["bad", "unusual"] };
+    for (const d of v.diffs) {
+      const [cls, word] = VERDICT[d.verdict] || ["", d.verdict];
+      box.append(landRow(d.land, el("span", {}, diffText(d),
+        el("span", { class: "badge " + cls, title: d.why }, word),
+        d.confirmed ? null : el("span", { class: "badge" }, `checking ${d.streak}/2`),
+        el("div", { class: "why" }, d.why)),
+        el("button", { onclick: () => vision({ accept: d.land }) }, "Use camera")));
+    }
+    if (v.diffs.some((d) => d.confirmed && d.verdict !== "unusual"))
+      box.append(el("button", { class: "primary", onclick: () => vision({ accept: "all" }) }, "Use all the expected ones"));
+    box.append(el("p", { class: "why" }, "Presence counts all colours together; energy tokens and anything unrecognised are ignored."));
   }
   const board = v.view === "board" && v.has_map;
   box.append(el("h3", {}, "What the camera sees"));
@@ -352,7 +364,8 @@ function renderTabs() {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("hidden", t.id !== "tab-" + tab));
   const v = S.vision;
-  $("cam-dot").textContent = v && v.connected && v.diffs.length ? ` (${v.diffs.length})` : "";
+  const nConf = v && v.connected ? v.diffs.filter((d) => d.confirmed).length : 0;
+  $("cam-dot").textContent = v && v.blind ? " (!)" : nConf ? ` (${nConf})` : "";
   // The camera tab reloads its photo only when there is a new one, so it doesn't flicker on every tap.
   if (tab === "camera" && v && v.stamp === lastCamStamp && renderTabs.drawnFor === JSON.stringify([v, S.state.boards])) return;
   if (tab === "camera") { lastCamStamp = v && v.stamp; renderTabs.drawnFor = JSON.stringify([v, S.state.boards]); }

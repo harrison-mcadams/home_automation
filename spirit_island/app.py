@@ -117,7 +117,10 @@ class Store:
         """
         v = self.vision
         if v is not None and v.auto and v.settled() and self.game.state["status"] == "playing":
-            diffs = v.public(self.game.state)["diffs"]
+            # Only believable suggestions: held for a few readings, camera not blind,
+            # and fitting the step. Unusual ones wait for a tap on the phone.
+            diffs = [d for d in v.public(self.game.state)["diffs"]
+                     if d["confirmed"] and d["verdict"] in ("expected", "plausible")]
             if diffs:
                 try:
                     self.dispatch({"type": "observe", "lands": {d["land"]: d["camera"] for d in diffs}}, "camera")
@@ -236,7 +239,9 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
         accept = body.get("accept")
         if accept:
             diffs = v.public(store.game.state)["diffs"]
-            lands = {d["land"]: d["camera"] for d in diffs if accept in ("all", d["land"])}
+            # "all" takes only what's believable; a single land can be taken by hand regardless.
+            lands = {d["land"]: d["camera"] for d in diffs
+                     if d["land"] == accept or (accept == "all" and d["confirmed"] and d["verdict"] != "unusual")}
             if lands:
                 try:
                     return jsonify(store.dispatch({"type": "observe", "lands": lands}, "camera"))

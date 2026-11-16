@@ -62,6 +62,54 @@ def differences(seen: dict, lands: dict) -> list[dict]:
     return diffs
 
 
+# --- judging what the camera suggests ------------------------------------------
+#
+# The tracked game is the truth. The camera only *suggests* changes, and a suggestion
+# is believed when (1) it has held for a couple of readings in a row, (2) the camera
+# isn't obviously failing (everything vanishing at once is the camera, not the game),
+# and (3) it fits what the current step can do. Spirit powers and fear cards can move
+# almost anything, so then any change is plausible; in the invader steps only the
+# card's own effects are expected.
+
+CONFIRM = 2          # readings in a row a suggestion must hold
+BLIND_FRACTION = 0.4  # seeing this share of the tracked pieces or less = camera can't see well
+BLIND_MIN = 3        # ... once at least this many are tracked
+
+ANY_CHANGE = ("setup.", "spirit.", "fast", "slow", "invader.fear")
+EXPECTED = {  # step -> slot whose card picks the lands, and {piece: direction} it brings
+    "invader.explore": ("explore", {"explorers": +1}),
+    "setup.first_explore": ("explore", {"explorers": +1}),
+    "invader.build": ("build", {"towns": +1, "cities": +1}),
+    "invader.ravage": ("ravage", {"blight": +1, "dahan": -1, "explorers": -1, "towns": -1, "cities": -1}),
+}
+
+
+def blind(seen: dict, lands: dict) -> bool:
+    """True if the camera sees far fewer pieces than we know are on its lands."""
+    tracked = sum(lands[l].get(p, 0) for l in seen if l in lands for p in TRACKED)
+    visible = sum(sum(c.values()) for l, c in seen.items() if l in lands)
+    return tracked >= BLIND_MIN and visible <= BLIND_FRACTION * tracked
+
+
+def judge(state: dict, diff: dict) -> tuple[str, str]:
+    """("expected" | "plausible" | "unusual", why) for one land's suggested change."""
+    step = state.get("step", "")
+    if step.startswith(ANY_CHANGE):
+        return "plausible", "spirit powers, fear cards and setup can move pieces"
+    if step in EXPECTED:
+        slot, allowed = EXPECTED[step]
+        card = state["invaders"]["slots"].get(slot)
+        from .engine import game as g
+        matches = card is not None and g.land_matches(state, diff["land"], card) is not False
+        fits = all(allowed.get(p, 0) * n > 0 for p, n in diff["delta"].items())
+        if matches and fits:
+            return "expected", f"this is what {step.split('.')[-1].replace('_', ' ')} does here"
+        if not matches:
+            return "unusual", "the invader card doesn't hit this land"
+        return "unusual", f"{step.split('.')[-1].replace('_', ' ')} doesn't do this"
+    return "unusual", "nothing changes pieces in this step"
+
+
 class VisionLink:
     """Polls the board page and keeps the latest settled reading."""
 
@@ -80,6 +128,7 @@ class VisionLink:
         self.auto = False          # copy settled camera counts into the game automatically
         self.stopping = threading.Event()
         self._thread = None
+        self.history: list = []    # recent settled readings (board_state), newest last
 
     # -- polling --
     def fetch_once(self) -> bool:
@@ -93,8 +142,11 @@ class VisionLink:
                 self.raw, self.error, self.last_ok = data, None, time.time()
                 # Only move the drawn pieces when the reading has settled, so a hand over
                 # the board or a half-moved piece doesn't make them jump about.
-                if data.get("status") == "ok" and data.get("settled") == "settled" and self.map is not None:
-                    self.pieces = self.map.place(data.get("pieces"))
+                if data.get("status") == "ok" and data.get("settled") == "settled":
+                    if self.map is not None:
+                        self.pieces = self.map.place(data.get("pieces"))
+                    if changed and data.get("board_state") is not None:
+                        self.history = (self.history + [data["board_state"]])[-6:]
             return changed
         except (OSError, ValueError, urllib.error.URLError) as e:
             with self.lock:
@@ -150,6 +202,21 @@ class VisionLink:
             age = round(time.time() - self.last_ok) if self.last_ok else None
         seen = self.seen(state)
         status = raw.get("settled") or raw.get("status") or ""
+        lands = state.get("lands", {})
+        board = self.camera_board(state)
+        is_blind = bool(seen) and blind(seen, lands)
+        with self.lock:
+            history = [to_game_counts(b, board) for b in self.history] if board else []
+        diffs = differences(seen, lands) if seen else []
+        for d in diffs:
+            streak = 0
+            for past in reversed(history):
+                if past.get(d["land"]) != d["camera"]:
+                    break
+                streak += 1
+            d["streak"] = streak
+            d["confirmed"] = streak >= CONFIRM and not is_blind
+            d["verdict"], d["why"] = judge(state, d)
         return {
             "url": self.url,
             "connected": error is None,
@@ -165,5 +232,6 @@ class VisionLink:
             "view": self.view,
             "pieces": list(self.pieces),
             "seen": seen,
-            "diffs": differences(seen, state.get("lands", {})) if seen else [],
+            "blind": is_blind,
+            "diffs": diffs,
         }

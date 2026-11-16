@@ -147,7 +147,8 @@ function renderLands() {
   if (!ids.length) { box.append(el("div", { class: "board-label" }, "Lands appear once players are chosen")); return; }
   const hits = hitLands();
   const camDiff = {};
-  for (const d of (S.vision && S.vision.diffs) || []) camDiff[d.land] = d.delta;
+  // Only changes the camera has held for a few readings; the tracker stays the truth.
+  for (const d of (S.vision && S.vision.diffs) || []) if (d.confirmed) camDiff[d.land] = d;
   const multi = s.boards.length > 1;
   for (const b of s.boards) {
     if (multi) box.append(el("div", { class: "board-label" }, `Board ${b}`));
@@ -155,11 +156,12 @@ function renderLands() {
       const l = s.lands[lid];
       const pcs = PIECES.filter((p) => l[p]).map((p) => el("span", { class: "pc " + p, title: p }, el("i"), l[p]));
       const diff = camDiff[lid];
-      const camTxt = diff ? "cam " + Object.entries(diff).map(([p, n]) => `${n > 0 ? "+" : ""}${n} ${SHORT[p]}`).join(", ") : null;
+      const camTxt = diff ? (diff.verdict === "unusual" ? "cam? " : "cam ") +
+        Object.entries(diff.delta).map(([p, n]) => `${n > 0 ? "+" : ""}${n} ${SHORT[p]}`).join(", ") : null;
       box.append(el("div", { class: "land" + (hits.has(lid) ? " hit" : ""), style: `border-left-color:${l.terrain ? TERRAIN_VAR[l.terrain] : "var(--line)"}` },
         el("h4", {}, lid, el("small", {}, (l.terrain ? REF.terrains[l.terrain] : "") + (l.coastal ? " · coast" : ""))),
         el("div", { class: "pcs" }, pcs.length ? pcs : el("span", { style: "color:var(--muted);font-size:1.6vh" }, "empty")),
-        camTxt ? el("div", { class: "cam" }, camTxt) : null));
+        camTxt ? el("div", { class: "cam" + (diff.verdict === "unusual" ? " odd" : "") }, camTxt) : null));
     }
   }
 }
@@ -203,7 +205,12 @@ function renderCamera() {
   }
   img.classList.toggle("hidden", board);
   if (v.stamp && v.stamp !== lastCamStamp) { lastCamStamp = v.stamp; img.src = "/api/vision/board.jpg?" + encodeURIComponent(v.stamp); }
-  const n = v.diffs.length;
+  const n = v.diffs.filter((d) => d.confirmed).length;
+  if (v.blind) {
+    st.replaceChildren(el("span", { class: "warn" }, "Camera can't see the pieces well (light?) "),
+      "· keeping the tracked board as it is");
+    return;
+  }
   st.replaceChildren(
     el("span", { class: v.settled ? "ok" : "warn" }, v.settled ? "Camera: settled" : "Camera: " + (v.status || "waiting")),
     ` · ${v.stamp || ""} · board ${v.board || "?"}`,

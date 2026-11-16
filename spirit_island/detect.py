@@ -246,6 +246,7 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         "large_changes": large,
         "_aligned": aligned,
         "_change_mask": change_mask,
+        "_homography": reg.homography,
     }
 
 
@@ -285,7 +286,8 @@ def draw_pieces(image: np.ndarray, result: dict) -> np.ndarray:
     out = image.copy()
     t = _thickness(out)
     for i, p in enumerate(result["pieces"], 1):
-        cv2.polylines(out, [np.int32(p["outline"])], True, (0, 0, 255), t)
+        # Red: found in this photo. Green: kept from memory (see perception/memory.py).
+        cv2.polylines(out, [np.int32(p["outline"])], True, (0, 200, 0) if p.get("remembered") else (0, 0, 255), t)
         x, y = p["centroid"]
         tag = f"{i} {p.get('type', '')}" + (f" @{p['land']}" if p.get("land") else "")
         cv2.putText(out, tag, (x + 15, y - 15), cv2.FONT_HERSHEY_SIMPLEX, t * 0.7, (0, 0, 0), t * 3)

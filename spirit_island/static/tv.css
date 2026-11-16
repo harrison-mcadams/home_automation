@@ -125,3 +125,4 @@ body.lost #now { border-color: var(--bad); }
 #cam-view span { padding: .3vh .7vw; border-radius: 1vh; background: rgba(0,0,0,.55); color: var(--muted); }
 #cam-view span.on { background: var(--accent); color: #0b2412; }
 #cam-status { z-index: 2; }
+.land .cam.odd { color: var(--bad); }
