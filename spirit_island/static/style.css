@@ -85,3 +85,10 @@ footer#bar button { padding: 12px 6px; font-size: 17px; }
   padding: 10px 14px; border-radius: 10px; text-align: center; }
 @media (max-width: 380px) { .chip b, .slot b { font-size: 10px; } h1 { font-size: 21px; } }
 #toast.ok { background: #244a2f; color: #dff5e3; }
+
+/* camera link */
+.camdiff { margin-top: 6px; font-size: 13px; color: var(--warn); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.camdiff button { padding: 3px 8px; font-size: 13px; }
+.camphoto { width: 100%; border-radius: 10px; margin-top: 6px; }
+pre.cmd { white-space: pre-wrap; background: var(--panel2); padding: 8px; border-radius: 8px; font-size: 13px; }
+.links a { color: var(--accent); word-break: break-all; }

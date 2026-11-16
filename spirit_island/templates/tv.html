@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spirit Island · TV</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='tv.css') }}">
+</head>
+<body>
+<div id="tv">
+  <header id="status">
+    <div class="stat big" id="s-round"><b>Round</b><span>-</span></div>
+    <div class="stat" id="s-terror"><b>Terror level</b><span class="pips"></span></div>
+    <div class="stat wide" id="s-fear"><b>Fear</b><div class="meter"><i></i></div><span></span></div>
+    <div class="stat wide" id="s-blight"><b>Blight left on the card</b><div class="meter"><i></i></div><span></span></div>
+    <div class="stat" id="s-deck"><b>Invader cards left</b><span>-</span></div>
+  </header>
+
+  <nav id="track"></nav>
+
+  <main>
+    <section id="now">
+      <div id="n-phase" class="eyebrow"></div>
+      <h1 id="n-title"></h1>
+      <ol id="n-do"></ol>
+      <div id="n-focus"></div>
+      <p id="n-why"></p>
+      <div id="n-words"></div>
+    </section>
+
+    <aside id="side">
+      <div id="invaders">
+        <div class="icard" id="c-ravage"><b>Ravage</b><span></span></div>
+        <div class="icard" id="c-build"><b>Build</b><span></span></div>
+        <div class="icard" id="c-explore"><b>Explore</b><span></span></div>
+      </div>
+      <div id="lands"></div>
+      <div id="camera">
+        <img id="cam-img" alt="Latest photo of the board from the camera">
+        <div id="cam-status"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer id="foot">
+    <span id="f-links"></span>
+    <span id="f-keys">Remote: <kbd>→</kbd> next step · <kbd>←</kbd> undo · <kbd>F</kbd> +1 fear</span>
+    <span id="conn">●</span>
+  </footer>
+</div>
+<div id="toast" class="hidden"></div>
+<script src="{{ url_for('static', filename='tv.js') }}"></script>
+</body>
+</html>

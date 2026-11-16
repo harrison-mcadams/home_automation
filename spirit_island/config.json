@@ -1,5 +1,7 @@
 {
   "host": "0.0.0.0",
   "port": 5055,
-  "data_dir": "games"
+  "data_dir": "games",
+  "board_camera_url": "http://localhost:8091",
+  "public_urls": ["http://192.168.1.169:5055", "http://100.98.2.44:5055"]
 }

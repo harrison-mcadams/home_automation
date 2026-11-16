@@ -3,6 +3,7 @@
 
 let S = null;          // last snapshot from the server
 let REF = null;        // reference data (spirits, terrains, glossary)
+let LINKS = null;      // addresses of the phone and TV pages
 let tab = "island";
 const $ = (id) => document.getElementById(id);
 const PIECE_LABEL = { explorers: "Explorers", towns: "Towns", cities: "Cities", dahan: "Dahan",
@@ -106,9 +107,12 @@ const HELPERS = {
           REF.spirits.map((x) => el("option", { value: x.name, selected: x.name === p.spirit }, `${x.name} (${x.complexity})`)));
         const upd = () => { style.textContent = REF.spirits.find((x) => x.name === sp.value).style; };
         upd();
-        inputs.push({ name, sp });
+        const boardNow = s.boards[i] || REF.boards[i];
+        const bd = el("select", {}, REF.boards.map((b) => el("option", { value: b, selected: b === boardNow }, `Board ${b}`)));
+        inputs.push({ name, sp, bd });
         playersBox.append(el("div", { class: "player" }, el("label", {}, `Player ${i + 1} name`), name,
-          el("label", {}, "Spirit"), sp, style));
+          el("label", {}, "Spirit"), sp, style,
+          el("label", {}, "Island board (the letter printed on it)"), bd));
       }
     }
     drawPlayers();
@@ -122,6 +126,7 @@ const HELPERS = {
       el("div", { style: "margin-top:10px" }, el("button", { class: "primary", onclick: () => act({
         type: "configure",
         players: inputs.map((x) => ({ name: x.name.value.trim(), spirit: x.sp.value })),
+        boards: inputs.map((x) => x.bd.value),
         adversary: { name: adv.value, level: +lvl.value, difficulty: +diff.value },
       }).then(() => S.state.players.length && toast("Saved. Tap Next.", true)) }, s.players.length ? "Update" : "Save players")));
     return box;
@@ -188,6 +193,8 @@ function renderIsland() {
     `On the island: ${t.explorers} explorers, ${t.towns} towns, ${t.cities} cities, ${t.dahan} Dahan, ${t.blight} blight. `,
     `Score now: ${S.derived.score_if_won} if you won, ${S.derived.score_if_lost} if you lost.`));
   const hits = hitLands();
+  const camDiff = {};
+  for (const d of (S.vision && S.vision.diffs) || []) camDiff[d.land] = d;
   const order = [null, "J", "W", "S", "M"];
   const grid = el("div", { class: "lands" });
   for (const [lid, l] of Object.entries(s.lands)) {
@@ -201,7 +208,9 @@ function renderIsland() {
       REF.pieces.map((p) => el("div", { class: "ctr" }, el("span", { class: "nm" }, PIECE_LABEL[p]),
         el("button", { onclick: () => act({ type: "land", land: lid, piece: p, delta: -1 }) }, "−"),
         el("span", { class: "n" }, l[p]),
-        el("button", { onclick: () => act({ type: "land", land: lid, piece: p, delta: 1 }) }, "+")))));
+        el("button", { onclick: () => act({ type: "land", land: lid, piece: p, delta: 1 }) }, "+"))),
+      camDiff[lid] ? el("div", { class: "camdiff" }, `Camera sees: ${diffText(camDiff[lid])} `,
+        el("button", { onclick: () => vision({ accept: lid }) }, "Use camera")) : null));
   }
   box.append(grid);
 }
@@ -216,6 +225,59 @@ function renderLearn() {
     el("p", {}, "The blight card runs out of blight (after it has flipped), any spirit has no presence left on the island, or the invader deck is empty when it's time to explore."));
 }
 
+// ---------- camera ----------
+async function vision(body) {
+  try {
+    const r = await fetch("/api/vision", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) return toast(data.error || "That didn't work");
+    render(data);
+    if (body.accept) toast("Copied the camera's counts", true);
+  } catch (e) { toast("Can't reach the game server"); }
+}
+
+function diffText(d) {
+  return Object.entries(d.delta).map(([p, n]) => `${PIECE_LABEL[p]} ${d.camera[p]} (${n > 0 ? "+" : ""}${n})`).join(", ");
+}
+
+let lastCamStamp = null;
+function renderCamera() {
+  const box = $("tab-camera"); box.replaceChildren();
+  const v = S.vision;
+  if (!v) { box.append(el("p", {}, "The camera link is turned off for this server.")); return; }
+  if (!v.connected) {
+    box.append(el("h3", {}, "Board camera not running"),
+      el("p", {}, "Start the live board page on the PC (it serves port 8091), then this tab fills in by itself:"),
+      el("pre", { class: "cmd" }, "py -m spirit_island.board_view --phone --reference <reference folder>"),
+      el("p", { class: "why" }, v.error || ""));
+    return;
+  }
+  const boards = S.state.boards;
+  box.append(
+    el("div", { class: "rowline" },
+      el("div", { class: "what" }, el("b", {}, v.settled ? "Settled" : "Waiting"), ` · photo ${v.stamp || "-"} · ${v.pieces_seen} piece(s) seen`,
+        v.settled ? null : el("div", { class: "why" }, v.status))),
+    boards.length > 1 ? el("div", { class: "rowline" }, el("div", { class: "what" }, "The camera is looking at"),
+      el("select", { onchange: (e) => vision({ board: e.target.value }) },
+        boards.map((b) => el("option", { value: b, selected: b === v.board }, `Board ${b}`)))) : "",
+    el("div", { class: "rowline" },
+      el("div", { class: "what" }, el("b", {}, "Auto-sync"), el("div", { class: "why" },
+        "Copy settled camera counts into the game by itself during play. Undo still works.")),
+      el("button", { class: v.auto ? "primary" : "", onclick: () => vision({ auto: !v.auto }) }, v.auto ? "On" : "Off")));
+
+  if (!boards.length) box.append(el("p", {}, "Choose players first, so the camera's lands have names."));
+  else if (!v.diffs.length) box.append(el("p", { class: "badge ok" }, "The camera agrees with the tracker."));
+  else {
+    box.append(el("h3", {}, `${v.diffs.length} land(s) where the camera sees something different`));
+    for (const d of v.diffs) box.append(landRow(d.land, diffText(d), el("button", { onclick: () => vision({ accept: d.land }) }, "Use camera")));
+    box.append(el("button", { class: "primary", onclick: () => vision({ accept: "all" }) }, "Use the camera for all of them"),
+      el("p", { class: "why" }, "Presence counts all colours together; energy tokens and anything unrecognised are ignored."));
+  }
+  const img = el("img", { class: "camphoto", alt: "Latest board photo, pieces labelled",
+    src: "/api/vision/board.jpg?" + encodeURIComponent(v.stamp || "") });
+  box.append(el("h3", {}, "What the camera sees"), img);
+}
+
 function renderLog() {
   const box = $("tab-log"); box.replaceChildren();
   const items = S.state.log.slice().reverse();
@@ -228,6 +290,9 @@ function renderSettings() {
   const s = S.state;
   const blightIn = el("input", { type: "number", value: s.blight.pool, style: "width:5em" });
   box.append(el("div", { class: "stack" },
+    el("h3", {}, "Screens"),
+    el("p", {}, "Open this on the TV's browser for the couch view (big type, follows every tap here):"),
+    el("div", { class: "links" }, (LINKS ? LINKS.tv : ["/tv"]).map((u) => el("div", {}, el("a", { href: u, target: "_blank" }, u)))),
     el("h3", {}, "Fix a number"),
     el("div", { class: "btngrid" }, el("button", { onclick: () => act({ type: "fear", amount: -1 }) }, "−1 Fear"),
       el("button", { onclick: () => act({ type: "fear", amount: 1 }) }, "+1 Fear")),
@@ -249,7 +314,12 @@ function renderSettings() {
 function renderTabs() {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("hidden", t.id !== "tab-" + tab));
-  ({ island: renderIsland, learn: renderLearn, log: renderLog, settings: renderSettings })[tab]();
+  const v = S.vision;
+  $("cam-dot").textContent = v && v.connected && v.diffs.length ? ` (${v.diffs.length})` : "";
+  // The camera tab reloads its photo only when there is a new one, so it doesn't flicker on every tap.
+  if (tab === "camera" && v && v.stamp === lastCamStamp && renderTabs.drawnFor === JSON.stringify([v, S.state.boards])) return;
+  if (tab === "camera") { lastCamStamp = v && v.stamp; renderTabs.drawnFor = JSON.stringify([v, S.state.boards]); }
+  ({ island: renderIsland, camera: renderCamera, learn: renderLearn, log: renderLog, settings: renderSettings })[tab]();
 }
 
 function render(snapshot) {
@@ -279,6 +349,7 @@ function connect() {
 
 (async function start() {
   REF = await (await fetch("/api/reference")).json();
+  try { LINKS = await (await fetch("/api/links")).json(); } catch (e) { LINKS = null; }
   render(await (await fetch("/api/state")).json());
   connect();
 })();

@@ -20,13 +20,15 @@ from flask import Flask, Response, jsonify, render_template, request
 
 from .engine import ActionError, Game, describe, rules
 from .engine import game as g
+from .vision_link import VisionLink
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
 
 def load_config():
-    cfg = {"host": "0.0.0.0", "port": 5055, "data_dir": "games"}
+    cfg = {"host": "0.0.0.0", "port": 5055, "data_dir": "games",
+           "board_camera_url": "http://localhost:8091", "public_urls": []}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             cfg.update(json.load(f))
@@ -46,6 +48,7 @@ class Store:
         self.lock = threading.Lock()
         self.listeners = []
         self.game = self._load()
+        self.vision = None  # VisionLink, when the board camera page is linked
 
     def _load(self):
         if os.path.exists(self.path):
@@ -83,9 +86,32 @@ class Store:
                 action = {**action, "terrains": {**self.saved_terrains(), **(action.get("terrains") or {})}}
             self.game.dispatch(action, source=source)
             self._save()
-            payload = snapshot(self.game)
+            payload = self._snapshot()
         self.broadcast(payload)
         return payload
+
+    def _snapshot(self):
+        out = snapshot(self.game)
+        if self.vision is not None:
+            out["vision"] = self.vision.public(self.game.state)
+        return out
+
+    def vision_changed(self):
+        """Called by the vision link when a new camera reading arrives (or the link drops).
+
+        With auto-sync on, a settled reading that differs from the tracked game is copied
+        in (logged as coming from the camera, and Undo-able like any other change).
+        """
+        v = self.vision
+        if v is not None and v.auto and v.settled() and self.game.state["status"] == "playing":
+            diffs = v.public(self.game.state)["diffs"]
+            if diffs:
+                try:
+                    self.dispatch({"type": "observe", "lands": {d["land"]: d["camera"] for d in diffs}}, "camera")
+                    return
+                except ActionError as e:
+                    print(f"camera sync failed: {e}")
+        self.broadcast(self.snapshot())
 
     def broadcast(self, payload):
         data = json.dumps(payload)
@@ -97,7 +123,7 @@ class Store:
 
     def snapshot(self):
         with self.lock:
-            return snapshot(self.game)
+            return self._snapshot()
 
 
 def snapshot(game):
@@ -129,15 +155,66 @@ REFERENCE = {
 }
 
 
-def create_app(data_dir=None):
+def create_app(data_dir=None, vision_url=None, start_vision=True):
     cfg = load_config()
     app = Flask(__name__, template_folder="templates", static_folder="static")
     store = Store(data_dir or cfg["data_dir"])
     app.config["STORE"] = store
+    url = cfg["board_camera_url"] if vision_url is None else vision_url
+    if url:
+        store.vision = VisionLink(url, on_change=store.vision_changed)
+        if start_vision:
+            store.vision.start()
 
     @app.get("/")
+    @app.get("/phone")
     def index():
         return render_template("index.html")
+
+    @app.get("/tv")
+    def tv():
+        return render_template("tv.html")
+
+    @app.get("/api/links")
+    def links():
+        port = request.host.rsplit(":", 1)[1] if ":" in request.host else "80"
+        hosts = cfg["public_urls"] or [f"http://{lan_address()}:{port}"]
+        return jsonify({"phone": [h.rstrip("/") + "/phone" for h in hosts],
+                        "tv": [h.rstrip("/") + "/tv" for h in hosts]})
+
+    @app.get("/api/vision/board.jpg")
+    def vision_photo():
+        body = store.vision.photo() if store.vision else None
+        if not body:
+            return Response("no photo yet", status=503)
+        return Response(body, mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/vision")
+    def vision_control():
+        """{"board": "C"} says which board the camera sees, {"auto": true} turns on
+        auto-sync, {"accept": "C3"} or {"accept": "all"} copies the camera's counts in."""
+        v = store.vision
+        if v is None:
+            return jsonify({"error": "no board camera is linked"}), 400
+        body = request.get_json(silent=True) or {}
+        if "board" in body:
+            v.board = body["board"] or None
+        if "auto" in body:
+            v.auto = bool(body["auto"])
+        accept = body.get("accept")
+        if accept:
+            diffs = v.public(store.game.state)["diffs"]
+            lands = {d["land"]: d["camera"] for d in diffs if accept in ("all", d["land"])}
+            if lands:
+                try:
+                    return jsonify(store.dispatch({"type": "observe", "lands": lands}, "camera"))
+                except ActionError as e:
+                    return jsonify({"error": str(e)}), 400
+        if body.get("auto"):
+            store.vision_changed()
+        payload = store.snapshot()
+        store.broadcast(payload)
+        return jsonify(payload)
 
     @app.get("/health")
     def health():
@@ -198,9 +275,14 @@ def main():
     ap.add_argument("--host", default=cfg["host"])
     ap.add_argument("--port", type=int, default=cfg["port"])
     ap.add_argument("--data-dir", default=cfg["data_dir"])
+    ap.add_argument("--board-camera", default=cfg["board_camera_url"],
+                    help="URL of the live board page (board_view.py); pass '' to run without the camera")
     args = ap.parse_args()
-    app = create_app(args.data_dir)
-    print(f"Spirit Island dashboard: http://localhost:{args.port}  (phone: http://{lan_address()}:{args.port})")
+    app = create_app(args.data_dir, vision_url=args.board_camera)
+    ip = lan_address()
+    print(f"Spirit Island dashboard on port {args.port}")
+    print(f"  phone (controls): http://{ip}:{args.port}/phone")
+    print(f"  TV (couch view):  http://{ip}:{args.port}/tv")
     app.run(host=args.host, port=args.port, threaded=True, debug=False)
 
 
