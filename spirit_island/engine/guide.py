@@ -135,8 +135,8 @@ def spirit_pictures(state):
         pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True,
                      "caption": f"Spirit panel (front) for {p['spirit']}. Growth choices on top, the two "
                                 "presence tracks in the middle, innate power below."})
-        pics.append({"src": f"spirits/{folder}/panel_back.jpg", "wide": True,
-                     "caption": "Panel back: the story, and SETUP (where your first presence goes)."})
+        pics.append({"src": f"spirits/{folder}/card_back.jpg", "mark": True,
+                     "caption": "Back of your 4 starting cards: your spirit's art"})
         for c in cards:
             pics.append({"src": f"spirits/{folder}/{rules.picture_slug(c)}.jpg",
                          "caption": f"{c} (starting power card)"})
@@ -149,7 +149,8 @@ def _spirits(s):
         "title": "Set up each spirit",
         "do": [
             "Spirit panel: the big double-sided card (large picture). Lay it front side up.",
-            "Starting hand: the 4 power cards with your spirit's name (bottom row of pictures).",
+            "Starting hand: the 4 power cards whose BACK shows your spirit's art (the highlighted "
+            "picture). Their fronts don't name the spirit. Every spirit starts with its own 4.",
             "Presence: in the middle of the panel are two rows of circles. Put a disc of your colour "
             "on every circle except the first one in each row.",
         ] + (starts or ["Starting presence: the SETUP box on the back of the panel says where your "

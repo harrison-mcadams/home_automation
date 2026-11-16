@@ -148,3 +148,5 @@ body.gallery #n-do li { margin-bottom: .9vh; }
 #g-rest.row figure { min-width: 0; }
 #g-rest.row img { height: auto; width: 100%; }
 #g-rest img { height: var(--h, 27vh); border-radius: 1vh; display: block; }
+#gallery figure.mark img { outline: .6vh solid var(--accent); outline-offset: .3vh; }
+#gallery figure.mark figcaption { color: var(--accent); font-weight: 700; }

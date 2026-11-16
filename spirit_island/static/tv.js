@@ -116,7 +116,7 @@ function words(g) {
 
 function figure(p, cls) {
   const img = el("img", { src: "/assets/" + p.src, alt: p.caption });
-  const fig = el("figure", { class: cls || "" }, img, el("figcaption", {}, p.caption.split(":")[0].split(" (")[0]));
+  const fig = el("figure", { class: (cls || "") + (p.mark ? " mark" : "") }, img, el("figcaption", {}, p.caption.split(":")[0].split(" (")[0]));
   img.onerror = () => fig.remove();
   return fig;
 }
@@ -293,3 +293,12 @@ function connect() {
     $("f-links").textContent = "Phone controls: " + links.phone.join("  or  ");
   } catch (e) { /* footer link is a nicety */ }
 })();
+
+// Keep the TV from dimming or sleeping while this page is up. The lock drops whenever the
+// page is hidden, so take it again when it comes back.
+async function keepAwake() {
+  try { if (navigator.wakeLock && document.visibilityState === "visible") await navigator.wakeLock.request("screen"); }
+  catch (e) { console.warn("wake lock:", e); }
+}
+document.addEventListener("visibilitychange", keepAwake);
+keepAwake();

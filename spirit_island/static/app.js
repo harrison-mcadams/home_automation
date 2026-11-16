@@ -73,7 +73,7 @@ function renderHeader() {
 function pictures(list) {
   return (list || []).map((p) => {
     const img = el("img", { src: "/assets/" + p.src, alt: p.caption, loading: "lazy" });
-    const fig = el("figure", { class: p.wide ? "wide" : "" }, el("a", { href: "/assets/" + p.src, target: "_blank" }, img), el("figcaption", {}, p.caption));
+    const fig = el("figure", { class: (p.wide ? "wide" : "") + (p.mark ? " mark" : "") }, el("a", { href: "/assets/" + p.src, target: "_blank" }, img), el("figcaption", {}, p.caption));
     img.onerror = () => fig.remove();
     return fig;
   });
