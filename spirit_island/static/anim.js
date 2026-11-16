@@ -97,34 +97,48 @@ function blightScene(svg, p) {
     `${n} blight on the card`), 1.2 + n * 0.6, "fade"));
 }
 
-// A labelled diagram of the invader board: where each thing goes. Each area lights up in turn.
+// A labelled diagram of the base-game invader board, laid out like the real one (square,
+// four folds): fear cards down the left, fear pool and generated fear in the middle, terror
+// level and blight on the right, invader slots along the bottom. Areas light up in turn.
 function boardScene(svg) {
-  svg.append(svgEl("rect", { x: 40, y: 120, width: 1520, height: 660, rx: 30, fill: "#2b2216", stroke: "#8a6a3c", "stroke-width": 8 }));
-  svg.append(svgEl("text", { x: 800, y: 80, "text-anchor": "middle", "font-size": 54, fill: "#f1f5ee", "font-weight": 700 },
-    "Invader board (a diagram: your board's art differs)"));
+  svg.setAttribute("viewBox", "0 0 1000 1000");
+  svg.append(svgEl("rect", { x: 10, y: 10, width: 980, height: 980, rx: 24, fill: "#2a3a2c", stroke: "#8a6a3c", "stroke-width": 8 }));
+  svg.append(svgEl("line", { x1: 500, y1: 14, x2: 500, y2: 986, stroke: "rgba(0,0,0,.35)", "stroke-width": 4 }));
+  svg.append(svgEl("line", { x1: 14, y1: 500, x2: 986, y2: 500, stroke: "rgba(0,0,0,.35)", "stroke-width": 4 }));
+  const card = (x, y, w, h, label, sub, c) => ({ x, y, w, h, label, sub, c });
   const zones = [
-    { x: 80, y: 160, w: 380, h: 270, label: "Fear pool", sub: "fear markers start here", c: "#b993f5" },
-    { x: 490, y: 160, w: 300, h: 270, label: "Fear earned", sub: "markers move here", c: "#b993f5" },
-    { x: 820, y: 160, w: 300, h: 270, label: "Fear deck", sub: "+ terror level", c: "#b993f5" },
-    { x: 1150, y: 160, w: 370, h: 270, label: "Blight card", sub: "blight sits on it", c: "#e08a5f" },
-    { x: 80, y: 470, w: 220, h: 270, label: "Discard", sub: "", c: "#8f949c" },
-    { x: 330, y: 470, w: 260, h: 270, label: "Ravage", sub: "", c: "#ff7a6b" },
-    { x: 620, y: 470, w: 260, h: 270, label: "Build", sub: "", c: "#f3c862" },
-    { x: 910, y: 470, w: 260, h: 270, label: "Explore", sub: "", c: "#86dc93" },
-    { x: 1200, y: 470, w: 320, h: 270, label: "Invader deck", sub: "face down", c: "#8f949c" },
+    card(40, 40, 200, 290, "Fear deck", "face down", "#b993f5"),
+    card(370, 40, 260, 110, "Fear pool", "markers start here", "#b993f5"),
+    { ...card(400, 230, 200, 260, "Generated", "fear", "#b993f5"), round: true },
+    card(40, 350, 200, 290, "Earned fear", "cards", "#b993f5"),
+    card(40, 660, 200, 300, "Fear discard", "", "#8f949c"),
+    card(780, 40, 180, 280, "Terror level", "I → II → III", "#b993f5"),
+    card(780, 340, 180, 280, "Blight card", "blight on top", "#e08a5f"),
+    card(270, 690, 210, 160, "Discard", "", "#8f949c"),
+    card(520, 690, 130, 220, "Ravage", "", "#ff7a6b"),
+    card(680, 690, 130, 220, "Build", "", "#f3c862"),
+    card(840, 670, 130, 220, "Invader deck", "on Explore", "#86dc93"),
   ];
+  svg.append(svgEl("rect", { x: 290, y: 545, width: 420, height: 100, rx: 18, fill: "#e9d8b0", opacity: .85 }));
+  svg.append(svgEl("text", { x: 500, y: 605, "text-anchor": "middle", "font-size": 30, fill: "#4a3a20", "font-weight": 700 }, "Phase order scroll"));
+  for (const z of zones) {
+    svg.append(z.round
+      ? svgEl("ellipse", { cx: z.x + z.w / 2, cy: z.y + z.h / 2, rx: z.w / 2, ry: z.h / 2, fill: "rgba(0,0,0,.25)", stroke: z.c, "stroke-width": 5, "stroke-dasharray": "12 9" })
+      : svgEl("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 14, fill: "rgba(0,0,0,.25)", stroke: z.c, "stroke-width": 5, "stroke-dasharray": "12 9" }));
+    const fs = z.w < 150 ? 21 : z.w <= 210 ? 28 : 34;
+    svg.append(svgEl("text", { x: z.x + z.w / 2, y: z.y + z.h / 2 + (z.sub ? -4 : 10), "text-anchor": "middle", "font-size": fs, fill: "#f1f5ee", "font-weight": 700 }, z.label));
+    if (z.sub) svg.append(svgEl("text", { x: z.x + z.w / 2, y: z.y + z.h / 2 + 30, "text-anchor": "middle", "font-size": 21, fill: "#cfd8cc" }, z.sub));
+  }
+  for (const x of [500, 660, 820]) svg.append(svgEl("text", { x: x + 5, y: 815, "text-anchor": "middle", "font-size": 40, fill: "#f1f5ee" }, "‹"));
   zones.forEach((z, i) => {
-    svg.append(svgEl("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 18, fill: "rgba(0,0,0,.25)",
-      stroke: z.c, "stroke-width": 5, "stroke-dasharray": "14 10" }));
-    const g = svgEl("g", {},
-      svgEl("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 18, fill: z.c, opacity: 0.28 }),
-      svgEl("text", { x: z.x + z.w / 2, y: z.y + z.h / 2 + (z.sub ? -6 : 14), "text-anchor": "middle", "font-size": 44,
-        fill: "#fff", "font-weight": 700 }, z.label),
-      z.sub ? svgEl("text", { x: z.x + z.w / 2, y: z.y + z.h / 2 + 44, "text-anchor": "middle", "font-size": 28, fill: "#e8e2d6" }, z.sub) : null);
-    svg.append(dropIn(g, 0.3 + i * 0.45, "fade"));
+    const hl = z.round
+      ? svgEl("ellipse", { cx: z.x + z.w / 2, cy: z.y + z.h / 2, rx: z.w / 2, ry: z.h / 2, fill: "rgba(255,210,80,.22)", stroke: "#ffd23a", "stroke-width": 8 })
+      : svgEl("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 14, fill: "rgba(255,210,80,.22)", stroke: "#ffd23a", "stroke-width": 8 });
+    hl.setAttribute("class", "a-spot");
+    hl.style.animationDuration = zones.length * 1.6 + "s";
+    hl.style.animationDelay = i * 1.6 + "s";
+    svg.append(hl);
   });
-  svg.append(dropIn(svgEl("text", { x: 800, y: 850, "text-anchor": "middle", "font-size": 36, fill: "#a3b3a5" },
-    "Invader cards slide left each round: Explore → Build → Ravage → Discard"), 4.6, "fade"));
 }
 
 // A photo with labelled areas lighting up in turn: {src, zones: [{x, y, w, h, label}]}
