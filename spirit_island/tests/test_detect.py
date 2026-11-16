@@ -167,3 +167,40 @@ def test_lands_and_types_on_synthetic_board(scene, tmp_path):
     assert ("presence", "3") in found and ("blight", "2") in found, result["pieces"]
     state = detect.board_state(result["pieces"])
     assert state["3"] == {"presence (red)": 1}
+
+
+# Features measured on Harrison's real pieces (Pixel 6, layouts r6-r9), at the edges of
+# each piece's observed range. The rules must keep sorting all of them correctly.
+MEASURED = [
+    ((21, 43, 202, 8.3, .065, .032, 1.08, .80), "dahan"), ((24, 51, 219, 17.4, .068, .033, 1.22, .84), "dahan"),
+    ((21, 38, 219, 7.1, .066, .031, 1.10, .79), "dahan"),
+    ((31, 147, 213, 6, .069, .033, 1.1, .77), "presence"), ((140, 123, 221, 16.5, .082, .040, 1.1, .82), "presence"),
+    ((100, 79, 116, 19, .065, .031, 1.1, .79), "blight"), ((103, 91, 129, 22, .068, .033, 1.1, .83), "blight"),
+    ((19, 69, 153, 29, .093, .047, 1.1, .81), "energy"), ((21, 78, 170, 32, .095, .048, 1.1, .82), "energy"),
+    ((105, 51, 239, 30, .070, .0265, 1.79, .70), "explorer"), ((70, 27, 212, 20, .065, .025, 1.70, .73), "explorer"),
+    ((100, 39, 235, 26, .080, .036, 1.03, .68), "city"), ((107, 58, 245, 28, .083, .040, 1.11, .73), "city"),
+    ((101, 38, 220, 22, .086, .035, 1.76, .39), "town"),
+]
+
+
+@pytest.mark.parametrize("values,truth", MEASURED)
+def test_rules_sort_measured_pieces(values, truth):
+    from spirit_island.perception.pieces import PieceFeatures, classify
+
+    assert classify(PieceFeatures(*values))["type"] == truth
+
+
+def test_board_view_page(scene, tmp_path):
+    from spirit_island.board_view import BoardView
+
+    reference, _, _ = scene
+    ref_dir = tmp_path / "ref"
+    ref_dir.mkdir()
+    cv2.imwrite(str(ref_dir / "reference.jpg"), reference)
+    cv2.imwrite(str(ref_dir / "board_mask.png"), find_board(reference).mask)
+    image, _ = place(add_token(flat_board()), BOARD, table(seed=5))
+    view = BoardView(ref_dir, lambda: image)
+    state = view.update_once()
+    assert state["status"] == "ok" and len(state["pieces"]) == 1
+    page = view.page()
+    assert "Land ?" not in page and "1 piece(s)" in page and view.jpeg[:2] == b"\xff\xd8"

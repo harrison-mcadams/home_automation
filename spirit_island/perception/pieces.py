@@ -3,11 +3,12 @@
 A first, rule-based classifier for the pieces in Harrison's set, as seen from the
 overhead camera (see the project notes for what each looks like):
 
-    explorer, town, city   white plastic figures, told apart by size and shape
-    dahan                  plain cream wooden disc
+    explorer, town, city   white plastic figures (read cool/blue-ish): explorer thinnest,
+                           city big and squat, town the rest
+    dahan                  plain cream wooden disc (warm hue, smooth)
     presence               wooden disc in a spirit's colour (saturated)
-    blight                 dark blue-grey bumpy plastic
-    energy                 tan cardboard marker with a printed value (normally on a spirit panel)
+    blight                 blue-grey bumpy plastic
+    energy                 tan cardboard marker with a printed value (warm, textured, larger)
 
 Sizes are measured relative to the board, so they don't change with camera distance.
 The thresholds live in RULES so they can be tuned against labelled photos.
@@ -21,20 +22,27 @@ import cv2
 import numpy as np
 
 RULES = {
-    # Colour families (OpenCV HSV: hue 0-180, saturation and value 0-255), from core pixels.
-    "blight_max_value": 120,  # dark
-    "vivid_min_saturation": 105,  # presence discs are strongly coloured
-    "white_max_saturation": 38,  # plastic invaders are near-white (any hue)
-    "white_min_value": 150,
-    "warm_hue": (6, 32),  # cream (dahan) and tan (cardboard) are warm yellow-orange
-    "cream_min_value": 170,  # dahan: light; energy marker: darker tan
-    # Invader sizes, as sqrt(piece area) / sqrt(board area).
-    "city_min_size": 0.085,
-    "explorer_max_fill": 0.62,  # explorers are spindly: they fill little of their bounding rectangle
+    # Measured on Harrison's set under the Pixel 6 (r7-r9 layouts, 2026-11-16). Colour is
+    # OpenCV HSV (hue 0-180, saturation and value 0-255), the median of the piece's core.
+    "vivid_min_saturation": 105,  # presence discs: S 115-165; nothing else above ~90
+    "dark_max_value": 100,  # anything this dark is blight, whatever its hue
+    "blight_hue": (85, 125),  # blight is blue-grey: H 100-103, S 79-91, V 116-129
+    "blight_min_saturation": 60,
+    "blight_max_value": 175,
+    "warm_hue": (5, 35),  # cream dahan (H 21-24) and tan cardboard (H 19-21); white plastic is H 70-109
+    "pale_max_saturation": 70,  # white plastic S 27-58 (bluish white balance), dahan S 38-58
+    "pale_min_value": 170,
+    "energy_min_texture": 23,  # printed card: texture 29-32; plain wooden dahan 8-17
+    "energy_min_size": 0.082,  # energy marker 0.093; dahan 0.065-0.068
+    # White plastic invaders. Sizes are sqrt(piece area) / sqrt(board area).
+    "explorer_max_thickness": 0.030,  # spindly: 0.025-0.0265; town and city 0.035-0.040
+    "city_min_size": 0.075,  # city 0.080-0.083; explorer 0.065-0.070
+    "city_max_elongation": 1.35,  # city 1.03-1.11
+    "bad_segment_max_fill": 0.5,  # a cut through touching pieces leaves ragged shapes
 }
 
-HUE_NAMES = [(5, "red"), (20, "orange"), (35, "yellow"), (85, "green"), (100, "cyan"), (130, "blue"),
-             (160, "purple"), (175, "magenta"), (181, "red")]
+HUE_NAMES = [(5, "red"), (20, "orange"), (35, "yellow"), (85, "green"), (100, "cyan"), (125, "blue"),
+             (135, "purple"), (170, "magenta"), (181, "red")]
 
 
 @dataclass
@@ -87,26 +95,42 @@ def measure(image: np.ndarray, piece_mask: np.ndarray, board_area: float) -> Pie
 
 
 def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
-    """Best guess of the piece type, with the reason, for checking against photos."""
+    """Best guess of the piece type, with the reason, for checking against photos.
+
+    Hue does most of the work: under the camera's white balance the white plastic reads
+    cool (blue-ish) while the wooden dahan and cardboard read warm, even though both are
+    pale with similar saturation.
+    """
     lo, hi = rules["warm_hue"]
     warm = lo <= f.hue <= hi
-    if f.value <= rules["blight_max_value"]:
-        return {"type": "blight", "why": f"dark (value {f.value})"}
-    if f.saturation >= rules["vivid_min_saturation"] and not (warm and f.value < rules["cream_min_value"]):
-        return {"type": "presence", "colour": hue_name(f.hue), "why": f"vivid {hue_name(f.hue)} (sat {f.saturation})"}
-    if f.saturation <= rules["white_max_saturation"] and f.value >= rules["white_min_value"]:
-        if f.size >= rules["city_min_size"]:
-            kind = "city"
-        elif f.fill <= rules["explorer_max_fill"]:
+    blo, bhi = rules["blight_hue"]
+    out: dict
+    if f.value <= rules["dark_max_value"]:
+        out = {"type": "blight", "why": f"dark (value {f.value})"}
+    elif f.saturation >= rules["vivid_min_saturation"]:
+        out = {"type": "presence", "colour": hue_name(f.hue), "why": f"vivid {hue_name(f.hue)} (sat {f.saturation})"}
+    elif (blo <= f.hue <= bhi and f.saturation >= rules["blight_min_saturation"]
+          and f.value <= rules["blight_max_value"]):
+        out = {"type": "blight", "why": f"blue-grey (hue {f.hue}, sat {f.saturation}, value {f.value})"}
+    elif warm:
+        if f.texture >= rules["energy_min_texture"] or f.size >= rules["energy_min_size"]:
+            out = {"type": "energy", "why": f"tan, printed (texture {f.texture}, size {f.size})"}
+        else:
+            out = {"type": "dahan", "why": f"plain cream (hue {f.hue}, texture {f.texture})"}
+    elif f.saturation <= rules["pale_max_saturation"] and f.value >= rules["pale_min_value"]:
+        if f.thickness <= rules["explorer_max_thickness"]:
             kind = "explorer"
+        elif f.size >= rules["city_min_size"] and f.elongation <= rules["city_max_elongation"]:
+            kind = "city"
         else:
             kind = "town"
-        return {"type": kind, "why": f"white plastic, size {f.size}, fill {f.fill}"}
-    if warm and f.value >= rules["cream_min_value"]:
-        return {"type": "dahan", "why": f"light cream (sat {f.saturation}, value {f.value})"}
-    if warm:
-        return {"type": "energy", "why": f"tan cardboard (sat {f.saturation}, value {f.value})"}
-    return {"type": "unknown", "why": "no rule matched"}
+        out = {"type": kind, "why": f"white plastic, thickness {f.thickness}, size {f.size}, elongation {f.elongation}"}
+    else:
+        out = {"type": "unknown", "why": f"no rule matched (hue {f.hue}, sat {f.saturation}, value {f.value})"}
+    out["sure"] = f.fill > rules["bad_segment_max_fill"]
+    if not out["sure"]:
+        out["why"] += f"; ragged outline (fill {f.fill}), may be cut wrongly from a touching piece"
+    return out
 
 
 def describe(f: PieceFeatures) -> dict:
