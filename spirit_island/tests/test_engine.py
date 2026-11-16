@@ -197,3 +197,14 @@ def test_printed_board_terrains_fill_in_by_themselves():
     assert "".join(lands[f"A{i}"]["terrain"] for i in range(1, 9)) == "MWJSWMSJ"
     for b, layout in rules.BOARD_TERRAINS.items():
         assert sorted(layout) == sorted("JJMMSSWW"), b  # two of each terrain per board
+
+
+def test_back_steps_through_setup_keeping_choices():
+    from spirit_island.engine import Game
+    g = Game()
+    g.dispatch({"type": "next"})
+    g.dispatch({"type": "configure", "players": [{"name": "H", "spirit": "River Surges in Sunlight"}], "boards": ["C"]})
+    g.dispatch({"type": "next"})
+    assert g.state["step"] == "setup.island"
+    g.dispatch({"type": "back"})
+    assert g.state["step"] == "setup.players" and g.state["players"][0]["name"] == "H"

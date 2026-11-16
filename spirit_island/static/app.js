@@ -63,7 +63,10 @@ function renderHeader() {
     const i = ROUND_STEPS.indexOf(s.step);
     ROUND_STEPS.forEach((st, j) => bar.append(el("i", { class: j < i ? "done" : j === i ? "now" : "" })));
   }
-  $("btn-undo").disabled = !S.can_undo;
+  // During setup the left button steps back a screen; once playing it undoes the last tap.
+  const back = s.status === "setup";
+  $("btn-undo").textContent = back ? "‹ Back" : "Undo";
+  $("btn-undo").disabled = back ? s.step === "setup.welcome" : !S.can_undo;
   $("btn-next").disabled = s.status === "won" || s.status === "lost";
   $("btn-fear").disabled = s.status !== "playing";
 }
@@ -419,7 +422,7 @@ function render(snapshot) {
 
 // ---------- wiring ----------
 $("btn-next").onclick = () => act({ type: "next" });
-$("btn-undo").onclick = () => act({ type: "undo" });
+$("btn-undo").onclick = () => act({ type: S.state.status === "setup" ? "back" : "undo" });
 $("btn-fear").onclick = () => act({ type: "fear", amount: 1 });
 document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => { tab = b.dataset.tab; renderTabs(); });
 

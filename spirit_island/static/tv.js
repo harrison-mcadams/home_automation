@@ -294,7 +294,7 @@ document.addEventListener("keydown", (e) => {
   if (!S) return;
   const k = e.key;
   if (k === "ArrowRight" || k === "Enter" || k === " " || k === "MediaTrackNext") { e.preventDefault(); act({ type: "next" }, "Next step"); }
-  else if (k === "ArrowLeft" || k === "Backspace" || k === "MediaTrackPrevious") { e.preventDefault(); if (S.can_undo) act({ type: "undo" }, "Undone"); }
+  else if (k === "ArrowLeft" || k === "Backspace" || k === "MediaTrackPrevious") { e.preventDefault(); if (S.state.status === "setup") act({ type: "back" }, "Back"); else if (S.can_undo) act({ type: "undo" }, "Undone"); }
   else if (k === "f" || k === "F") { if (S.state.status === "playing") act({ type: "fear", amount: 1 }, "+1 fear"); }
   else if ((k === "v" || k === "V") && S.vision && S.vision.has_map) {
     fetch("/api/vision", { method: "POST", headers: { "Content-Type": "application/json" },

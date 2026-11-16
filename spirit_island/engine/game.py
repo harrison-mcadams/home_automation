@@ -264,6 +264,14 @@ class Game:
         self.state = self.history.pop()
         return self.state
 
+    def _do_back(self, action):
+        """Go back one setup step, keeping everything already chosen."""
+        s = self.state
+        if s["status"] != "setup" or s["step"] not in SETUP_STEPS or s["step"] == SETUP_STEPS[0]:
+            raise ActionError("already at the first setup step")
+        s["step"] = SETUP_STEPS[SETUP_STEPS.index(s["step"]) - 1]
+        return f"Back to {s['step']}"
+
     def _do_new_game(self, action):
         self.state = new_state()
         return "Started a new game"
