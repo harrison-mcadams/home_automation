@@ -17,7 +17,7 @@ def flat_board(seed=1, size=(1000, 700)):
     """A top-down 'board': coloured land patches with busy, feature-rich texture."""
     rng = np.random.default_rng(seed)
     w, h = size
-    colours = [(60, 160, 60), (90, 170, 210), (190, 160, 90), (140, 140, 140), (200, 120, 40)]
+    colours = [(60, 160, 60), (90, 170, 210), (190, 160, 90), (160, 148, 138), (200, 120, 40)]
     board = np.zeros((h, w, 3), np.uint8)
     for i, c in enumerate(colours):
         board[:, i * w // 5:(i + 1) * w // 5] = c
@@ -65,12 +65,22 @@ def scene():
 
 def test_outline_finds_board(scene):
     reference, _, _ = scene
+    reference = reference.copy()
+    # A white mug just off the board (cool-tinted glaze, like the real one) must stay out.
+    cv2.circle(reference, (1300, 330), 140, (215, 205, 195), -1)
     board = find_board(reference)
     assert board is not None
     x, y, w, h = board.bbox
     assert abs(x - 820) < 40 and abs(y - 560) < 40 and abs((x + w) - 2000) < 40 and abs((y + h) - 1450) < 40
     for got, want in zip(board.quad, BOARD):
         assert np.linalg.norm(got - want) < 60
+    assert not board.touches_edge
+
+
+def test_board_running_off_frame_is_flagged():
+    image, _ = place(flat_board(), BOARD + np.float32([600, 0]), table())
+    board = find_board(image)
+    assert board is not None and board.touches_edge
 
 
 def test_find_single_token_after_board_moved(scene):

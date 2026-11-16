@@ -138,35 +138,48 @@ def cmd_reference(args) -> int:
     return 0
 
 
-def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarray, **kwargs) -> dict:
+def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarray,
+                  max_piece_frac: float = 0.03, **kwargs) -> dict:
     """Register `image` onto the reference and find what changed on the board."""
     reg = register(reference, image, reference_mask=board_mask)
     if reg is None or not reg.ok:
-        return {"registered": False, "inliers": reg.inliers if reg else 0, "pieces": []}
+        return {"registered": False, "inliers": reg.inliers if reg else 0, "pieces": [], "large_changes": []}
     aligned = warp_to_reference(image, reg, reference.shape)
     covered = valid_mask(image.shape, reg, reference.shape)
+    # Stay clear of the picture's edges, in both photos: where the board runs off the
+    # frame, a few pixels of misalignment look like change.
+    edge = max(8, int(0.006 * max(reference.shape[:2])))
+    covered = cv2.erode(covered, np.ones((2 * edge + 1, 2 * edge + 1), np.uint8))
+    covered[:edge, :] = 0
+    covered[-edge:, :] = 0
+    covered[:, :edge] = 0
+    covered[:, -edge:] = 0
     region = cv2.bitwise_and(board_mask, covered)
     blobs, change_mask = find_changes(reference, aligned, region, **kwargs)
+    board_area = max(1, int((region > 0).sum()))
     H_inv = np.linalg.inv(reg.homography)
-    pieces = []
+    pieces, large = [], []
     for b in blobs:
         x, y, w, h = b.bbox
         corners = np.float32([[x, y], [x + w, y], [x + w, y + h], [x, y + h]]).reshape(-1, 1, 2)
         img_corners = cv2.perspectiveTransform(corners, H_inv).reshape(-1, 2)
         cx, cy = cv2.perspectiveTransform(np.float32([[b.centroid]]), H_inv).reshape(2)
-        pieces.append({
+        entry = {
             "centroid": [round(float(cx)), round(float(cy))],
             "outline": [[round(float(px)), round(float(py))] for px, py in img_corners],
             "reference_bbox": list(b.bbox),
             "area_px": b.area,
             "mean_bgr": list(b.mean_bgr),
             "change_score": b.score,
-        })
+        }
+        # Far bigger than any piece: a hand, a moved object, or the board itself moved.
+        (large if b.area > max_piece_frac * board_area else pieces).append(entry)
     return {
         "registered": True,
         "inliers": reg.inliers,
         "matches": reg.matches,
         "pieces": pieces,
+        "large_changes": large,
         "_aligned": aligned,
         "_change_mask": change_mask,
     }
@@ -179,7 +192,11 @@ def draw_pieces(image: np.ndarray, result: dict) -> np.ndarray:
         cv2.polylines(out, [np.int32(p["outline"])], True, (0, 0, 255), t)
         x, y = p["centroid"]
         cv2.putText(out, str(i), (x + 15, y - 15), cv2.FONT_HERSHEY_SIMPLEX, t * 0.8, (0, 0, 255), t * 2)
+    for p in result.get("large_changes", []):
+        cv2.polylines(out, [np.int32(p["outline"])], True, (0, 165, 255), t)
     label = f"{len(result['pieces'])} piece(s)" if result["registered"] else "could not line up with reference"
+    if result.get("large_changes"):
+        label += f", {len(result['large_changes'])} large change(s)"
     cv2.putText(out, label, (30, 60 * t // 2 + 30), cv2.FONT_HERSHEY_SIMPLEX, t * 0.8, (0, 0, 0), t * 3)
     cv2.putText(out, label, (30, 60 * t // 2 + 30), cv2.FONT_HERSHEY_SIMPLEX, t * 0.8, (255, 255, 255), t)
     return out
@@ -214,6 +231,9 @@ def cmd_find(args) -> int:
         for i, p in enumerate(result["pieces"], 1):
             print(f"  {i}: at {p['centroid']}, {p['area_px']} px, colour BGR {p['mean_bgr']}, "
                   f"change {p['change_score']}")
+        for p in result["large_changes"]:
+            print(f"  (large change, not counted as a piece: at {p['centroid']}, {p['area_px']} px; "
+                  "a hand, a moved object, or the board moved)")
     print(f"Annotated picture: {path}")
     return 0
 

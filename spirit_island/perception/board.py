@@ -48,6 +48,23 @@ def _quad_from_contour(contour: np.ndarray) -> np.ndarray:
     return order_corners(cv2.boxPoints(cv2.minAreaRect(contour)))
 
 
+def _touches_edge(contour: np.ndarray, shape, margin: int = 2) -> bool:
+    """Checked at working scale, where the frame edge is exact."""
+    h, w = shape
+    pts = contour.reshape(-1, 2)
+    return bool((pts[:, 0] <= margin).any() or (pts[:, 1] <= margin).any()
+                or (pts[:, 0] >= w - 1 - margin).any() or (pts[:, 1] >= h - 1 - margin).any())
+
+
+def _contour_gap(a: np.ndarray, b: np.ndarray, shape) -> float:
+    """Smallest distance in pixels between two filled contours."""
+    canvas = np.full(shape, 255, np.uint8)
+    cv2.drawContours(canvas, [a], -1, 0, thickness=cv2.FILLED)
+    dist = cv2.distanceTransform(canvas, cv2.DIST_L2, 3)
+    pts = b.reshape(-1, 2)
+    return float(dist[pts[:, 1].clip(0, shape[0] - 1), pts[:, 0].clip(0, shape[1] - 1)].min())
+
+
 def find_board(
     image: np.ndarray,
     work_side: int = 1200,
@@ -96,30 +113,26 @@ def find_board(
     if best is None:
         return None
 
-    # Grey mountains and pale wetlands are barely saturated, so one board can split
-    # into several coloured pieces. Gather the pieces lying next to the best one...
+    # Join only pieces that (nearly) touch the board, e.g. a land split off by a
+    # printed border line. Reaching further pulls in nearby objects such as a mug.
     group = [best]
     bx, by, bw, bh = cv2.boundingRect(best)
-    reach = 0.35 * max(bw, bh)
     for c in contours:
         if c is best or cv2.contourArea(c) < 0.002 * frame_area:
             continue
         cx, cy, cw, ch = cv2.boundingRect(c)
-        gap_x = max(0, max(bx, cx) - min(bx + bw, cx + cw))
-        gap_y = max(0, max(by, cy) - min(by + bh, cy + ch))
-        if max(gap_x, gap_y) <= reach and cw * ch < 4 * bw * bh:
+        if cx > bx + bw + k or cx + cw < bx - k or cy > by + bh + k or cy + ch < by - k:
+            continue  # bounding boxes are not even within k of each other
+        gap = _contour_gap(best, c, small.shape[:2])
+        if gap <= k:
             group.append(c)
-    # ...and close the gaps between them with a kernel sized to the board.
-    union = np.zeros_like(mask)
-    cv2.drawContours(union, group, -1, 255, thickness=cv2.FILLED)
-    gx, gy, gw, gh = cv2.boundingRect(np.vstack(group))
-    k2 = max(k, int(0.35 * min(gw, gh)) | 1)
-    pad = k2
-    padded = cv2.copyMakeBorder(union, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0)
-    padded = cv2.morphologyEx(padded, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k2, k2)))
-    union = padded[pad:-pad, pad:-pad]
-    merged, _ = cv2.findContours(union, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    best = max(merged, key=cv2.contourArea)
+    if len(group) > 1:
+        union = np.zeros_like(mask)
+        cv2.drawContours(union, group, -1, 255, thickness=cv2.FILLED)
+        k2 = min(2 * k + 1, int(0.04 * max(small.shape[:2])) | 1)
+        union = cv2.morphologyEx(union, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k2, k2)))
+        merged, _ = cv2.findContours(union, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        best = max(merged, key=cv2.contourArea)
 
     contour = (best.astype(np.float32) / scale).astype(np.int32)
     full_mask = np.zeros((h, w), np.uint8)
@@ -129,8 +142,5 @@ def find_board(
         quad=_quad_from_contour(contour),
         mask=full_mask,
         area_frac=round(float(cv2.contourArea(best)) / frame_area, 4),
-        touches_edge=bool(
-            (contour[..., 0] <= 2).any() or (contour[..., 1] <= 2).any()
-            or (contour[..., 0] >= w - 3).any() or (contour[..., 1] >= h - 3).any()
-        ),
+        touches_edge=_touches_edge(best, small.shape[:2]),
     )
