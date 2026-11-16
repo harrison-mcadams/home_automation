@@ -11,7 +11,7 @@ def setup_game(players=1, terrains=None):
                    "players": [{"name": f"P{i}", "spirit": "River Surges in Sunlight"} for i in range(players)],
                    "terrains": terrains or {}})
     while game.state["step"] != "setup.first_explore":
-        game.dispatch({"type": "next"})
+        game.dispatch({"type": "next", "screen": True})
     return game
 
 
@@ -28,7 +28,7 @@ def test_setup_numbers_scale_with_players():
 def test_every_step_has_guidance():
     game = setup_game()
     game.dispatch({"type": "reveal_invader", "card": "J"})
-    game.dispatch({"type": "next"})
+    game.dispatch({"type": "next", "screen": True})
     seen = set()
     for _ in range(40):
         info = describe(game.state)
@@ -36,7 +36,7 @@ def test_every_step_has_guidance():
         seen.add(game.state["step"])
         if game.state["step"] == "invader.explore":
             game.dispatch({"type": "reveal_invader", "card": g.possible_next_cards(game.state)[0]})
-        game.dispatch({"type": "next"})
+        game.dispatch({"type": "next", "screen": True})
     assert {"spirit.growth", "fast", "invader.ravage", "invader.build", "invader.explore", "slow",
             "time_passes"} <= seen
 
@@ -44,20 +44,20 @@ def test_every_step_has_guidance():
 def test_first_explore_card_moves_to_build_then_ravage():
     game = setup_game()
     with pytest.raises(ActionError):
-        game.dispatch({"type": "next"})  # must reveal first
+        game.dispatch({"type": "next", "screen": True})  # must reveal first
     game.dispatch({"type": "reveal_invader", "card": "W"})
-    game.dispatch({"type": "next"})
+    game.dispatch({"type": "next", "screen": True})
     s = game.state
     assert s["status"] == "playing" and s["round"] == 1
     assert s["invaders"]["slots"] == {"ravage": None, "build": "W", "explore": None}
     while s["step"] != "invader.explore":
-        game.dispatch({"type": "next"})
+        game.dispatch({"type": "next", "screen": True})
         s = game.state
     with pytest.raises(ActionError):
         game.dispatch({"type": "reveal_invader", "card": "W"})  # already drawn
     game.dispatch({"type": "reveal_invader", "card": "S"})
-    game.dispatch({"type": "next"})  # -> advance
-    game.dispatch({"type": "next"})  # slides cards
+    game.dispatch({"type": "next", "screen": True})  # -> advance
+    game.dispatch({"type": "next", "screen": True})  # slides cards
     assert game.state["invaders"]["slots"] == {"ravage": "W", "build": "S", "explore": None}
     assert game.state["step"] == "slow"
 
@@ -65,14 +65,14 @@ def test_first_explore_card_moves_to_build_then_ravage():
 def test_fear_earns_cards_and_raises_terror():
     game = setup_game()
     game.dispatch({"type": "reveal_invader", "card": "J"})
-    game.dispatch({"type": "next"})
+    game.dispatch({"type": "next", "screen": True})
     game.dispatch({"type": "fear", "amount": 4 * 3})
     s = game.state
     assert s["fear"]["earned_total"] == 3 and s["fear"]["unresolved"] == 3
     assert g.terror_level(s) == 2
     # Fear step is not skipped when cards are waiting.
     while s["step"] != "invader.fear":
-        game.dispatch({"type": "next"})
+        game.dispatch({"type": "next", "screen": True})
         s = game.state
     game.dispatch({"type": "resolve_fear_card"})
     assert game.state["fear"]["unresolved"] == 2
@@ -81,12 +81,12 @@ def test_fear_earns_cards_and_raises_terror():
 def test_fear_step_skipped_when_nothing_earned():
     game = setup_game()
     game.dispatch({"type": "reveal_invader", "card": "J"})
-    game.dispatch({"type": "next"})
+    game.dispatch({"type": "next", "screen": True})
     steps = []
     for _ in range(8):
         if game.state["step"] == "invader.explore":
             game.dispatch({"type": "reveal_invader", "card": "W"})
-        game.dispatch({"type": "next"})
+        game.dispatch({"type": "next", "screen": True})
         steps.append(game.state["step"])
     assert "invader.fear" not in steps and "invader.blighted" not in steps
 
@@ -94,7 +94,7 @@ def test_fear_step_skipped_when_nothing_earned():
 def test_earning_whole_fear_deck_wins():
     game = setup_game()
     game.dispatch({"type": "reveal_invader", "card": "J"})
-    game.dispatch({"type": "next"})
+    game.dispatch({"type": "next", "screen": True})
     game.dispatch({"type": "fear", "amount": 4 * 9})
     assert game.state["status"] == "won"
     assert game.state["result"]["score"] == 10 + 2 * g.invader_cards_left(game.state)
@@ -142,7 +142,7 @@ def test_card_matching_uses_terrain_and_coast():
 def test_blight_pool_loss_after_flip():
     game = setup_game()
     game.dispatch({"type": "reveal_invader", "card": "J"})
-    game.dispatch({"type": "next"})
+    game.dispatch({"type": "next", "screen": True})
     game.dispatch({"type": "blight", "land": "A1", "amount": 3})
     assert game.state["blight"]["pool"] == 0 and game.state["status"] == "playing"
     game.dispatch({"type": "flip_blight_card", "add": 5})
@@ -153,13 +153,13 @@ def test_blight_pool_loss_after_flip():
 def test_invader_deck_running_out_loses():
     game = setup_game()
     game.dispatch({"type": "reveal_invader", "card": "J"})
-    game.dispatch({"type": "next"})
+    game.dispatch({"type": "next", "screen": True})
     for _ in range(200):
         if game.state["status"] != "playing":
             break
         if game.state["step"] == "invader.explore":
             game.dispatch({"type": "reveal_invader", "card": g.possible_next_cards(game.state)[0]})
-        game.dispatch({"type": "next"})
+        game.dispatch({"type": "next", "screen": True})
     assert game.state["status"] == "lost"
     assert "deck" in game.state["result"]["reason"]
     # 12 cards: one explored in setup, then 11 rounds of explores; round 12 has none left.
@@ -202,9 +202,22 @@ def test_printed_board_terrains_fill_in_by_themselves():
 def test_back_steps_through_setup_keeping_choices():
     from spirit_island.engine import Game
     g = Game()
-    g.dispatch({"type": "next"})
+    g.dispatch({"type": "next", "screen": True})
     g.dispatch({"type": "configure", "players": [{"name": "H", "spirit": "River Surges in Sunlight"}], "boards": ["C"]})
-    g.dispatch({"type": "next"})
+    g.dispatch({"type": "next", "screen": True})
     assert g.state["step"] == "setup.island"
     g.dispatch({"type": "back"})
     assert g.state["step"] == "setup.players" and g.state["players"][0]["name"] == "H"
+
+
+def test_next_walks_items_before_screens():
+    from spirit_island.engine import Game, describe
+    g = Game()
+    n = len(describe(g.state)["do"])
+    for i in range(n - 1):
+        g.dispatch({"type": "next"})
+        assert g.state["step"] == "setup.welcome" and describe(g.state)["sub"] == i + 1
+    g.dispatch({"type": "next"})
+    assert g.state["step"] == "setup.players" and g.state["sub"] == 0
+    g.dispatch({"type": "back"})
+    assert g.state["step"] == "setup.welcome" and g.state["sub"] == n - 1

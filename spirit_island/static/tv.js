@@ -176,11 +176,15 @@ function renderGallery(pics, setup) {
         r.classList.add("row");
         r.style.gridTemplateColumns = rest.map((p) => (p.wide ? "2.1fr" : "1fr")).join(" ");
       }
-      r.style.setProperty("--h", (multi ? 15.5 : rest.length <= 3 ? 50 : rest.length === 4 ? 38 : 34) + "vh");
+      r.style.setProperty("--h", (multi ? 15.5 : rest.length <= 3 ? 50 : rest.length === 4 ? 38 : rest.length === 5 ? 31 : 34) + "vh");
       sec.append(r);
     }
     return sec;
   }));
+}
+
+function forItem(pics, sub) {
+  return (pics || []).filter((p) => !p.items || p.items.includes(sub));
 }
 
 function renderNow() {
@@ -189,7 +193,10 @@ function renderNow() {
   document.body.classList.toggle("lost", s.status === "lost");
   $("n-phase").textContent = g.phase;
   $("n-title").textContent = g.title;
-  $("n-do").replaceChildren(...g.do.map((t) => el("li", {}, t)));
+  // Next walks the numbered items one at a time: the current one is lit, and only its
+  // pictures are shown.
+  const sub = g.sub || 0;
+  $("n-do").replaceChildren(...g.do.map((t, i) => el("li", { class: i === sub ? "now" : i < sub ? "done" : "" }, t)));
   const focus = focusRows(g.helper);
   if (g.helper && g.helper.kind === "configure") {
     const roster = g.helper.roster || [];
@@ -201,7 +208,7 @@ function renderNow() {
   }
   if (g.helper && g.helper.kind === "fear_cards") focus.push(el("div", { class: "focus" }, el("b", {}, g.helper.left), "fear card(s) to read and resolve"));
   $("n-focus").replaceChildren(...focus);
-  renderGallery(g.pictures || [], s.status === "setup");
+  renderGallery(forItem(g.pictures, sub), s.status === "setup");
   // Build the screen up as the game goes: setup shows only the step itself; the invader
   // cards, lands and camera join at the first explore, the status bar once play starts.
   document.body.classList.toggle("bare", s.status === "setup" && s.step !== "setup.first_explore");

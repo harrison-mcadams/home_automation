@@ -129,3 +129,6 @@ figure { position: relative; }
   45% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   55%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
+
+#g-do li:not(.now) { opacity: .5; }
+#g-do li.now { font-weight: 600; }

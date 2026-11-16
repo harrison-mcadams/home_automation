@@ -34,6 +34,7 @@ def describe(state):
            "why": "", "tips": [], "helper": None, "pictures": []}
     if fn:
         out.update(fn(state))
+    out["sub"] = max(0, min(state.get("sub", 0), len(out["do"]) - 1))
     if state["status"] in ("won", "lost"):
         r = state["result"]
         out.update({
@@ -179,7 +180,9 @@ def _track_discs(spirit):
             for y, n in ((t["energy_y"], t["energy"]), (t["cards_y"], t["cards"])) for i in range(1, n)]
 
 
-def spirit_pictures(state):
+def spirit_pictures(state, start_item=3):
+    """Pictures for the spirit step, each tagged with the numbered item it illustrates:
+    0 the panel, 1 the starting cards, 2 presence on the tracks, 3+ starting presence."""
     pics = []
     for group, p in enumerate(state["players"]):
         art = rules.SPIRIT_ART.get(p["spirit"])
@@ -187,32 +190,33 @@ def spirit_pictures(state):
             continue
         folder, cards = art
         colour = DISC_COLOURS[group % len(DISC_COLOURS)]
-        pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True, "group": group,
+        who = f"{p['name']}'s spirit panel" if len(state["players"]) > 1 else "Spirit panel"
+        pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True, "group": group, "items": [0],
+                     "caption": f"{who} (front) for {p['spirit']}"})
+        pics.append({"src": f"spirits/{folder}/card_back.jpg", "mark": True, "group": group, "items": [1],
+                     "caption": "Back of your 4 starting cards: your spirit's art"})
+        for c in cards:
+            pics.append({"src": f"spirits/{folder}/{rules.picture_slug(c)}.jpg", "group": group, "items": [1],
+                         "caption": f"{c} (starting power card)"})
+        pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True, "group": group, "items": [2],
                      "discs": _track_discs(p["spirit"]), "disc_colour": colour, "disc_size": 0.052,
-                     "caption": (f"{p['name']}'s spirit panel" if len(state["players"]) > 1 else "Spirit panel")
-                                + f" (front) for {p['spirit']}: a disc on every track circle but the first."})
+                     "caption": f"{who}: a disc on every track circle but the first"})
         b = state["boards"][group] if group < len(state["boards"]) else None
-        places = rules.START_PRESENCE.get(p["spirit"], [])
         discs = []
-        for t, n in places:
+        for t, n in rules.START_PRESENCE.get(p["spirit"], []):
             lid = _highest_id(state, t, b)
             pt = _land_point(lid, b) if lid else None
             if pt:
                 discs += [{"x": round(pt[0] + 0.03 * k, 4), "y": round(pt[1], 4), "land": True} for k in range(n)]
         if discs:
             pics.append({"src": f"components/board_{b}.jpg", "wide": True, "group": group,
-                         "discs": discs, "disc_colour": colour, "disc_size": 0.06,
-                         "caption": f"Board {b}: starting presence"})
-        pics.append({"src": f"spirits/{folder}/card_back.jpg", "mark": True, "group": group,
-                     "caption": "Back of your 4 starting cards: your spirit's art"})
-        for c in cards:
-            pics.append({"src": f"spirits/{folder}/{rules.picture_slug(c)}.jpg", "group": group,
-                         "caption": f"{c} (starting power card)"})
+                         "items": [start_item + group], "discs": discs, "disc_colour": colour,
+                         "disc_size": 0.06, "caption": f"Board {b}: starting presence"})
     return pics
 
 
 def _spirits(s):
-    starts, unknown = [], False
+    starts, unknown, start_groups = [], False, []
     for i, p in enumerate(s["players"]):
         board = s["boards"][i] if i < len(s["boards"]) else None
         t = _start_text(s, p["spirit"], board)
@@ -220,6 +224,7 @@ def _spirits(s):
             t = f"{p['name']}: " + t[0].lower() + t[1:]
         if t:
             starts.append(t)
+            start_groups.append(i)
         else:
             unknown = True
     return {
@@ -235,12 +240,15 @@ def _spirits(s):
         "why": "Each disc you later move from a track onto the island uncovers a bigger number, so "
                "you gain more energy or more card plays as you spread.",
         "tips": ["Tap the Presence counts in the Island panel if you want the app to track them."],
-        "pictures": spirit_pictures(s),
+        "pictures": [dict(p, items=[3 + start_groups.index(p["group"])]) if p["items"][0] >= 3 else p
+                     for p in spirit_pictures(s) if p["items"][0] < 3 or p["group"] in start_groups],
     }
 
 
-def _comp(name, caption, wide=False):
+def _comp(name, caption, wide=False, items=None):
     pic = {"src": f"components/{name}.jpg", "caption": caption}
+    if items is not None:
+        pic["items"] = items
     if wide:
         pic["wide"] = True
     return pic
@@ -264,13 +272,13 @@ def _invader_board(s):
         "tips": ["An adversary changes these numbers. If you use one, follow its setup and correct the "
                  "pools in Settings."] if s["adversary"]["name"] != "None" else [],
         "pictures": [
-            _comp("fear_back", "Fear card (back)"),
-            _comp("terror_2", "Terror Level II divider"),
-            _comp("terror_3", "Terror Level III divider"),
-            _comp("blight_healthy", "Blight card, Healthy side"),
-            _comp("stage1_back", "Invader card, Stage I back"),
-            _comp("stage2_back", "Stage II back"),
-            _comp("stage3_back", "Stage III back"),
+            _comp("fear_back", items=[2], caption="Fear card (back)"),
+            _comp("terror_2", items=[2], caption="Terror Level II divider"),
+            _comp("terror_3", items=[2], caption="Terror Level III divider"),
+            _comp("blight_healthy", items=[3], caption="Blight card, Healthy side"),
+            _comp("stage1_back", items=[4], caption="Invader card, Stage I back"),
+            _comp("stage2_back", items=[4], caption="Stage II back"),
+            _comp("stage3_back", items=[4], caption="Stage III back"),
         ],
     }
 

@@ -188,3 +188,9 @@ figure { position: relative; }
   45% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   55%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
+
+/* the numbered item Next is on */
+#n-do li { transition: opacity .3s; }
+#n-do li.done, #n-do li:not(.now) { opacity: .4; }
+#n-do li.now { opacity: 1; }
+#n-do li.now::marker { color: var(--warn); }

@@ -12,6 +12,8 @@ import uuid
 
 from . import rules
 
+QUIET = "_quiet"  # an action summary that is not written to the log
+
 SETUP_STEPS = [
     "setup.welcome",
     "setup.players",
@@ -225,7 +227,8 @@ class Game:
             raise
         self.history.append(before)
         del self.history[:-HISTORY_LIMIT]
-        self._log(summary or kind, source)
+        if summary != QUIET:
+            self._log(summary or kind, source)
         self._check_end()
         return self.state
 
@@ -265,11 +268,16 @@ class Game:
         return self.state
 
     def _do_back(self, action):
-        """Go back one setup step, keeping everything already chosen."""
+        """Go back one item, or to the last item of the previous setup screen, keeping
+        everything already chosen."""
         s = self.state
+        if s.get("sub", 0) > 0:
+            s["sub"] -= 1
+            return QUIET
         if s["status"] != "setup" or s["step"] not in SETUP_STEPS or s["step"] == SETUP_STEPS[0]:
             raise ActionError("already at the first setup step")
         s["step"] = SETUP_STEPS[SETUP_STEPS.index(s["step"]) - 1]
+        s["sub"] = max(0, self._items() - 1)
         return f"Back to {s['step']}"
 
     def _do_new_game(self, action):
@@ -314,10 +322,19 @@ class Game:
         names = ", ".join(f"{p['name']} ({p['spirit'] or 'spirit not chosen'})" for p in s["players"])
         return f"Set up {n} player(s): {names}; boards {', '.join(boards)}"
 
+    def _items(self):
+        from .guide import describe  # the screen's numbered items; imported here to avoid a cycle
+        return len(describe(self.state)["do"])
+
     def _do_next(self, action):
         s = self.state
         if s["status"] in ("won", "lost"):
             raise ActionError("the game is over")
+        # Walk the screen's numbered items one at a time before moving to the next screen.
+        if not action.get("screen") and s.get("sub", 0) < self._items() - 1:
+            s["sub"] = s.get("sub", 0) + 1
+            return QUIET
+        s["sub"] = 0
         step = s["step"]
         if step == "setup.players" and not s["players"]:
             raise ActionError("choose players and spirits first")

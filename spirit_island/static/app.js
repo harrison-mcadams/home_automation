@@ -66,7 +66,7 @@ function renderHeader() {
   // During setup the left button steps back a screen; once playing it undoes the last tap.
   const back = s.status === "setup";
   $("btn-undo").textContent = back ? "‹ Back" : "Undo";
-  $("btn-undo").disabled = back ? s.step === "setup.welcome" : !S.can_undo;
+  $("btn-undo").disabled = back ? s.step === "setup.welcome" && !s.sub : !S.can_undo;
   $("btn-next").disabled = s.status === "won" || s.status === "lost";
   $("btn-fear").disabled = s.status !== "playing";
 }
@@ -109,10 +109,11 @@ function renderGuide() {
   const g = S.guide;
   $("g-phase").textContent = g.phase;
   $("g-title").textContent = g.title;
-  $("g-do").replaceChildren(...g.do.map((t) => el("li", {}, t)));
+  const sub = g.sub || 0;
+  $("g-do").replaceChildren(...g.do.map((t, i) => el("li", { class: i === sub ? "now" : i < sub ? "done" : "" }, t)));
   $("g-why").textContent = g.why || "";
   $("g-tips").replaceChildren(...(g.tips || []).map((t) => el("li", {}, t)));
-  $("g-pics").replaceChildren(...pictures(g.pictures));
+  $("g-pics").replaceChildren(...pictures((g.pictures || []).filter((p) => !p.items || p.items.includes(sub))));
   const h = $("g-helper"); h.replaceChildren();
   if (!g.helper) return;
   const fn = HELPERS[g.helper.kind];
