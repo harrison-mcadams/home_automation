@@ -132,3 +132,23 @@ figure { position: relative; }
 
 #g-do li:not(.now) { opacity: .5; }
 #g-do li.now { font-weight: 600; }
+
+/* animated setup scenes (anim.js) */
+svg.scene { display: block; width: 100%; height: auto; }
+.a-drop, .a-fade, .a-remove { opacity: 0; transform-box: fill-box; transform-origin: center;
+  animation: a-drop 10s ease-out infinite; }
+.a-fade { animation-name: a-fade; }
+.a-remove { animation-name: a-remove; }
+@keyframes a-drop {
+  0% { opacity: 0; transform: translateY(-140px); }
+  5% { opacity: 1; transform: none; }
+  88% { opacity: 1; transform: none; }
+  96%, 100% { opacity: 0; transform: none; }
+}
+@keyframes a-fade { 0% { opacity: 0; } 5%, 88% { opacity: 1; } 96%, 100% { opacity: 0; } }
+@keyframes a-remove {
+  0% { opacity: 0; transform: none; }
+  4% { opacity: 1; transform: none; }
+  16% { opacity: 1; transform: none; }
+  28%, 100% { opacity: 0; transform: translateX(160px); }
+}

@@ -262,23 +262,33 @@ def _invader_board(s):
             "Invader board: the long board with spaces for fear, blight and the invader cards. "
             "Put it beside the island.",
             f"Fear pool: {f['pool_size']} fear markers (4 per player).",
-            f"Fear deck, top to bottom: {f['deck'][0]} fear cards, Terror II divider, "
-            f"{f['deck'][1]} cards, Terror III divider, {f['deck'][2]} cards.",
+            f"Fear deck: shuffle the fear cards and deal {sum(f['deck'])} face down, building from the "
+            f"bottom up: {f['deck'][2]} cards, the Terror III divider, {f['deck'][1]} cards, the "
+            f"Terror II divider, {f['deck'][0]} cards on top. The rest go back in the box.",
             f"Blight card: Healthy Island side up, with {s['blight']['pool']} blight on it.",
-            "Invader deck: remove 1 random card of each stage without looking, then stack face "
-            "down with Stage I on top and Stage III at the bottom (12 cards).",
+            "Invader deck: sort the invader cards by the I, II, III on their backs and shuffle each "
+            "pile. Take 1 card from each pile without looking and put it back in the box. Stack them "
+            "face down: Stage III at the bottom, Stage II on it, Stage I on top (12 cards).",
         ],
         "why": "The fear deck is your victory clock; the invader deck is your defeat clock.",
         "tips": ["An adversary changes these numbers. If you use one, follow its setup and correct the "
                  "pools in Settings."] if s["adversary"]["name"] != "None" else [],
         "pictures": [
-            _comp("fear_back", items=[2], caption="Fear card (back)"),
-            _comp("terror_2", items=[2], caption="Terror Level II divider"),
-            _comp("terror_3", items=[2], caption="Terror Level III divider"),
-            _comp("blight_healthy", items=[3], caption="Blight card, Healthy side"),
-            _comp("stage1_back", items=[4], caption="Invader card, Stage I back"),
-            _comp("stage2_back", items=[4], caption="Stage II back"),
-            _comp("stage3_back", items=[4], caption="Stage III back"),
+            _comp("invader_board", "Your invader board", True, items=[0]),
+            {"anim": "pool", "count": f["pool_size"], "wide": True, "items": [1],
+             "caption": "Fear pool: the fear markers wait here"},
+            {"anim": "stack", "wide": True, "items": [2], "caption": "The fear deck, built from the bottom up",
+             "layers": [{"src": "components/fear_back.jpg", "count": f["deck"][0], "label": f"{f['deck'][0]} fear cards"},
+                        {"src": "components/terror_2.jpg", "label": "Terror Level II divider"},
+                        {"src": "components/fear_back.jpg", "count": f["deck"][1], "label": f"{f['deck'][1]} fear cards"},
+                        {"src": "components/terror_3.jpg", "label": "Terror Level III divider"},
+                        {"src": "components/fear_back.jpg", "count": f["deck"][2], "label": f"{f['deck'][2]} fear cards"}]},
+            {"anim": "blight", "src": "components/blight_healthy.jpg", "count": s["blight"]["pool"], "wide": True,
+             "items": [3], "caption": "Blight card, Healthy Island side up"},
+            {"anim": "stack", "wide": True, "items": [4], "caption": "The invader deck, built from the bottom up",
+             "layers": [{"src": "components/stage1_back.jpg", "count": 3, "removed": 1, "label": "Stage I: 3 cards"},
+                        {"src": "components/stage2_back.jpg", "count": 4, "removed": 1, "label": "Stage II: 4 cards"},
+                        {"src": "components/stage3_back.jpg", "count": 5, "removed": 1, "label": "Stage III: 5 cards"}]},
         ],
     }
 

@@ -97,6 +97,7 @@ function addDiscs(fig, img, p) {
 }
 function pictures(list) {
   return (list || []).map((p) => {
+    if (p.anim) return el("figure", { class: "wide anim" }, animScene(p), el("figcaption", {}, p.caption));
     const img = el("img", { src: "/assets/" + p.src, alt: p.caption, loading: "lazy" });
     const fig = el("figure", { class: (p.wide ? "wide" : "") + (p.mark ? " mark" : "") }, el("a", { href: "/assets/" + p.src, target: "_blank" }, img), el("figcaption", {}, p.caption));
     img.onerror = () => fig.remove();

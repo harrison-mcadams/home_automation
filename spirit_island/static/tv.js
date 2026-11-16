@@ -138,6 +138,7 @@ function addDiscs(fig, img, p) {
   fig.append(layer);
 }
 function figure(p, cls) {
+  if (p.anim) return el("figure", { class: (cls || "") + " anim" }, animScene(p), el("figcaption", {}, p.caption.split(":")[0]));
   const img = el("img", { src: "/assets/" + p.src, alt: p.caption });
   const fig = el("figure", { class: (cls || "") + (p.mark ? " mark" : "") }, img, el("figcaption", {}, p.caption.split(":")[0].split(" (")[0]));
   img.onerror = () => fig.remove();
