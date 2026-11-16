@@ -225,11 +225,24 @@ class Camera:
             self.backend_name = "unknown"
         return True
 
-    def start(self, first_frame_timeout: float = 10.0) -> "Camera":
-        if not self._open():
+    def start(self, first_frame_timeout: float = 10.0, open_retry_seconds: float = 15.0) -> "Camera":
+        opened = self._open()
+        if not opened and _is_stream(self.source):
+            # A phone's camera server can drop briefly (another app grabbed the camera,
+            # the server restarted). Keep trying for a little while before giving up.
+            print(f"[vision] {redact(self.source)} not answering yet, retrying for {open_retry_seconds:g} s...")
+            deadline = time.monotonic() + open_retry_seconds
+            while not opened and time.monotonic() < deadline:
+                time.sleep(self.reconnect_delay)
+                opened = self._open()
+        if not opened:
+            hint = (
+                " Check the phone's camera app is open and its server is started."
+                if _is_stream(self.source)
+                else " Run `python -m vision.probe --list` to see which cameras exist."
+            )
             raise RuntimeError(
-                f"Could not open camera source {redact(self.source)!r}. "
-                "Run `python -m vision.probe --list` to see which cameras exist."
+                f"Could not open camera source {redact(self.source)!r}.{hint}"
                 + (
                     " On macOS, also check System Settings > Privacy & Security > Camera "
                     "for the app you are running this from (Terminal, iTerm, sshd)."
