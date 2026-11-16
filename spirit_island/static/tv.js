@@ -125,6 +125,16 @@ function renderNow() {
   if (g.helper && g.helper.kind === "configure") focus.push(el("div", { class: "focus" }, "Pick players and spirits on the phone."));
   if (g.helper && g.helper.kind === "fear_cards") focus.push(el("div", { class: "focus" }, el("b", {}, g.helper.left), "fear card(s) to read and resolve"));
   $("n-focus").replaceChildren(...focus);
+  const pics = g.pictures || [];
+  $("now").classList.toggle("has-pics", pics.length > 0);
+  // Panels are ~1.5x wider than tall and cards ~0.71x, so these column widths give one even row.
+  $("n-pics").style.gridTemplateColumns = pics.map((p) => (p.wide ? "2.1fr" : "1fr")).join(" ");
+  $("n-pics").replaceChildren(...pics.map((p) => {
+    const img = el("img", { src: "/assets/" + p.src, alt: p.caption });
+    const fig = el("figure", { class: p.wide ? "wide" : "" }, img, el("figcaption", {}, p.caption.split(":")[0].split(" (")[0]));
+    img.onerror = () => fig.remove();
+    return fig;
+  }));
   $("n-why").textContent = g.why || "";
   $("n-why").classList.toggle("hidden", !g.why);
   $("n-words").replaceChildren(...words(g));
@@ -218,6 +228,7 @@ function renderCamera() {
 }
 
 function render(snap) {
+  if (S && S.boot && snap.boot && S.boot !== snap.boot) { location.reload(); return; }
   S = snap;
   renderStatus(); renderTrack(); renderNow(); renderInvaders(); renderLands(); renderCamera();
 }

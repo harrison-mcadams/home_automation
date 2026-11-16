@@ -31,7 +31,7 @@ def describe(state):
     step = state["step"]
     fn = _STEPS.get(step)
     out = {"step": step, "phase": g.PHASES[g.phase_of(step)], "title": step, "do": [],
-           "why": "", "tips": [], "helper": None}
+           "why": "", "tips": [], "helper": None, "pictures": []}
     if fn:
         out.update(fn(state))
     if state["status"] in ("won", "lost"):
@@ -101,21 +101,67 @@ def _island(s):
     }
 
 
+def _highest(s, terrain):
+    """'land 8 on board C' for the highest-numbered land of a terrain on the first board."""
+    if not s["boards"]:
+        return None
+    b = s["boards"][0]
+    terrains = rules.default_terrains([b])
+    for lid, info in s.get("lands", {}).items():  # a terrain set on the Island panel wins
+        if lid in terrains and info.get("terrain"):
+            terrains[lid] = info["terrain"]
+    lands = [lid for lid, t in terrains.items() if t == terrain]
+    if not lands:
+        return None
+    best = max(lands, key=lambda l: int(l[len(b):]))
+    return f"land {best[len(b):]} on board {b}"
+
+
+# Starting presence printed on each panel's back, where it can be worked out for you.
+_START = {
+    "River Surges in Sunlight": lambda s: (
+        f"River puts 1 presence in the highest-numbered Wetland: {_highest(s, 'W')}."
+        if _highest(s, "W") else None),
+}
+
+
+def spirit_pictures(state):
+    pics = []
+    for p in state["players"]:
+        art = rules.SPIRIT_ART.get(p["spirit"])
+        if not art:
+            continue
+        folder, cards = art
+        pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True,
+                     "caption": f"Spirit panel (front) for {p['spirit']}. Growth choices on top, the two "
+                                "presence tracks in the middle, innate power below."})
+        pics.append({"src": f"spirits/{folder}/panel_back.jpg", "wide": True,
+                     "caption": "Panel back: the story, and SETUP (where your first presence goes)."})
+        for c in cards:
+            pics.append({"src": f"spirits/{folder}/{rules.picture_slug(c)}.jpg",
+                         "caption": f"{c} (starting power card)"})
+    return pics
+
+
 def _spirits(s):
+    starts = [t for t in (_START[p["spirit"]](s) for p in s["players"] if p["spirit"] in _START) if t]
     return {
         "title": "Set up each spirit",
         "do": [
-            "Each player takes their spirit panel and its 4 unique power cards (the ones with the "
-            "spirit's name). Those are your starting hand.",
-            "Fill every empty circle on the panel's two presence tracks (energy and card plays) with "
-            "presence discs in your colour.",
-            "The back of the panel shows where your starting presence goes on the island (often "
-            "in a specific terrain). Place those discs now.",
-            "Take any special pieces your panel mentions.",
-        ],
-        "why": "Presence on the tracks is what you will move onto the island as you grow; uncovering "
-               "track spaces gives you more energy and more card plays.",
+            "Spirit panel: the big, thick double-sided card with your spirit's art (pictured below). "
+            "Lay it in front of you, front side up.",
+            "Power cards: find the 4 normal-sized cards with your spirit's name. Those are your "
+            "starting hand. Leave the Minor and Major power decks aside for now.",
+            "Presence: choose a colour of wooden discs. The middle of the panel has two rows of "
+            "circles: Energy on top, Card Plays below. Put a disc on every circle except the first "
+            "(leftmost) one in each row; those first numbers are what you start with.",
+            "Starting presence: the SETUP box on the back of the panel says where your first discs "
+            "go on the island. Place them now.",
+        ] + starts,
+        "why": "Each disc you later move from a track onto the island uncovers a bigger number, so "
+               "you gain more energy or more card plays as you spread.",
         "tips": ["Tap the Presence counts in the Island panel if you want the app to track them."],
+        "pictures": spirit_pictures(s),
     }
 
 

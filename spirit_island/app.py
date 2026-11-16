@@ -142,9 +142,14 @@ class Store:
             return self._snapshot()
 
 
+# Changes each time the server starts, so open pages reload to pick up new code.
+BOOT_ID = str(os.getpid()) + "-" + str(int(__import__("time").time()))
+
+
 def snapshot(game):
     s = game.state
     return {
+        "boot": BOOT_ID,
         "state": s,
         "guide": describe(s),
         "can_undo": bool(game.history),
@@ -191,6 +196,14 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
     @app.get("/tv")
     def tv():
         return render_template("tv.html")
+
+    @app.get("/assets/<path:name>")
+    def asset(name):
+        """Pictures of game components (spirit panels, cards) shown on the setup steps."""
+        from flask import send_from_directory
+        if not name.lower().endswith((".jpg", ".png")):
+            return Response("not found", status=404)
+        return send_from_directory(os.path.join(BASE_DIR, "assets"), name, max_age=86400)
 
     @app.get("/api/links")
     def links():

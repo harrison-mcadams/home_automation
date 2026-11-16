@@ -94,3 +94,11 @@ pre.cmd { white-space: pre-wrap; background: var(--panel2); padding: 8px; border
 .links a { color: var(--accent); word-break: break-all; }
 .phonemap { width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; margin-top: 6px; }
 .seg { display: flex; gap: 4px; } .seg button { padding: 6px 10px; }
+
+/* component pictures on setup steps */
+.pics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 12px; }
+.pics:empty { display: none; }
+.pics figure { margin: 0; }
+.pics figure.wide { grid-column: 1 / -1; }
+.pics img { width: 100%; border-radius: 8px; display: block; }
+.pics figcaption { font-size: 13px; opacity: .8; margin-top: 3px; }

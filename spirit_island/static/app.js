@@ -70,6 +70,15 @@ function renderHeader() {
 }
 
 // ---------- guide ----------
+function pictures(list) {
+  return (list || []).map((p) => {
+    const img = el("img", { src: "/assets/" + p.src, alt: p.caption, loading: "lazy" });
+    const fig = el("figure", { class: p.wide ? "wide" : "" }, el("a", { href: "/assets/" + p.src, target: "_blank" }, img), el("figcaption", {}, p.caption));
+    img.onerror = () => fig.remove();
+    return fig;
+  });
+}
+
 function renderGuide() {
   const g = S.guide;
   $("g-phase").textContent = g.phase;
@@ -77,6 +86,7 @@ function renderGuide() {
   $("g-do").replaceChildren(...g.do.map((t) => el("li", {}, t)));
   $("g-why").textContent = g.why || "";
   $("g-tips").replaceChildren(...(g.tips || []).map((t) => el("li", {}, t)));
+  $("g-pics").replaceChildren(...pictures(g.pictures));
   const h = $("g-helper"); h.replaceChildren();
   if (!g.helper) return;
   const fn = HELPERS[g.helper.kind];
@@ -376,6 +386,7 @@ function renderTabs() {
 }
 
 function render(snapshot) {
+  if (S && S.boot && snapshot.boot && S.boot !== snapshot.boot) { location.reload(); return; }
   const stepChanged = !S || S.state.step !== snapshot.state.step;
   S = snapshot;
   renderHeader();

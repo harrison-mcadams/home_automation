@@ -65,6 +65,25 @@ SPIRITS = [
      "style": "Frightens instead of harming; wins by fear, not destruction."},
 ]
 
+
+# Pictures of each spirit's panel and its 4 unique power cards, kept under
+# assets/spirits/<folder>/ (gitignored; fetched from the open-source Tabletop Simulator mod).
+SPIRIT_ART = {
+    'River Surges in Sunlight': ('river', ['Boon of Vigor', 'Flash Floods', "River's Bounty", 'Wash Away']),
+    "Lightning's Swift Strike": ('lightning', ['Harbingers of the Lightning', "Lightning's Boon", 'Raging Storm', 'Shatter Homesteads']),
+    'Vital Strength of the Earth': ('earth', ['A Year of Perfect Stillness', 'Draw of the Fruitful Earth', 'Guard the Healing Land', 'Rituals of Destruction']),
+    'Shadows Flicker Like Flame': ('shadows', ['Concealing Shadows', 'Crops Wither and Fade', 'Favors Called Due', 'Mantle of Dread']),
+    'A Spread of Rampant Green': ('green', ['Fields Choked with Growth', 'Gift of Proliferation', 'Overgrow in a Night', 'Stem the Flow of Fresh Water']),
+    'Thunderspeaker': ('thunderspeaker', ['Manifestation of Power and Glory', 'Sudden Ambush', 'Voice of Thunder', 'Words of Warning']),
+    "Ocean's Hungry Grasp": ('ocean', ['Call of the Deeps', 'Grasping Tide', 'Swallow the Land-Dwellers', 'Tidal Boon']),
+    'Bringer of Dreams and Nightmares': ('bringer', ["Call on Midnight's Dream", 'Dreams of the Dahan', 'Predatory Nightmares', 'Dread Apparitions']),
+}
+
+
+def picture_slug(name):
+    return "".join(ch if ch.isalnum() else "_" for ch in name.lower()).strip("_")
+
+
 ADVERSARIES = ["None", "Brandenburg-Prussia", "England", "Sweden"]
 
 GLOSSARY = [
