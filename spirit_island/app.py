@@ -228,7 +228,7 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
         from flask import send_from_directory
         if not name.lower().endswith((".jpg", ".png")):
             return Response("not found", status=404)
-        return send_from_directory(os.path.join(BASE_DIR, "assets"), name, max_age=86400)
+        return send_from_directory(os.path.join(BASE_DIR, "assets"), name, max_age=0)
 
     @app.get("/api/links")
     def links():

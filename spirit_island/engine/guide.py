@@ -275,7 +275,7 @@ def _invader_board(s):
         "tips": ["An adversary changes these numbers. If you use one, follow its setup and correct the "
                  "pools in Settings."] if s["adversary"]["name"] != "None" else [],
         "pictures": [
-            {"anim": "photo", "src": "components/invader_board.jpg", "aspect": 0.907, "wide": True, "items": [0],
+            {"anim": "photo", "src": "components/invader_board_art.jpg", "aspect": 0.907, "wide": True, "items": [0],
              "caption": "Invader board: where everything goes",
              "zones": [{"x": .41, "y": .015, "w": .2, "h": .085, "label": "Fear pool"},
                        {"x": .38, "y": .25, "w": .24, "h": .28, "label": "Generated fear"},

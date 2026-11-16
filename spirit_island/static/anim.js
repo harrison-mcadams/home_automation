@@ -39,7 +39,7 @@ function poolScene(svg, p) {
   // The real invader board, zoomed on the fear pool, with the markers dropping in.
   const n = p.count || 4;
   svg.setAttribute("viewBox", "250 0 500 300");
-  svg.append(svgEl("image", { href: "/assets/components/invader_board.jpg", x: 0, y: 0, width: 1000, height: 907 }));
+  svg.append(svgEl("image", { href: "/assets/components/invader_board_art.jpg", x: 0, y: 0, width: 1000, height: 907 }));
   svg.append(svgEl("rect", { x: 250, y: 0, width: 500, height: 300, fill: "rgba(0,0,0,.25)" }));
   const gap = Math.min(70, 300 / n);
   for (let i = 0; i < n; i++) {
@@ -169,7 +169,7 @@ function photoScene(svg, p) {
 function setupScene(svg, p) {
   const W = 1000, H = 907, step = p.step || 1;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.append(svgEl("image", { href: "/assets/components/invader_board.jpg", x: 0, y: 0, width: W, height: H }));
+  svg.append(svgEl("image", { href: "/assets/components/invader_board_art.jpg", x: 0, y: 0, width: W, height: H }));
   const now = (k) => k === step;
   const notes = [];
   const anim = (node, k, delay, kind) => (now(k) ? dropIn(node, delay, kind) : node);
