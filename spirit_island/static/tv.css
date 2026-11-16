@@ -221,3 +221,12 @@ svg.scene { display: block; width: 100%; height: auto; }
 .a-spot { opacity: 0; animation: a-spot 16s linear infinite; }
 @keyframes a-spot { 0% { opacity: 0; } 2% { opacity: 1; } 9% { opacity: 1; } 11%, 100% { opacity: 0; } }
 body.gallery #n-do li:not(.now) { font-size: 1.9vh; }
+
+/* play once and hold (current step of the invader board build-up) */
+.a-drop1, .a-fade1, .a-remove1 { opacity: 0; transform-box: fill-box; transform-origin: center;
+  animation: a-drop1 .6s ease-out forwards; }
+.a-fade1 { animation-name: a-fade1; }
+.a-remove1 { animation: a-remove1 1.6s ease-in forwards; }
+@keyframes a-drop1 { from { opacity: 0; transform: translateY(-140px); } to { opacity: 1; transform: none; } }
+@keyframes a-fade1 { from { opacity: 0; } to { opacity: 1; } }
+@keyframes a-remove1 { 0% { opacity: 0; } 20% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(160px); } }

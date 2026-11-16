@@ -172,7 +172,8 @@ function setupScene(svg, p) {
   svg.append(svgEl("image", { href: "/assets/components/invader_board_art.jpg", x: 0, y: 0, width: W, height: H }));
   const now = (k) => k === step;
   const notes = [];
-  const anim = (node, k, delay, kind) => (now(k) ? dropIn(node, delay, kind) : node);
+  // The current step plays once and then holds still.
+  const anim = (node, k, delay, kind) => (now(k) ? dropIn(node, delay, (kind || "drop") + "1") : node);
 
   // 1. fear markers in the pool
   if (step >= 1) {
@@ -221,7 +222,7 @@ function setupScene(svg, p) {
     for (const [src, n, label] of stages) {
       if (now(4)) {
         const gone = svgEl("image", { href: `/assets/components/${src}.jpg`, x: 846, y: 652, width: 131, height: 200 });
-        svg.append(dropIn(gone, t, "remove"));
+        svg.append(dropIn(gone, t, "remove1"));
         notes.push([`${label}: ${n} cards (1 to the box)`, t]);
       }
       for (let k = 0; k < n; k++, i++) {
@@ -232,11 +233,40 @@ function setupScene(svg, p) {
       t += 0.5 + n * 0.28;
     }
   }
-  // what's going in, over the middle of the board
+  // What's going in, over the middle of the board, then (for the decks) a still picture of
+  // the finished stack, top to bottom.
+  const rows = step === 2 ? fearRows(p.deck || [3, 3, 3]) : step === 4 ? invaderRows() : [];
   if (notes.length) {
-    svg.append(svgEl("rect", { x: 270, y: 200, width: 460, height: 60 + notes.length * 52, rx: 18, fill: "rgba(10,18,14,.82)",
+    const lineH = 38, rowH = 46;
+    const textH = 30 + notes.length * lineH, picH = rows.length ? 50 + rows.length * rowH : 0;
+    const top = 150;
+    svg.append(svgEl("rect", { x: 260, y: top, width: 480, height: textH + picH + 16, rx: 18, fill: "rgba(10,18,14,.88)",
       stroke: "#ffd23a", "stroke-width": 3 }));
-    notes.forEach(([text, delay], i) => svg.append(dropIn(svgEl("text", { x: 500, y: 250 + i * 52, "text-anchor": "middle",
-      "font-size": 29, fill: "#f1f5ee", "font-weight": 600 }, text), delay, "fade")));
+    notes.forEach(([text, delay], i) => svg.append(dropIn(svgEl("text", { x: 500, y: top + 40 + i * lineH, "text-anchor": "middle",
+      "font-size": 26, fill: "#f1f5ee", "font-weight": 600 }, text), delay, "fade1")));
+    if (rows.length) {
+      const y0 = top + textH + 20;
+      svg.append(svgEl("line", { x1: 280, y1: y0 - 8, x2: 720, y2: y0 - 8, stroke: "#4c6b58", "stroke-width": 2 }));
+      svg.append(svgEl("text", { x: 285, y: y0 + 22, "font-size": 18, fill: "#86dc93", "font-weight": 700 }, "TOP"));
+      svg.append(svgEl("text", { x: 285, y: y0 + rows.length * rowH - 4, "font-size": 18, fill: "#a3b3a5", "font-weight": 700 }, "BOTTOM"));
+      rows.forEach(([src, count, label], i) => {
+        const y = y0 + i * rowH;
+        for (let k = 0; k < count; k++) {
+          svg.append(svgEl("image", { href: `/assets/components/${src}.jpg`, x: 370 + k * 16, y, width: 29, height: 40,
+            preserveAspectRatio: "xMidYMid slice" }));
+        }
+        svg.append(svgEl("text", { x: 370 + (count - 1) * 16 + 42, y: y + 28, "font-size": 23, fill: "#f1f5ee" }, label));
+      });
+    }
   }
+}
+
+function fearRows([top, mid, bot]) {
+  return [["fear_back", top, `${top} fear cards`], ["terror_2", 1, "Terror II divider"],
+          ["fear_back", mid, `${mid} fear cards`], ["terror_3", 1, "Terror III divider"],
+          ["fear_back", bot, `${bot} fear cards`]];
+}
+
+function invaderRows() {
+  return [["stage1_back", 3, "Stage I: 3 cards"], ["stage2_back", 4, "Stage II: 4 cards"], ["stage3_back", 5, "Stage III: 5 cards"]];
 }
