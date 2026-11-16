@@ -91,11 +91,43 @@ def forward(port: int = DEFAULT_PORT, serial: Optional[str] = None, adb: Optiona
     return f"http://localhost:{port}"
 
 
-def credentials(user: Optional[str] = None, password: Optional[str] = None) -> tuple:
-    """Login for the camera app, if it has one: arguments first, then the
-    PHONE_CAM_USER / PHONE_CAM_PASSWORD environment variables (keeps the
-    password out of shell history and out of the repo)."""
-    return (user or os.environ.get("PHONE_CAM_USER"), password or os.environ.get("PHONE_CAM_PASSWORD"))
+USER_VAR, PASS_VAR = "IPWEBCAM_USER", "IPWEBCAM_PASS"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def read_env_file(path: Path) -> dict:
+    """Minimal .env reader: KEY=value lines, # comments, optional quotes."""
+    values = {}
+    try:
+        lines = Path(path).read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return values
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip().removeprefix("export ").strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        values[key] = value
+    return values
+
+
+def credentials(user: Optional[str] = None, password: Optional[str] = None,
+                env_file: Optional[Path] = None) -> tuple:
+    """Login for the camera app, if it has one. Looks at, in order: the arguments,
+    the IPWEBCAM_USER / IPWEBCAM_PASS environment variables, then the same keys
+    in the repo's .env file (git-ignored), then ~/.ipwebcam/credentials.txt, so the password is set once and never
+    committed or typed on the command line."""
+    env = {}
+    for path in ([env_file] if env_file else [REPO_ROOT / ".env", Path.home() / ".ipwebcam" / "credentials.txt"]):
+        for key, value in read_env_file(path).items():
+            env.setdefault(key, value)  # the repo .env wins over the home-folder copy
+    user = user or os.environ.get(USER_VAR) or env.get(USER_VAR)
+    password = password or os.environ.get(PASS_VAR) or env.get(PASS_VAR)
+    return user, password
 
 
 def urls(base: str, user: Optional[str] = None, password: Optional[str] = None) -> dict:
@@ -123,8 +155,8 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help="the camera app's port on the phone")
     p.add_argument("--serial", help="which phone, if several are attached")
-    p.add_argument("--user", help="camera app login (or set PHONE_CAM_USER)")
-    p.add_argument("--password", help="camera app password (or set PHONE_CAM_PASSWORD)")
+    p.add_argument("--user", help="camera app login (default: IPWEBCAM_USER from env or .env)")
+    p.add_argument("--password", help="camera app password (default: IPWEBCAM_PASS from env or .env)")
     args = p.parse_args(argv)
     try:
         base = forward(args.port, args.serial)
@@ -136,7 +168,7 @@ def main(argv=None) -> int:
     except Exception as exc:  # camera app not running, wrong port, etc.
         print(f"Forwarded, but the camera app did not answer: {exc}\n"
               "Open the camera app on the phone and start its server, then try again. "
-              "If the app has a login, pass --user/--password or set PHONE_CAM_USER/PHONE_CAM_PASSWORD.")
+              "If the app has a login, put IPWEBCAM_USER and IPWEBCAM_PASS in the repo's .env file.")
         return 1
     print(f"Video frames:  {result['shot']['width']}x{result['shot']['height']}")
     print(f"Full photos:   {result['photo']['width']}x{result['photo']['height']} "

@@ -53,9 +53,26 @@ def test_find_adb_falls_back_to_sdk_folder(tmp_path, monkeypatch):
     assert phone.find_adb() == str(tools / name)
 
 
-def test_urls_take_login_from_env(monkeypatch):
-    monkeypatch.setenv("PHONE_CAM_USER", "me")
-    monkeypatch.setenv("PHONE_CAM_PASSWORD", "secret")
-    assert phone.urls("http://localhost:8080")["video"] == "http://me:secret@localhost:8080/video"
-    monkeypatch.delenv("PHONE_CAM_USER")
+def test_urls_take_login_from_env_then_dotenv(monkeypatch, tmp_path):
+    for var in ("IPWEBCAM_USER", "IPWEBCAM_PASS"):
+        monkeypatch.delenv(var, raising=False)
+    env = tmp_path / ".env"
+    env.write_text('# camera\nIPWEBCAM_USER=cam\nIPWEBCAM_PASS="s3cret"\nOTHER=1\n')
+    monkeypatch.setattr(phone, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(phone.Path, "home", lambda: tmp_path / "nohome")
+    assert phone.urls("http://localhost:8080")["video"] == "http://cam:s3cret@localhost:8080/video"
+    monkeypatch.setenv("IPWEBCAM_PASS", "fromenv")  # real env var wins over .env
+    assert phone.credentials() == ("cam", "fromenv")
+    env.unlink()
+    monkeypatch.delenv("IPWEBCAM_PASS")
     assert phone.urls("http://localhost:8080")["photo"] == "http://localhost:8080/photo.jpg"
+
+
+def test_credentials_fall_back_to_home_folder(monkeypatch, tmp_path):
+    for var in ("IPWEBCAM_USER", "IPWEBCAM_PASS"):
+        monkeypatch.delenv(var, raising=False)
+    (tmp_path / ".ipwebcam").mkdir()
+    (tmp_path / ".ipwebcam" / "credentials.txt").write_text("IPWEBCAM_USER=pixelcam\nIPWEBCAM_PASS=x\n")
+    monkeypatch.setattr(phone, "REPO_ROOT", tmp_path / "repo-without-env")
+    monkeypatch.setattr(phone.Path, "home", lambda: tmp_path)
+    assert phone.credentials() == ("pixelcam", "x")

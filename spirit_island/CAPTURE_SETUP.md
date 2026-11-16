@@ -51,16 +51,18 @@ no Wi-Fi and charges while it works.
 [platform-tools](https://developer.android.com/tools/releases/platform-tools)
 and make sure `adb` is on your PATH (`adb version` should work in a new terminal).
 
-**If you set a login in the app** (recommended), give it to the kit through
-environment variables so the password stays out of the repo and your command history.
-PowerShell:
+**If you set a login in the app** (recommended), put it in the `.env` file at
+the top of the repo (git ignores it), the same place `phone\setup_phone.ps1` reads it:
 
-```powershell
-$env:PHONE_CAM_USER = "harrison"; $env:PHONE_CAM_PASSWORD = "..."
+```
+IPWEBCAM_USER=cam
+IPWEBCAM_PASS=...
 ```
 
-macOS: `export PHONE_CAM_USER=harrison PHONE_CAM_PASSWORD=...`. (Or pass
-`--phone-user` / `--phone-password`.) Reports and recordings never store it.
+The kit picks it up automatically, and also looks in
+`~/.ipwebcam/credentials.txt` (same two lines) if the repo has no `.env`. Environment variables with the same names,
+or `--phone-user` / `--phone-password`, override it. Reports and recordings never
+store the password.
 
 **Each session:** plug in the phone, start the app's server, then check it:
 

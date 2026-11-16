@@ -101,8 +101,8 @@ def main(argv=None) -> int:
     p.add_argument("--source", default="0", help="USB camera index, stream URL or video file (default 0)")
     p.add_argument("--phone", nargs="?", const=8080, type=int, metavar="PORT",
                    help="use an Android phone on USB: adb-forward its camera app (default port 8080)")
-    p.add_argument("--phone-user", help="camera app login, if set (or PHONE_CAM_USER env var)")
-    p.add_argument("--phone-password", help="camera app password (or PHONE_CAM_PASSWORD env var)")
+    p.add_argument("--phone-user", help="camera app login (default: IPWEBCAM_USER from env or the repo .env)")
+    p.add_argument("--phone-password", help="camera app password (default: IPWEBCAM_PASS from env or the repo .env)")
     p.add_argument("--still-url", help="full-resolution photo URL for phone cameras, e.g. http://phone:8080/photo.jpg")
     p.add_argument("--marker-mm", type=float, help="side of the printed ArUco markers in view, in mm")
     p.add_argument("--fov-width-mm", type=float, help="or: width of the area the camera sees, in mm")
