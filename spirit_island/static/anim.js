@@ -27,25 +27,27 @@ function animScene(p) {
   return svg;
 }
 
+// A fear marker: a round cardboard token with the fear mask printed on it.
 function fearToken(x, y, r) {
   return svgEl("g", {},
-    svgEl("circle", { cx: x, cy: y, r, fill: "#6d4fb3", stroke: "#e9ddff", "stroke-width": 6 }),
-    svgEl("text", { x, y: y + r * 0.35, "text-anchor": "middle", "font-size": r, fill: "#f4ecff", "font-weight": 700 }, "✷"));
+    svgEl("circle", { cx: x, cy: y + r * 0.08, r, fill: "#7a5a3a" }),
+    svgEl("circle", { cx: x, cy: y, r, fill: "#e8cfa0", stroke: "#a07a4a", "stroke-width": r * 0.08 }),
+    svgEl("image", { href: "/assets/components/fear_icon.png", x: x - r * 0.68, y: y - r * 0.68, width: r * 1.36, height: r * 1.36 }));
 }
 
 function poolScene(svg, p) {
+  // The real invader board, zoomed on the fear pool, with the markers dropping in.
   const n = p.count || 4;
-  svg.append(svgEl("rect", { x: 300, y: 170, width: 1000, height: 480, rx: 240, fill: "rgba(140,110,200,.18)",
-    stroke: "#b993f5", "stroke-width": 8, "stroke-dasharray": "24 16" }));
-  svg.append(svgEl("text", { x: 800, y: 130, "text-anchor": "middle", "font-size": 64, fill: "#d9c8ff", "font-weight": 700 },
-    p.label || "Fear pool"));
-  const gap = Math.min(170, 800 / n);
+  svg.setAttribute("viewBox", "250 0 500 300");
+  svg.append(svgEl("image", { href: "/assets/components/invader_board.jpg", x: 0, y: 0, width: 1000, height: 907 }));
+  svg.append(svgEl("rect", { x: 250, y: 0, width: 500, height: 300, fill: "rgba(0,0,0,.25)" }));
+  const gap = Math.min(70, 300 / n);
   for (let i = 0; i < n; i++) {
-    const x = 800 - ((n - 1) * gap) / 2 + i * gap;
-    svg.append(dropIn(fearToken(x, 410, 62), 0.4 + i * 0.5));
+    const x = 500 - ((n - 1) * gap) / 2 + i * gap;
+    svg.append(dropIn(fearToken(x, 150, 28), 0.4 + i * 0.5));
   }
-  svg.append(dropIn(svgEl("text", { x: 800, y: 790, "text-anchor": "middle", "font-size": 58, fill: "#f1f5ee" },
-    `${n} fear marker${n > 1 ? "s" : ""}`), 0.4 + n * 0.5, "fade"));
+  svg.append(dropIn(svgEl("text", { x: 500, y: 270, "text-anchor": "middle", "font-size": 30, fill: "#fff", "font-weight": 700,
+    stroke: "#000", "stroke-width": 1 }, `${n} fear marker${n > 1 ? "s" : ""} in the pool`), 0.4 + n * 0.5, "fade"));
 }
 
 function stackScene(svg, p) {
@@ -144,11 +146,12 @@ function boardScene(svg) {
 // A photo with labelled areas lighting up in turn: {src, zones: [{x, y, w, h, label}]}
 // (fractions of the photo).
 function photoScene(svg, p) {
-  svg.setAttribute("viewBox", "0 0 1000 1000");
-  svg.append(svgEl("image", { href: "/assets/" + p.src, x: 0, y: 0, width: 1000, height: 1000 }));
+  const H = 1000 * (p.aspect || 1);
+  svg.setAttribute("viewBox", `0 0 1000 ${H}`);
+  svg.append(svgEl("image", { href: "/assets/" + p.src, x: 0, y: 0, width: 1000, height: H }));
   const n = (p.zones || []).length;
   (p.zones || []).forEach((z, i) => {
-    const x = z.x * 1000, y = z.y * 1000, w = z.w * 1000, h = z.h * 1000;
+    const x = z.x * 1000, y = z.y * H, w = z.w * 1000, h = z.h * H;
     const g = svgEl("g", {},
       svgEl("rect", { x, y, width: w, height: h, rx: 14, fill: "rgba(255,210,80,.18)", stroke: "#ffd23a", "stroke-width": 7 }),
       svgEl("rect", { x: x + w / 2 - 120, y: y + h / 2 - 28, width: 240, height: 56, rx: 12, fill: "rgba(0,0,0,.78)" }),
