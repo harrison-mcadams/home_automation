@@ -104,3 +104,7 @@ pre.cmd { white-space: pre-wrap; background: var(--panel2); padding: 8px; border
 .pics figcaption { font-size: 13px; opacity: .8; margin-top: 3px; }
 .pics figure.mark img { outline: 3px solid #86dc93; outline-offset: 2px; }
 .pics figure.mark figcaption { color: #86dc93; font-weight: 700; opacity: 1; }
+
+.player-head { display: flex; justify-content: space-between; align-items: center; }
+.remove-player { padding: 4px 10px; font-size: 13px; }
+.add-player { width: 100%; margin: 8px 0 14px; }

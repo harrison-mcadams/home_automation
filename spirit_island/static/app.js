@@ -100,43 +100,50 @@ const HELPERS = {
   configure() {
     const s = S.state;
     const box = el("div", { class: "helper form" });
-    const existing = s.players.length ? s.players : [{ name: "", spirit: REF.spirits[0].name }];
-    let count = existing.length;
     const playersBox = el("div");
-    const countSel = el("select", { onchange: () => { count = +countSel.value; drawPlayers(); autosave(0); } },
-      [1, 2, 3, 4].map((n) => el("option", { value: n, selected: n === count }, `${n} player${n > 1 ? "s" : ""}`)));
     const inputs = [];
     // Save as you go so the TV shows the players while you fill them in.
     let timer = null;
     const autosave = (delay) => { clearTimeout(timer); timer = setTimeout(save, delay); };
+    // Default to the board the camera recognised for player 1, then the others in order.
+    const seen = S.vision && S.vision.detected_board;
+    const order = seen ? [seen, ...REF.boards.filter((b) => b !== seen)] : REF.boards;
+    let rows = s.players.length ? s.players.map((p, i) => ({ name: p.name, spirit: p.spirit, board: s.boards[i] }))
+      : [{ name: "", spirit: REF.spirits[0].name, board: order[0] }];
+    const current = () => inputs.map((x) => ({ name: x.name.value, spirit: x.sp.value, board: x.bd.value }));
+    function addPlayer() {
+      rows = current();
+      const used = rows.map((r) => r.spirit), boards = rows.map((r) => r.board);
+      rows.push({ name: "", spirit: (REF.spirits.find((x) => !used.includes(x.name)) || REF.spirits[0]).name,
+                  board: order.find((b) => !boards.includes(b)) });
+      drawPlayers(); autosave(0);
+    }
+    function removePlayer(i) { rows = current(); rows.splice(i, 1); drawPlayers(); autosave(0); }
+    const addBtn = el("button", { class: "add-player", onclick: addPlayer }, "+ Add player");
     function drawPlayers() {
-      // Keep what's already typed when the player count changes.
-      const typed = inputs.map((x) => ({ name: x.name.value, spirit: x.sp.value, board: x.bd.value }));
       playersBox.replaceChildren(); inputs.length = 0;
-      for (let i = 0; i < count; i++) {
-        const p = typed[i] || existing[i] || { name: "", spirit: REF.spirits[i % REF.spirits.length].name };
+      rows.forEach((p, i) => {
         const name = el("input", { value: p.name, placeholder: `Player ${i + 1}`, oninput: () => autosave(700) });
         const style = el("div", { class: "spirit-style" });
         const sp = el("select", { onchange: () => { upd(); autosave(0); } },
           REF.spirits.map((x) => el("option", { value: x.name, selected: x.name === p.spirit }, `${x.name} (${x.complexity})`)));
         const upd = () => { style.textContent = REF.spirits.find((x) => x.name === sp.value).style; };
         upd();
-        // Default to the board the camera recognised for player 1, then the others in order.
-        const seen = S.vision && S.vision.detected_board;
-        const order = seen ? [seen, ...REF.boards.filter((b) => b !== seen)] : REF.boards;
-        const boardNow = p.board || s.boards[i] || order.filter((b) => !typed.some((t) => t.board === b))[0] || order[i];
-        const bd = el("select", { onchange: () => autosave(0) }, REF.boards.map((b) => el("option", { value: b, selected: b === boardNow }, `Board ${b}`)));
+        const bd = el("select", { onchange: () => autosave(0) }, REF.boards.map((b) => el("option", { value: b, selected: b === p.board }, `Board ${b}`)));
         inputs.push({ name, sp, bd });
-        playersBox.append(el("div", { class: "player" }, el("label", {}, `Player ${i + 1} name`), name,
+        const head = el("div", { class: "player-head" }, el("b", {}, `Player ${i + 1}`),
+          rows.length > 1 ? el("button", { class: "remove-player", onclick: () => removePlayer(i) }, "Remove") : null);
+        playersBox.append(el("div", { class: "player" }, head, el("label", {}, "Name"), name,
           el("label", {}, "Spirit"), sp, style,
           el("label", {}, "Island board (the letter printed on it)"), bd));
-      }
+      });
+      addBtn.classList.toggle("hidden", rows.length >= 4);
     }
     drawPlayers();
     const adv = el("select", { onchange: () => autosave(0) }, REF.adversaries.map((a) => el("option", { value: a, selected: a === s.adversary.name }, a)));
     const lvl = el("input", { type: "number", min: 0, max: 6, value: s.adversary.level, style: "width:5em" });
     const diff = el("input", { type: "number", min: 0, max: 20, value: s.adversary.difficulty, style: "width:5em" });
-    box.append(el("h3", {}, "Players"), countSel, playersBox,
+    box.append(el("h3", {}, "Players"), playersBox, addBtn,
       el("label", {}, "Adversary (optional; leave None for now)"), adv,
       el("label", {}, "Adversary level and difficulty (from its panel; used for the score)"),
       el("div", { class: "btngrid" }, lvl, diff),
