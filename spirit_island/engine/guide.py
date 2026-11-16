@@ -104,15 +104,18 @@ def _island(s):
             f"Take {n} island board{'s' if n > 1 else ''} ({', '.join(s['boards'])}), one per player.",
             "Use the side with the lettered lands (the standard, balanced side).",
         ] + ([
-            "With two boards, put them edge to edge so the ocean edges face away from each other; "
-            "the rulebook shows the suggested layouts.",
+            "Two boards: turn the second board upside down and push its inland edge against the "
+            "first board's inland edge, so the oceans are on the outside (like the picture). The "
+            "edges are shaped to fit together.",
         ] if n > 1 else []) + [
             "Each board has 8 numbered lands plus an ocean. Lands are Jungle, Mountain, Sands or Wetland.",
         ],
         "why": "Invader cards name a terrain, and every land of that terrain is affected.",
         "tips": ["Optional but useful: open Island and tap each land's terrain once. The app remembers "
                  "it for future games and can then tell you exactly which lands ravage, build and explore."],
-        "pictures": [_comp(f"board_{b}", f"Board {b}", True) for b in s["boards"]],
+        "pictures": ([{"src": f"layout/{s['boards'][0]}-{s['boards'][1]}.jpg", "wide": True,
+                       "caption": f"Boards {s['boards'][0]} and {s['boards'][1]} joined, oceans on the outside"}]
+                     if n == 2 else [_comp(f"board_{b}", f"Board {b}", True) for b in s["boards"]]),
     }
 
 
@@ -250,8 +253,11 @@ def _pieces(s):
         "why": "This is the island as the invaders first find it.",
         "tips": ["To have the app track the board, enter each land's pieces in the Island panel. "
                  "It is optional: the step-by-step guide works without it."],
-        "pictures": [_comp(f"board_{b}", f"Board {b}: starting-piece icons by each land number", True)
-                     for b in s["boards"]],
+        "pictures": ([{"src": f"layout/{s['boards'][0]}-{s['boards'][1]}.jpg", "wide": True,
+                       "caption": f"Boards {s['boards'][0]} and {s['boards'][1]}: starting-piece icons by each land number"}]
+                     if len(s["boards"]) == 2 else
+                     [_comp(f"board_{b}", f"Board {b}: starting-piece icons by each land number", True)
+                      for b in s["boards"]]),
     }
 
 

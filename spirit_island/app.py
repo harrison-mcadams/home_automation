@@ -197,6 +197,21 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
     def tv():
         return render_template("tv.html")
 
+    @app.get("/assets/layout/<first>-<second>.jpg")
+    def layout_picture(first, second):
+        """Two boards fitted together (made once, then kept next to the board pictures)."""
+        from flask import send_file
+        ok = set(rules.BOARDS)
+        if first not in ok or second not in ok:
+            return Response("not found", status=404)
+        boards_dir = os.path.join(BASE_DIR, cfg["board_art_dir"])
+        out = os.path.join(BASE_DIR, "assets", "components", f"layout_{first}_{second}.jpg")
+        try:
+            from .layout_art import two_board_layout
+            return send_file(two_board_layout(boards_dir, first, second, out), max_age=86400)
+        except FileNotFoundError:
+            return Response("no board pictures", status=404)
+
     @app.get("/assets/<path:name>")
     def asset(name):
         """Pictures of game components (spirit panels, cards) shown on the setup steps."""
