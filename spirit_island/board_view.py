@@ -4,7 +4,8 @@
     # then open http://<this computer>:8091 on a phone, tablet or TV browser
 
 Every few seconds it takes a full-resolution photo, finds the pieces (see detect.py)
-and updates the page. It only reads from the camera, so it can run next to the
+and updates the page. The counts only change once two photos in a row agree, and are
+held while a hand is over the board. It only reads from the camera, so it can run next to the
 live preview. `--image a.jpg --image b.jpg` cycles through saved photos instead,
 for trying it without the camera.
 """
@@ -76,7 +77,8 @@ def land_rows(result: dict) -> str:
 
 
 class BoardView:
-    def __init__(self, reference_dir: Path, grab, every: float = 5.0, max_side: int = 1600):
+    def __init__(self, reference_dir: Path, grab, every: float = 5.0, max_side: int = 1600,
+                 confirm: int = 2, save_dir: Path | None = None):
         self.reference = cv2.imread(str(reference_dir / "reference.jpg"))
         self.board_mask = cv2.imread(str(reference_dir / "board_mask.png"), cv2.IMREAD_GRAYSCALE)
         if self.reference is None or self.board_mask is None:
@@ -92,6 +94,12 @@ class BoardView:
         self.jpeg = b""
         self.state: dict = {"stamp": "", "status": "starting"}
         self.stopping = threading.Event()
+        self.confirm = confirm
+        self.stable: dict | None = None
+        self.candidate: dict | None = None
+        self.agree = 0
+        self.save_dir = save_dir
+        self.last_seen: dict | None = None
 
     def update_once(self) -> dict:
         started = time.time()
@@ -107,11 +115,48 @@ class BoardView:
         public["stamp"] = datetime.now().strftime("%H:%M:%S")
         public["seconds"] = round(time.time() - started, 1)
         public["status"] = "ok" if result["registered"] else "could not line up with the reference"
+        public["seen"] = public["board_state"]
+        public["board_state"], public["settled"] = self.settle(result)
+        if self.save_dir is not None and (public["seen"] != self.last_seen or result.get("large_changes")):
+            self.keep_photo(image, public)
+        self.last_seen = public["seen"]
         with self.lock:
             if ok:
                 self.jpeg = buf.tobytes()
             self.state = public
         return public
+
+    def settle(self, result: dict) -> tuple[dict, str]:
+        """The board state to show, and why.
+
+        One photo can be wrong: a hand over the board, pieces being moved, or a reading
+        right on a threshold that flips between photos. So a new state is only shown once
+        two clear photos in a row agree; until then the last settled state stays up.
+        """
+        if not result["registered"]:
+            return self.stable, "holding: the board is hidden or moved too far to line up (a hand?)"
+        if result.get("large_changes"):
+            return self.stable, "holding: something large is over the board (a hand?)"
+        seen = result["board_state"]
+        if seen == self.candidate:
+            self.agree += 1
+        else:
+            self.candidate, self.agree = seen, 1
+        if self.agree >= self.confirm or self.stable is None:
+            self.stable = seen
+            return seen, "settled"
+        return self.stable, "changing: waiting for the next photo to confirm"
+
+    def keep_photo(self, image, public: dict) -> None:
+        """Save the raw photo when the reading changes, for checking afterwards (newest 60 kept)."""
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+        name = datetime.now().strftime("%Y%m%d-%H%M%S")
+        cv2.imwrite(str(self.save_dir / f"{name}.jpg"), image, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        (self.save_dir / f"{name}.json").write_text(json.dumps(public, indent=2))
+        photos = sorted(self.save_dir.glob("*.jpg"))
+        for old in photos[:-60]:
+            old.unlink(missing_ok=True)
+            old.with_suffix(".json").unlink(missing_ok=True)
 
     def run(self) -> None:
         while not self.stopping.is_set():
@@ -133,8 +178,8 @@ class BoardView:
             meta += f" · {len(s['pieces'])} piece(s)"
         if s.get("status") not in ("ok", None):
             meta += f' · <span class="warn">{html.escape(str(s["status"]))}</span>'
-        if s.get("large_changes"):
-            meta += ' · <span class="warn">something large is in the way (a hand?)</span>'
+        if s.get("settled") and s["settled"] != "settled":
+            meta += f' · <span class="warn">{html.escape(s["settled"])}</span>'
         return PAGE.format(stamp=html.escape(s.get("stamp") or ""), meta=meta, rows=land_rows(s))
 
     def handler(self):
@@ -183,6 +228,8 @@ def main(argv=None) -> int:
     p.add_argument("--every", type=float, default=5.0, help="seconds between photos")
     p.add_argument("--port", type=int, default=8091)
     p.add_argument("--host", default="0.0.0.0")
+    p.add_argument("--confirm", type=int, default=2, help="photos in a row that must agree before the state changes")
+    p.add_argument("--save", help="folder to keep the raw photo whenever the reading changes")
     args = p.parse_args(argv)
 
     if args.image:
@@ -198,7 +245,8 @@ def main(argv=None) -> int:
         url = phone.urls(phone.connect(args.phone, args.phone_host))["photo"]
         grab = lambda: fetch_still(url, timeout=20)  # noqa: E731
 
-    view = BoardView(Path(args.reference), grab, every=args.every)
+    view = BoardView(Path(args.reference), grab, every=args.every, confirm=args.confirm,
+                     save_dir=Path(args.save) if args.save else None)
     threading.Thread(target=view.run, daemon=True).start()
     server = ThreadingHTTPServer((args.host, args.port), view.handler())
     print(f"Board page on http://localhost:{args.port} (Ctrl+C to stop)")

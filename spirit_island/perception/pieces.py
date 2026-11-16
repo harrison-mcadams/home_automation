@@ -25,15 +25,17 @@ RULES = {
     # Measured on Harrison's set under the Pixel 6 (r7-r9 layouts, 2026-11-16). Colour is
     # OpenCV HSV (hue 0-180, saturation and value 0-255), the median of the piece's core.
     "vivid_min_saturation": 105,  # presence discs: S 115-165; nothing else above ~90
-    "dark_max_value": 100,  # anything this dark is blight, whatever its hue
+    "dark_max_value": 100,
+    "presence_min_value": 130,  # painted discs are bright (V 204-230); dark saturated brown is wood  # anything this dark is blight, whatever its hue
     "blight_hue": (85, 125),  # blight is blue-grey: H 100-103, S 79-91, V 116-129
     "blight_min_saturation": 60,
     "blight_max_value": 175,
     "warm_hue": (5, 35),  # cream dahan (H 21-24) and tan cardboard (H 19-21); white plastic is H 70-109
     "pale_max_saturation": 70,  # white plastic S 27-58 (bluish white balance), dahan S 38-58
     "pale_min_value": 170,
-    "energy_min_texture": 23,  # printed card: texture 29-32; plain wooden dahan 8-17
-    "energy_min_size": 0.082,  # energy marker 0.093; dahan 0.065-0.068
+    "dahan_min_value": 130,  # dahan V 202-219; leaves room for shade
+    "energy_min_texture": 22,  # printed card: texture 25-32; dahan 7-17, presence 4-17
+    "energy_min_size": 0.088,  # energy marker 0.093-0.096; dahan 0.065-0.068, presence up to 0.082
     # White plastic invaders. Sizes are sqrt(piece area) / sqrt(board area).
     "explorer_max_thickness": 0.030,  # spindly: 0.025-0.0265; town and city 0.035-0.040
     "city_min_size": 0.075,  # city 0.080-0.083; explorer 0.065-0.070
@@ -105,18 +107,21 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
     warm = lo <= f.hue <= hi
     blo, bhi = rules["blight_hue"]
     out: dict
-    if f.value <= rules["dark_max_value"]:
+    blue_grey = blo <= f.hue <= bhi and f.saturation >= rules["blight_min_saturation"]
+    printed = f.texture >= rules["energy_min_texture"] or f.size >= rules["energy_min_size"]
+    if f.value <= rules["dark_max_value"] and (f.saturation < rules["blight_min_saturation"] or blue_grey):
+        # Dark and grey or blue-grey. Dark *brown* is table wood showing at a moved board's rim.
         out = {"type": "blight", "why": f"dark (value {f.value})"}
-    elif f.saturation >= rules["vivid_min_saturation"]:
+    elif warm and printed and f.value > rules["dark_max_value"]:
+        # Before presence: in warm sunlight the tan card can get as saturated as a yellow disc,
+        # but it stays textured (printed) and larger.
+        out = {"type": "energy", "why": f"tan, printed (texture {f.texture}, size {f.size})"}
+    elif f.saturation >= rules["vivid_min_saturation"] and f.value >= rules["presence_min_value"]:
         out = {"type": "presence", "colour": hue_name(f.hue), "why": f"vivid {hue_name(f.hue)} (sat {f.saturation})"}
-    elif (blo <= f.hue <= bhi and f.saturation >= rules["blight_min_saturation"]
-          and f.value <= rules["blight_max_value"]):
+    elif blue_grey and f.value <= rules["blight_max_value"]:
         out = {"type": "blight", "why": f"blue-grey (hue {f.hue}, sat {f.saturation}, value {f.value})"}
-    elif warm:
-        if f.texture >= rules["energy_min_texture"] or f.size >= rules["energy_min_size"]:
-            out = {"type": "energy", "why": f"tan, printed (texture {f.texture}, size {f.size})"}
-        else:
-            out = {"type": "dahan", "why": f"plain cream (hue {f.hue}, texture {f.texture})"}
+    elif warm and f.value >= rules["dahan_min_value"]:
+        out = {"type": "dahan", "why": f"plain cream (hue {f.hue}, texture {f.texture})"}
     elif f.saturation <= rules["pale_max_saturation"] and f.value >= rules["pale_min_value"]:
         if f.thickness <= rules["explorer_max_thickness"]:
             kind = "explorer"

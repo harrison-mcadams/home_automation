@@ -142,7 +142,7 @@ def cmd_reference(args) -> int:
 
 
 def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarray,
-                  max_piece_frac: float = 0.03, min_thickness: float = 0.02,
+                  max_piece_frac: float = 0.03, min_thickness: float = 0.02, close_frac: float = 0.015,
                   lands: Optional[tuple] = None, **kwargs) -> dict:
     """Register `image` onto the reference and find what changed on the board."""
     reg = register(reference, image, reference_mask=board_mask)
@@ -220,7 +220,16 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
             large.append(entry)  # far bigger than any piece: a hand, a moved object, or the board moved
             continue
         if b.thickness < min_thickness * np.sqrt(board_area):
-            continue  # a thin line of change along a printed edge, not a piece
+            # Thin, but maybe a spindly figure (an explorer and its staff, seen from a low
+            # angle, are two thin parts with a gap). Close small gaps and notches and measure
+            # again: a figure fills out, a line along a printed edge stays a line.
+            k = max(3, int(close_frac * np.sqrt(full_board_area))) | 1
+            closed = cv2.morphologyEx(piece_mask.astype(np.uint8), cv2.MORPH_CLOSE,
+                                      cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+            closed_thickness = cv2.distanceTransform(closed, cv2.DIST_L2, 5).max() / scale
+            if closed_thickness < min_thickness * np.sqrt(board_area):
+                continue  # a thin line of change along a printed edge, not a piece
+            entry["thickness_px"] = round(float(closed_thickness), 1)
         pieces.append(entry)
     # Safety net: a blob much bigger than a typical piece may be several pieces touching.
     if len(pieces) >= 3:

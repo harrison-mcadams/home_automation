@@ -180,6 +180,8 @@ MEASURED = [
     ((105, 51, 239, 30, .070, .0265, 1.79, .70), "explorer"), ((70, 27, 212, 20, .065, .025, 1.70, .73), "explorer"),
     ((100, 39, 235, 26, .080, .036, 1.03, .68), "city"), ((107, 58, 245, 28, .083, .040, 1.11, .73), "city"),
     ((101, 38, 220, 22, .086, .035, 1.76, .39), "town"),
+    ((21, 105, 142, 25.5, .096, .047, 1.2, .80), "energy"),  # warm sunlight, after the camera moved
+    ((17, 105, 91, 14, .045, .020, 1.5, .60), "unknown"),  # dark table wood at the moved board's rim
 ]
 
 
@@ -204,3 +206,23 @@ def test_board_view_page(scene, tmp_path):
     assert state["status"] == "ok" and len(state["pieces"]) == 1
     page = view.page()
     assert "Land ?" not in page and "1 piece(s)" in page and view.jpeg[:2] == b"\xff\xd8"
+
+
+def test_board_view_holds_state_through_a_hand_and_a_one_off_reading(scene, tmp_path):
+    from spirit_island.board_view import BoardView
+
+    reference, _, _ = scene
+    ref_dir = tmp_path / "ref"
+    ref_dir.mkdir()
+    cv2.imwrite(str(ref_dir / "reference.jpg"), reference)
+    cv2.imwrite(str(ref_dir / "board_mask.png"), find_board(reference).mask)
+    view = BoardView(ref_dir, lambda: None, save_dir=tmp_path / "kept")
+    one = {"registered": True, "large_changes": [], "board_state": {"?": {"dahan": 1}}}
+    two = {"registered": True, "large_changes": [], "board_state": {"?": {"dahan": 2}}}
+    hand = {"registered": True, "large_changes": [{}], "board_state": {}}
+    lost = {"registered": False, "large_changes": [], "board_state": {}}
+    assert view.settle(one) == (one["board_state"], "settled")
+    assert view.settle(hand)[0] == one["board_state"]
+    assert view.settle(lost)[0] == one["board_state"]
+    assert view.settle(two)[0] == one["board_state"]  # a single new reading isn't trusted yet
+    assert view.settle(two) == (two["board_state"], "settled")
