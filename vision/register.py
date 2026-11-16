@@ -57,6 +57,7 @@ def register(
     if des_ref is None or des_img is None or len(kp_ref) < 8 or len(kp_img) < 8:
         return None
 
+    cv2.setRNGSeed(0)  # FLANN's randomised trees and RANSAC both draw on OpenCV's RNG
     matcher = cv2.FlannBasedMatcher({"algorithm": 1, "trees": 5}, {"checks": 64})
     pairs = matcher.knnMatch(des_img, des_ref, k=2)
     good = [m for m, n in (p for p in pairs if len(p) == 2) if m.distance < 0.75 * n.distance]
@@ -65,9 +66,19 @@ def register(
 
     src = np.float32([kp_img[m.queryIdx].pt for m in good]) / img_scale
     dst = np.float32([kp_ref[m.trainIdx].pt for m in good]) / ref_scale
-    H, inlier_mask = cv2.findHomography(src, dst, cv2.RANSAC, 4.0 / ref_scale)
+    # RANSAC is random: fix the seed so the same photo always gives the same answer, then
+    # refit on all inliers by least squares so small sampling differences average out.
+    # Borderline decisions downstream (is this one piece or two?) must not flicker.
+    cv2.setRNGSeed(0)
+    method = getattr(cv2, "USAC_MAGSAC", cv2.RANSAC)
+    H, inlier_mask = cv2.findHomography(src, dst, method, 4.0 / ref_scale, maxIters=5000, confidence=0.999)
     if H is None:
         return None
+    keep = inlier_mask.ravel().astype(bool)
+    if keep.sum() >= 8:
+        refined, _ = cv2.findHomography(src[keep], dst[keep], 0)
+        if refined is not None:
+            H = refined
     return Registration(homography=H, inliers=int(inlier_mask.sum()), matches=len(good))
 
 

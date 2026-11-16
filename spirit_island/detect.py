@@ -158,10 +158,22 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     # Only the board itself counts, never the table around it: the board slides, so the
     # wood next to it changes. Outline the board in *this* photo too and keep the overlap,
     # pulled in a little from the rim.
+    # Only used to cut away clear table, so it is filled and grown generously first:
+    # pale grey mountains can drop out of this photo's outline (saturation ~5) and must
+    # not take pieces with them.
     current = find_board(image)
     if current is not None:
         now_mask = cv2.warpPerspective(current.mask, reg.homography, (reference.shape[1], reference.shape[0]),
                                        flags=cv2.INTER_NEAREST)
+        size = np.sqrt(max(1, int((now_mask > 0).sum())))
+        close = int(0.08 * size) | 1
+        now_mask = cv2.morphologyEx(now_mask, cv2.MORPH_CLOSE,
+                                    cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close, close)))
+        contours, _ = cv2.findContours(now_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        now_mask = np.zeros_like(now_mask)
+        cv2.drawContours(now_mask, contours, -1, 255, thickness=cv2.FILLED)
+        grow = int(0.02 * size) | 1
+        now_mask = cv2.dilate(now_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (grow, grow)))
         region = cv2.bitwise_and(region, now_mask)
     rim = max(5, int(0.012 * np.sqrt(max(1, int((region > 0).sum())))))
     region = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * rim + 1, 2 * rim + 1)))
@@ -190,6 +202,11 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         if b.thickness < min_thickness * np.sqrt(board_area):
             continue  # a thin line of change along a printed edge, not a piece
         pieces.append(entry)
+    # Safety net: a blob much bigger than a typical piece may be several pieces touching.
+    if len(pieces) >= 3:
+        median_area = float(np.median([p["area_px"] for p in pieces]))
+        for p in pieces:
+            p["maybe_several"] = bool(p["area_px"] > 2.5 * median_area)
     return {
         "registered": True,
         "inliers": reg.inliers,
@@ -245,8 +262,9 @@ def cmd_find(args) -> int:
         print(f"Lined up with the reference ({result['inliers']} of {result['matches']} matches). "
               f"Found {len(result['pieces'])} piece(s):")
         for i, p in enumerate(result["pieces"], 1):
+            note = "  (big: may be several pieces touching)" if p.get("maybe_several") else ""
             print(f"  {i}: at {p['centroid']}, {p['area_px']} px, colour BGR {p['mean_bgr']}, "
-                  f"change {p['change_score']}")
+                  f"change {p['change_score']}{note}")
         for p in result["large_changes"]:
             print(f"  (large change, not counted as a piece: at {p['centroid']}, {p['area_px']} px; "
                   "a hand, a moved object, or the board moved)")

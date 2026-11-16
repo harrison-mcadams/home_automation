@@ -238,3 +238,13 @@ def test_touching_objects_are_split_but_one_lumpy_object_is_not():
     assert abs(xs[0] - 250) <= 20 and abs(xs[1] - 310) <= 20 and abs(xs[2] - 600) <= 20
     unsplit, _ = find_changes(reference, image, min_area_frac=0.001, split=False)
     assert len(unsplit) == 2
+
+
+def test_registration_is_repeatable():
+    from vision.register import register
+
+    ref = make_scene(width=1000, height=700, seed=7)
+    M = cv2.getRotationMatrix2D((500, 350), 7, 1.05)
+    img = cv2.warpAffine(ref, M, (1000, 700))
+    hs = [register(ref, img).homography for _ in range(3)]
+    assert all(np.allclose(hs[0], h) for h in hs[1:])

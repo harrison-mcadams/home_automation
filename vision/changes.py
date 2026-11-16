@@ -76,7 +76,7 @@ def split_touching(
     next_label = 1
     for i in range(1, count):
         x, y, w, h, area = stats[i]
-        pad = 3
+        pad = int(dist[cc == i].max()) + 3  # room for the background seed to surround the blob
         x0, y0 = max(0, x - pad), max(0, y - pad)
         x1, y1 = min(mask.shape[1], x + w + pad), min(mask.shape[0], y + h + pad)
         sel = cc[y0:y1, x0:x1] == i
