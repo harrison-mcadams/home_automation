@@ -113,8 +113,7 @@ def _island(s):
             "Each board has 8 numbered lands plus an ocean. Lands are Jungle, Mountain, Sands or Wetland.",
         ],
         "why": "Invader cards name a terrain, and every land of that terrain is affected.",
-        "tips": ["Optional but useful: open Island and tap each land's terrain once. The app remembers "
-                 "it for future games and can then tell you exactly which lands ravage, build and explore."],
+        "tips": [],
         "pictures": ([{"src": f"layout/{s['boards'][0]}-{s['boards'][1]}.jpg", "wide": True,
                        "caption": f"Boards {s['boards'][0]} and {s['boards'][1]} joined, oceans on the outside"}]
                      if n == 2 else [_comp(f"board_{b}", f"Board {b}", True) for b in s["boards"]]),
