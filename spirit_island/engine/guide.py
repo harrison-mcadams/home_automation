@@ -91,8 +91,8 @@ def _players(s):
         "tips": [],
         "helper": {"kind": "configure", "roster": _roster(s)},
         "pictures": [{"src": f"spirits/{rules.SPIRIT_ART[p['spirit']][0]}/panel_front.jpg", "wide": True,
-                      "caption": p['spirit']}
-                     for p in s["players"] if p["spirit"] in rules.SPIRIT_ART],
+                      "group": i, "caption": f"{p['name']} · {p['spirit']}"}
+                     for i, p in enumerate(s["players"]) if p["spirit"] in rules.SPIRIT_ART],
     }
 
 
@@ -116,11 +116,10 @@ def _island(s):
     }
 
 
-def _highest(s, terrain):
-    """'land 8 on board C' for the highest-numbered land of a terrain on the first board."""
-    if not s["boards"]:
+def _highest(s, terrain, b):
+    """'land 8 on board C' for the highest-numbered land of a terrain on board b."""
+    if not b:
         return None
-    b = s["boards"][0]
     terrains = rules.default_terrains([b])
     for lid, info in s.get("lands", {}).items():  # a terrain set on the Island panel wins
         if lid in terrains and info.get("terrain"):
@@ -134,32 +133,46 @@ def _highest(s, terrain):
 
 # Starting presence printed on each panel's back, where it can be worked out for you.
 _START = {
-    "River Surges in Sunlight": lambda s: (
-        f"Starting presence: 1 disc on {_highest(s, 'W')} (the highest-numbered Wetland)."
-        if _highest(s, "W") else None),
+    "River Surges in Sunlight": lambda s, b: (
+        f"Starting presence: 1 disc on {_highest(s, 'W', b)} (the highest-numbered Wetland)."
+        if _highest(s, "W", b) else None),
+    "Vital Strength of the Earth": lambda s, b: (
+        f"Starting presence: 2 discs on {_highest(s, 'M', b)} (highest-numbered Mountain) and 1 on "
+        f"{_highest(s, 'J', b)} (highest-numbered Jungle)."
+        if _highest(s, "M", b) and _highest(s, "J", b) else None),
 }
 
 
 def spirit_pictures(state):
     pics = []
-    for p in state["players"]:
+    for group, p in enumerate(state["players"]):
         art = rules.SPIRIT_ART.get(p["spirit"])
         if not art:
             continue
         folder, cards = art
-        pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True,
-                     "caption": f"Spirit panel (front) for {p['spirit']}. Growth choices on top, the two "
+        pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True, "group": group,
+                     "caption": (f"{p['name']}'s spirit panel" if len(state["players"]) > 1 else "Spirit panel")
+                                + f" (front) for {p['spirit']}. Growth choices on top, the two "
                                 "presence tracks in the middle, innate power below."})
-        pics.append({"src": f"spirits/{folder}/card_back.jpg", "mark": True,
+        pics.append({"src": f"spirits/{folder}/card_back.jpg", "mark": True, "group": group,
                      "caption": "Back of your 4 starting cards: your spirit's art"})
         for c in cards:
-            pics.append({"src": f"spirits/{folder}/{rules.picture_slug(c)}.jpg",
+            pics.append({"src": f"spirits/{folder}/{rules.picture_slug(c)}.jpg", "group": group,
                          "caption": f"{c} (starting power card)"})
     return pics
 
 
 def _spirits(s):
-    starts = [t for t in (_START[p["spirit"]](s) for p in s["players"] if p["spirit"] in _START) if t]
+    starts, unknown = [], False
+    for i, p in enumerate(s["players"]):
+        board = s["boards"][i] if i < len(s["boards"]) else None
+        t = _START[p["spirit"]](s, board) if p["spirit"] in _START else None
+        if t and len(s["players"]) > 1:
+            t = f"{p['name']}: " + t[0].lower() + t[1:]
+        if t:
+            starts.append(t)
+        else:
+            unknown = True
     return {
         "title": "Set up each spirit",
         "do": [
@@ -168,8 +181,8 @@ def _spirits(s):
             "picture). Their fronts don't name the spirit. Every spirit starts with its own 4.",
             "Presence: in the middle of the panel are two rows of circles. Put a disc of your colour "
             "on every circle except the first one in each row.",
-        ] + (starts or ["Starting presence: the SETUP box on the back of the panel says where your "
-                        "first discs go on the island. Place them now."]),
+        ] + starts + (["Starting presence: the SETUP box on the back of each panel says where "
+                       "the first discs go on the island. Place them now."] if unknown else []),
         "why": "Each disc you later move from a track onto the island uncovers a bigger number, so "
                "you gain more energy or more card plays as you spread.",
         "tips": ["Tap the Presence counts in the Island panel if you want the app to track them."],

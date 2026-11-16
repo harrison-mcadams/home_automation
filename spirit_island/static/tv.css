@@ -138,16 +138,20 @@ body.gallery #n-do li { margin-bottom: .9vh; }
 #gallery { overflow: hidden; display: flex; flex-direction: column; gap: 1.6vh; min-height: 0; align-items: center; justify-content: center; }
 #gallery figure { margin: 0; text-align: center; }
 #gallery figcaption { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.8vh; color: var(--muted); margin-top: .4vh; }
-#g-hero { min-height: 0; flex: 1 1 auto; display: flex; justify-content: center; }
-#g-hero figure { display: flex; flex-direction: column; min-height: 0; }
-#g-hero img { max-height: 100%; max-width: 100%; min-height: 0; object-fit: contain; border-radius: 1.2vh; }
-#g-hero.hidden + #g-rest { flex: 1 1 auto; align-content: center; }
-#g-rest { display: flex; flex-wrap: wrap; gap: 1.2vh 1vw; justify-content: center; }
-#g-rest:empty { display: none; }
-#g-rest.row { display: grid; width: 100%; gap: 1vw; align-items: end; flex: 0 0 auto; }
-#g-rest.row figure { min-width: 0; }
-#g-rest.row img { height: auto; width: 100%; }
-#g-rest img { height: var(--h, 27vh); border-radius: 1vh; display: block; }
+.gsec { display: flex; flex-direction: column; gap: 1.6vh; min-height: 0; flex: 1 1 0; width: 100%; align-items: center; justify-content: center; }
+#gallery.multi .gsec { flex-direction: row; }
+.g-hero { min-height: 0; height: 100%; flex: 1 1 auto; display: flex; justify-content: center; }
+#gallery:not(.multi) .gsec .g-hero { height: auto; }
+.g-hero figure { display: flex; flex-direction: column; min-height: 0; }
+.g-hero img { max-height: 100%; max-width: 100%; min-height: 0; object-fit: contain; border-radius: 1.2vh; }
+.gsec > .g-rest:only-child { flex: 1 1 auto; align-content: center; }
+.g-rest { display: flex; flex-wrap: wrap; gap: 1.2vh 1vw; justify-content: center; }
+.g-rest.row { display: grid; width: 100%; gap: 1vw; align-items: end; flex: 0 0 auto; }
+.g-rest.row figure { min-width: 0; }
+.g-rest.row img { height: auto; width: 100%; }
+.g-rest img { height: var(--h, 27vh); border-radius: 1vh; display: block; }
+#gallery.multi .g-rest { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, auto); gap: .8vh .8vw; align-content: center; }
+#gallery.multi figcaption { font-size: 1.5vh; max-width: 12vw; }
 #gallery figure.mark img { outline: .6vh solid var(--accent); outline-offset: .3vh; }
 #gallery figure.mark figcaption { color: var(--accent); font-weight: 700; }
 

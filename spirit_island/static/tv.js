@@ -127,19 +127,36 @@ function renderGallery(pics, setup) {
   const on = pics.length > 0;
   document.body.classList.toggle("setup", setup);
   document.body.classList.toggle("gallery", on);
-  $("gallery").classList.toggle("hidden", !on);
-  const heroIdx = pics.findIndex((p) => p.wide);
-  const hero = heroIdx >= 0 ? pics[heroIdx] : null;
-  const rest = pics.filter((_, i) => i !== heroIdx);
-  $("g-hero").replaceChildren(...(hero ? [figure(hero, "hero")] : []));
-  $("g-hero").classList.toggle("hidden", !hero);
-  const r = $("g-rest");
-  // Under a hero, one row whose column widths follow each picture's shape (panels ~1.5:1,
-  // cards ~0.7:1) so everything shares one height. Without a hero, big wrapped cards.
-  r.classList.toggle("row", !!hero);
-  r.style.gridTemplateColumns = hero ? rest.map((p) => (p.wide ? "2.1fr" : "1fr")).join(" ") : "";
-  r.style.setProperty("--h", (rest.length <= 3 ? 50 : rest.length === 4 ? 38 : 34) + "vh");
-  r.replaceChildren(...rest.map((p) => figure(p)));
+  const gal = $("gallery");
+  gal.classList.toggle("hidden", !on);
+  // One section per player (pictures carry a group); with several players they share the
+  // space equally, each with its panel on the left and its cards beside it.
+  const groups = [];
+  for (const p of pics) {
+    const k = p.group || 0;
+    (groups.find((g) => g.k === k) || groups[groups.push({ k, pics: [] }) - 1]).pics.push(p);
+  }
+  const multi = groups.length > 1;
+  gal.classList.toggle("multi", multi);
+  gal.replaceChildren(...groups.map(({ pics: gp }) => {
+    const heroIdx = gp.findIndex((p) => p.wide);
+    const hero = heroIdx >= 0 ? gp[heroIdx] : null;
+    const rest = gp.filter((_, i) => i !== heroIdx);
+    const sec = el("div", { class: "gsec" });
+    if (hero) sec.append(el("div", { class: "g-hero" }, figure(hero, "hero")));
+    if (rest.length) {
+      const r = el("div", { class: "g-rest" }, ...rest.map((p) => figure(p)));
+      // Under a hero (one player), one row whose column widths follow each picture's shape
+      // (panels ~1.5:1, cards ~0.7:1) so everything shares one height.
+      if (hero && !multi) {
+        r.classList.add("row");
+        r.style.gridTemplateColumns = rest.map((p) => (p.wide ? "2.1fr" : "1fr")).join(" ");
+      }
+      r.style.setProperty("--h", (multi ? 15.5 : rest.length <= 3 ? 50 : rest.length === 4 ? 38 : 34) + "vh");
+      sec.append(r);
+    }
+    return sec;
+  }));
 }
 
 function renderNow() {
