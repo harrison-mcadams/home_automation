@@ -23,13 +23,13 @@ from .engine import game as g
 from .vision_link import VisionLink
 
 
-def load_board_map(path):
+def load_board_map(path, boards_dir=None):
     """The drawn-board map from the camera's reference folder, or None if it isn't there."""
     if not path:
         return None
     try:
         from .board_map import BoardMap
-        return BoardMap(path)
+        return BoardMap(path, boards_dir)
     except Exception as e:  # missing folder, no OpenCV, ...: the photo view still works
         print(f"No drawn board view ({type(e).__name__}: {e})")
         return None
@@ -41,7 +41,7 @@ CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 def load_config():
     cfg = {"host": "0.0.0.0", "port": 5055, "data_dir": "games",
            "board_camera_url": "http://localhost:8091", "public_urls": [],
-           "board_reference": ""}
+           "board_reference": "", "board_art_dir": "assets/boards"}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             cfg.update(json.load(f))
@@ -179,7 +179,7 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
     url = cfg["board_camera_url"] if vision_url is None else vision_url
     if url:
         store.vision = VisionLink(url, on_change=store.vision_changed,
-                                  board_map=load_board_map(cfg.get("board_reference")))
+                                  board_map=load_board_map(cfg.get("board_reference"), os.path.join(BASE_DIR, cfg["board_art_dir"])))
         if start_vision:
             store.vision.start()
 

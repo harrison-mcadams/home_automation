@@ -60,7 +60,7 @@ const BoardMap = (() => {
     // With art from the real board (a straightened photo of your own copy), lands are
     // drawn see-through on top of it, only lighting up when a step affects them.
     v.root.classList.toggle("art", !!map.has_art);
-    if (map.has_art) v.lands.append(svg("image", { href: "/api/vision/board_art.png", x: 0, y: 0,
+    if (map.has_art) v.lands.append(svg("image", { href: "/api/vision/board_art.png?b=" + (map.board || "photo") + "-" + map.width + "x" + map.height, x: 0, y: 0,
       width: map.width, height: map.height, preserveAspectRatio: "none", class: "boardart" }));
     for (const l of map.lands) {
       if (l.name === "ocean") continue;
