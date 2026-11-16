@@ -150,3 +150,16 @@ body.gallery #n-do li { margin-bottom: .9vh; }
 #g-rest img { height: var(--h, 27vh); border-radius: 1vh; display: block; }
 #gallery figure.mark img { outline: .6vh solid var(--accent); outline-offset: .3vh; }
 #gallery figure.mark figcaption { color: var(--accent); font-weight: 700; }
+
+/* players step roster */
+.player-card { width: 100%; background: var(--panel2); border: 1px solid var(--line); border-left: .7vh solid var(--accent);
+  border-radius: 1.2vh; padding: 1.2vh 1.2vw; }
+.pc-name { font-size: 3.4vh; font-weight: 800; display: flex; justify-content: space-between; align-items: baseline; }
+.pc-board { font-size: 2.2vh; color: var(--accent); font-weight: 700; }
+.pc-spirit { font-size: 2.6vh; margin-top: .4vh; }
+.pc-spirit .tag { font-size: 1.7vh; margin-left: .6vw; padding: .1vh .5vw; border-radius: .8vh; background: #1d3b23; color: #b8f2c0; }
+.pc-style { font-size: 2vh; color: var(--muted); margin-top: .4vh; }
+
+/* setup steps show only the step itself */
+body.bare #side, body.bare #n-words, body.bare #n-why { display: none; }
+body.bare:not(.gallery) main { grid-template-columns: 1fr; max-width: 70vw; margin: 0 auto; width: 100%; }

@@ -16,8 +16,7 @@ const ROUND_STEPS = ["spirit.growth", "spirit.energy", "spirit.powers", "fast", 
 function el(tag, attrs = {}, ...kids) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
-    if (k === "onclick") e.addEventListener("click", v);
-    else if (k === "onchange") e.addEventListener("change", v);
+    if (k.startsWith("on") && typeof v === "function") e.addEventListener(k.slice(2), v);
     else if (k === "class") e.className = v;
     else if (v !== undefined && v !== null && v !== false) e.setAttribute(k, v === true ? "" : v);
   }
@@ -104,24 +103,29 @@ const HELPERS = {
     const existing = s.players.length ? s.players : [{ name: "", spirit: REF.spirits[0].name }];
     let count = existing.length;
     const playersBox = el("div");
-    const countSel = el("select", { onchange: () => { count = +countSel.value; drawPlayers(); } },
+    const countSel = el("select", { onchange: () => { count = +countSel.value; drawPlayers(); autosave(0); } },
       [1, 2, 3, 4].map((n) => el("option", { value: n, selected: n === count }, `${n} player${n > 1 ? "s" : ""}`)));
     const inputs = [];
+    // Save as you go so the TV shows the players while you fill them in.
+    let timer = null;
+    const autosave = (delay) => { clearTimeout(timer); timer = setTimeout(save, delay); };
     function drawPlayers() {
+      // Keep what's already typed when the player count changes.
+      const typed = inputs.map((x) => ({ name: x.name.value, spirit: x.sp.value, board: x.bd.value }));
       playersBox.replaceChildren(); inputs.length = 0;
       for (let i = 0; i < count; i++) {
-        const p = existing[i] || { name: "", spirit: REF.spirits[i % REF.spirits.length].name };
-        const name = el("input", { value: p.name, placeholder: `Player ${i + 1}` });
+        const p = typed[i] || existing[i] || { name: "", spirit: REF.spirits[i % REF.spirits.length].name };
+        const name = el("input", { value: p.name, placeholder: `Player ${i + 1}`, oninput: () => autosave(700) });
         const style = el("div", { class: "spirit-style" });
-        const sp = el("select", { onchange: () => upd() },
+        const sp = el("select", { onchange: () => { upd(); autosave(0); } },
           REF.spirits.map((x) => el("option", { value: x.name, selected: x.name === p.spirit }, `${x.name} (${x.complexity})`)));
         const upd = () => { style.textContent = REF.spirits.find((x) => x.name === sp.value).style; };
         upd();
         // Default to the board the camera recognised for player 1, then the others in order.
         const seen = S.vision && S.vision.detected_board;
         const order = seen ? [seen, ...REF.boards.filter((b) => b !== seen)] : REF.boards;
-        const boardNow = s.boards[i] || order[i];
-        const bd = el("select", {}, REF.boards.map((b) => el("option", { value: b, selected: b === boardNow }, `Board ${b}`)));
+        const boardNow = p.board || s.boards[i] || order.filter((b) => !typed.some((t) => t.board === b))[0] || order[i];
+        const bd = el("select", { onchange: () => autosave(0) }, REF.boards.map((b) => el("option", { value: b, selected: b === boardNow }, `Board ${b}`)));
         inputs.push({ name, sp, bd });
         playersBox.append(el("div", { class: "player" }, el("label", {}, `Player ${i + 1} name`), name,
           el("label", {}, "Spirit"), sp, style,
@@ -129,19 +133,23 @@ const HELPERS = {
       }
     }
     drawPlayers();
-    const adv = el("select", {}, REF.adversaries.map((a) => el("option", { value: a, selected: a === s.adversary.name }, a)));
+    const adv = el("select", { onchange: () => autosave(0) }, REF.adversaries.map((a) => el("option", { value: a, selected: a === s.adversary.name }, a)));
     const lvl = el("input", { type: "number", min: 0, max: 6, value: s.adversary.level, style: "width:5em" });
     const diff = el("input", { type: "number", min: 0, max: 20, value: s.adversary.difficulty, style: "width:5em" });
     box.append(el("h3", {}, "Players"), countSel, playersBox,
       el("label", {}, "Adversary (optional; leave None for now)"), adv,
       el("label", {}, "Adversary level and difficulty (from its panel; used for the score)"),
       el("div", { class: "btngrid" }, lvl, diff),
-      el("div", { style: "margin-top:10px" }, el("button", { class: "primary", onclick: () => act({
+      el("p", { class: "why" }, "Changes save by themselves and show on the TV. Tap Next when everyone's in."));
+    function save() {
+      return act({
         type: "configure",
         players: inputs.map((x) => ({ name: x.name.value.trim(), spirit: x.sp.value })),
         boards: inputs.map((x) => x.bd.value),
         adversary: { name: adv.value, level: +lvl.value, difficulty: +diff.value },
-      }).then(() => S.state.players.length && toast("Saved. Tap Next.", true)) }, s.players.length ? "Update" : "Save players")));
+      });
+    }
+    if (!s.players.length) setTimeout(() => autosave(0));
     return box;
   },
   reveal(h) {

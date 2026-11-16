@@ -150,10 +150,20 @@ function renderNow() {
   $("n-title").textContent = g.title;
   $("n-do").replaceChildren(...g.do.map((t) => el("li", {}, t)));
   const focus = focusRows(g.helper);
-  if (g.helper && g.helper.kind === "configure") focus.push(el("div", { class: "focus" }, "Pick players and spirits on the phone."));
+  if (g.helper && g.helper.kind === "configure") {
+    const roster = g.helper.roster || [];
+    if (!roster.length) focus.push(el("div", { class: "focus" }, "Add players on the phone."));
+    roster.forEach((p, i) => focus.push(el("div", { class: "player-card" },
+      el("div", { class: "pc-name" }, p.name, el("span", { class: "pc-board" }, p.board ? `Board ${p.board}` : "")),
+      el("div", { class: "pc-spirit" }, p.spirit, p.complexity ? el("span", { class: "tag" }, p.complexity) : null),
+      el("div", { class: "pc-style" }, p.style))));
+  }
   if (g.helper && g.helper.kind === "fear_cards") focus.push(el("div", { class: "focus" }, el("b", {}, g.helper.left), "fear card(s) to read and resolve"));
   $("n-focus").replaceChildren(...focus);
   renderGallery(g.pictures || [], s.status === "setup");
+  // Build the screen up as the game goes: setup shows only the step itself; the invader
+  // cards, lands and camera join at the first explore, the status bar once play starts.
+  document.body.classList.toggle("bare", s.status === "setup" && s.step !== "setup.first_explore");
   $("n-why").textContent = g.why || "";
   $("n-why").classList.toggle("hidden", !g.why);
   $("n-words").replaceChildren(...words(g));

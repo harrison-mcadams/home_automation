@@ -69,6 +69,15 @@ def _welcome(s):
     }
 
 
+def _roster(s):
+    info = {x["name"]: x for x in rules.SPIRITS}
+    return [{"name": p["name"], "spirit": p["spirit"] or "not chosen yet",
+             "board": s["boards"][i] if i < len(s["boards"]) else "",
+             "complexity": info.get(p["spirit"], {}).get("complexity", ""),
+             "style": info.get(p["spirit"], {}).get("style", "")}
+            for i, p in enumerate(s["players"])]
+
+
 def _players(s):
     return {
         "title": "Choose players and spirits",
@@ -80,7 +89,10 @@ def _players(s):
         ],
         "why": "Each spirit plays very differently. The complexity is printed on the back of its panel.",
         "tips": [],
-        "helper": {"kind": "configure"},
+        "helper": {"kind": "configure", "roster": _roster(s)},
+        "pictures": [{"src": f"spirits/{rules.SPIRIT_ART[p['spirit']][0]}/panel_front.jpg", "wide": True,
+                      "caption": p['spirit']}
+                     for p in s["players"] if p["spirit"] in rules.SPIRIT_ART],
     }
 
 
@@ -91,13 +103,16 @@ def _island(s):
         "do": [
             f"Take {n} island board{'s' if n > 1 else ''} ({', '.join(s['boards'])}), one per player.",
             "Use the side with the lettered lands (the standard, balanced side).",
+        ] + ([
             "With two boards, put them edge to edge so the ocean edges face away from each other; "
             "the rulebook shows the suggested layouts.",
+        ] if n > 1 else []) + [
             "Each board has 8 numbered lands plus an ocean. Lands are Jungle, Mountain, Sands or Wetland.",
         ],
         "why": "Invader cards name a terrain, and every land of that terrain is affected.",
         "tips": ["Optional but useful: open Island and tap each land's terrain once. The app remembers "
                  "it for future games and can then tell you exactly which lands ravage, build and explore."],
+        "pictures": [_comp(f"board_{b}", f"Board {b}", True) for b in s["boards"]],
     }
 
 
