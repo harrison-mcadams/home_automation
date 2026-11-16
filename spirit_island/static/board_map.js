@@ -57,6 +57,11 @@ const BoardMap = (() => {
       svg("rect", { x: -pad, y: -pad, width: map.width + 2 * pad, height: map.height + 2 * pad, fill: "url(#bm-sea)" }),
       svg("rect", { x: -pad, y: -pad, width: map.width + 2 * pad, height: map.height + 2 * pad, fill: "url(#bm-waves)" }));
     v.lands.replaceChildren(); v.labels.replaceChildren(); v.landEls = {};
+    // With art from the real board (a straightened photo of your own copy), lands are
+    // drawn see-through on top of it, only lighting up when a step affects them.
+    v.root.classList.toggle("art", !!map.has_art);
+    if (map.has_art) v.lands.append(svg("image", { href: "/api/vision/board_art.png", x: 0, y: 0,
+      width: map.width, height: map.height, preserveAspectRatio: "none", class: "boardart" }));
     for (const l of map.lands) {
       if (l.name === "ocean") continue;
       const poly = svg("polygon", { points: l.points.map((p) => p.join(",")).join(" "), class: "land" });

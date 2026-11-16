@@ -33,8 +33,11 @@ class BoardMap:
         ref_json = ref_dir / "reference.json"
         if ref_json.exists():
             quad = (json.loads(ref_json.read_text()).get("board") or {}).get("quad")
+        self.ref_dir = ref_dir
         self.warp, self.width, self.height = self._straighten(quad, labels)
+        self._fit(labels > 0)
         self.lands = self._outlines(labels)
+        self._art = None
 
     def _straighten(self, quad, labels):
         if quad and len(quad) == 4:
@@ -50,6 +53,37 @@ class BoardMap:
         w, h = MAP_WIDTH, int(round(MAP_WIDTH * aspect))
         dst = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32)
         return cv2.getPerspectiveTransform(q, dst), w, h
+
+    def _fit(self, board):
+        """Grow the straightened view so the whole board fits, not just the four corners."""
+        contours, _ = cv2.findContours(board.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return
+        pts = self.to_map(np.vstack([c.reshape(-1, 2) for c in contours]))
+        (x0, y0), (x1, y1) = pts.min(0), pts.max(0)
+        k = MAP_WIDTH / max(1.0, x1 - x0)
+        fit = np.array([[k, 0, -x0 * k], [0, k, -y0 * k], [0, 0, 1]], dtype=np.float64)
+        self.warp = fit @ self.warp
+        self.width, self.height = MAP_WIDTH, int(round((y1 - y0) * k))
+
+    def art_png(self) -> bytes | None:
+        """The reference photo of the board, straightened, with everything off the board
+        made transparent: the board's own printed art, from your own copy."""
+        if self._art is None:
+            ref = cv2.imread(str(self.ref_dir / "reference.jpg"))
+            mask = cv2.imread(str(self.ref_dir / "board_mask.png"), cv2.IMREAD_GRAYSCALE)
+            if ref is None:
+                return None
+            if mask is None:
+                mask = np.full(ref.shape[:2], 255, np.uint8)
+            mask = cv2.resize(mask, (ref.shape[1], ref.shape[0]), interpolation=cv2.INTER_NEAREST)
+            size = (self.width, self.height)
+            img = cv2.warpPerspective(ref, self.warp, size, flags=cv2.INTER_AREA)
+            alpha = cv2.warpPerspective(mask, self.warp, size)
+            alpha = cv2.GaussianBlur(alpha, (5, 5), 0)
+            ok, buf = cv2.imencode(".png", np.dstack([img, alpha]))
+            self._art = buf.tobytes() if ok else b""
+        return self._art or None
 
     def to_map(self, points) -> np.ndarray:
         pts = np.asarray(points, dtype=np.float32).reshape(-1, 1, 2)
@@ -75,7 +109,8 @@ class BoardMap:
         return lands
 
     def public(self) -> dict:
-        return {"width": self.width, "height": self.height, "lands": self.lands}
+        return {"width": self.width, "height": self.height, "lands": self.lands,
+                "has_art": (self.ref_dir / "reference.jpg").exists()}
 
     def place(self, pieces: list) -> list:
         """Detected pieces -> [{type, colour, land, x, y}] in map units."""

@@ -210,6 +210,14 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
             return jsonify({"error": "no board map; set board_reference in config.json"}), 404
         return jsonify(m.public())
 
+    @app.get("/api/vision/board_art.png")
+    def vision_art():
+        m = store.vision.map if store.vision else None
+        body = m.art_png() if m is not None else None
+        if not body:
+            return Response("no board art", status=404)
+        return Response(body, mimetype="image/png", headers={"Cache-Control": "max-age=3600"})
+
     @app.post("/api/vision")
     def vision_control():
         """{"board": "C"} says which board the camera sees, {"auto": true} turns on
