@@ -22,7 +22,7 @@ function dropIn(node, delay, kind = "drop") {
 
 function animScene(p) {
   const svg = svgEl("svg", { viewBox: "0 0 1600 900", class: "scene", preserveAspectRatio: "xMidYMid meet" });
-  const scenes = { pool: poolScene, stack: stackScene, blight: blightScene };
+  const scenes = { pool: poolScene, stack: stackScene, blight: blightScene, board: boardScene };
   (scenes[p.anim] || (() => {}))(svg, p);
   return svg;
 }
@@ -95,4 +95,34 @@ function blightScene(svg, p) {
   }
   svg.append(dropIn(svgEl("text", { x: 800, y: 880, "text-anchor": "middle", "font-size": 50, fill: "#f1f5ee" },
     `${n} blight on the card`), 1.2 + n * 0.6, "fade"));
+}
+
+// A labelled diagram of the invader board: where each thing goes. Each area lights up in turn.
+function boardScene(svg) {
+  svg.append(svgEl("rect", { x: 40, y: 120, width: 1520, height: 660, rx: 30, fill: "#2b2216", stroke: "#8a6a3c", "stroke-width": 8 }));
+  svg.append(svgEl("text", { x: 800, y: 80, "text-anchor": "middle", "font-size": 54, fill: "#f1f5ee", "font-weight": 700 },
+    "Invader board (a diagram: your board's art differs)"));
+  const zones = [
+    { x: 80, y: 160, w: 380, h: 270, label: "Fear pool", sub: "fear markers start here", c: "#b993f5" },
+    { x: 490, y: 160, w: 300, h: 270, label: "Fear earned", sub: "markers move here", c: "#b993f5" },
+    { x: 820, y: 160, w: 300, h: 270, label: "Fear deck", sub: "+ terror level", c: "#b993f5" },
+    { x: 1150, y: 160, w: 370, h: 270, label: "Blight card", sub: "blight sits on it", c: "#e08a5f" },
+    { x: 80, y: 470, w: 220, h: 270, label: "Discard", sub: "", c: "#8f949c" },
+    { x: 330, y: 470, w: 260, h: 270, label: "Ravage", sub: "", c: "#ff7a6b" },
+    { x: 620, y: 470, w: 260, h: 270, label: "Build", sub: "", c: "#f3c862" },
+    { x: 910, y: 470, w: 260, h: 270, label: "Explore", sub: "", c: "#86dc93" },
+    { x: 1200, y: 470, w: 320, h: 270, label: "Invader deck", sub: "face down", c: "#8f949c" },
+  ];
+  zones.forEach((z, i) => {
+    svg.append(svgEl("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 18, fill: "rgba(0,0,0,.25)",
+      stroke: z.c, "stroke-width": 5, "stroke-dasharray": "14 10" }));
+    const g = svgEl("g", {},
+      svgEl("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 18, fill: z.c, opacity: 0.28 }),
+      svgEl("text", { x: z.x + z.w / 2, y: z.y + z.h / 2 + (z.sub ? -6 : 14), "text-anchor": "middle", "font-size": 44,
+        fill: "#fff", "font-weight": 700 }, z.label),
+      z.sub ? svgEl("text", { x: z.x + z.w / 2, y: z.y + z.h / 2 + 44, "text-anchor": "middle", "font-size": 28, fill: "#e8e2d6" }, z.sub) : null);
+    svg.append(dropIn(g, 0.3 + i * 0.45, "fade"));
+  });
+  svg.append(dropIn(svgEl("text", { x: 800, y: 850, "text-anchor": "middle", "font-size": 36, fill: "#a3b3a5" },
+    "Invader cards slide left each round: Explore → Build → Ravage → Discard"), 4.6, "fade"));
 }

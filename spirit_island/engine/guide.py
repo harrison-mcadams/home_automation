@@ -274,7 +274,7 @@ def _invader_board(s):
         "tips": ["An adversary changes these numbers. If you use one, follow its setup and correct the "
                  "pools in Settings."] if s["adversary"]["name"] != "None" else [],
         "pictures": [
-            _comp("invader_board", "Your invader board", True, items=[0]),
+            {"anim": "board", "wide": True, "items": [0], "caption": "Invader board: where everything goes"},
             {"anim": "pool", "count": f["pool_size"], "wide": True, "items": [1],
              "caption": "Fear pool: the fear markers wait here"},
             {"anim": "stack", "wide": True, "items": [2], "caption": "The fear deck, built from the bottom up",
