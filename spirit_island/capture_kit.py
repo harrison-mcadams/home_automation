@@ -101,7 +101,10 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--source", default="0", help="USB camera index, stream URL or video file (default 0)")
     p.add_argument("--phone", nargs="?", const=8080, type=int, metavar="PORT",
-                   help="use an Android phone on USB: adb-forward its camera app (default port 8080)")
+                   help="use the Android phone's camera app (default port 8080): over Wi-Fi if IPWEBCAM_HOST "
+                        "is set, else over USB via adb")
+    p.add_argument("--phone-host", help="phone's Wi-Fi address (default: IPWEBCAM_HOST from env or .env; "
+                   "without one, --phone uses USB)")
     p.add_argument("--phone-user", help="camera app login (default: IPWEBCAM_USER from env or the repo .env)")
     p.add_argument("--phone-password", help="camera app password (default: IPWEBCAM_PASS from env or the repo .env)")
     p.add_argument("--still-url", help="full-resolution photo URL for phone cameras, e.g. http://phone:8080/photo.jpg")
@@ -122,14 +125,15 @@ def main(argv=None) -> int:
         from vision import phone
 
         try:
-            base = phone.forward(args.phone)
+            base = phone.connect(args.phone, args.phone_host)
         except phone.PhoneError as exc:
             print(f"Problem with the phone: {exc}\nTry `python -m vision.phone` for a step-by-step check.")
             return 1
         phone_urls = phone.urls(base, args.phone_user, args.phone_password)
         args.source = phone_urls["video"]
         args.still_url = args.still_url or phone_urls["photo"]
-        print(f"Using the phone on USB: video {redact(args.source)}, stills {redact(args.still_url)}")
+        how = "over Wi-Fi" if phone.wifi_host(args.phone_host) else "on USB"
+        print(f"Using the phone {how}: video {redact(args.source)}, stills {redact(args.still_url)}")
     source = parse_source(args.source)
     session = Path(args.out) if args.out else RECORDINGS / datetime.now().strftime("%Y%m%d-%H%M%S")
     session.mkdir(parents=True, exist_ok=True)

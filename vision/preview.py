@@ -1,7 +1,8 @@
 """Live preview over HTTP, for aiming a camera attached to a headless machine.
 
     python -m vision.preview --source 0 --port 8090
-    then open http://<mac-name>.local:8090 on a phone or laptop.
+    python -m vision.preview --phone --max-width 1920 --fps 15     # the phone, TV-sized
+    then open the printed http://<this-computer>:8090 address on a phone, laptop or TV browser.
 
 Serves an MJPEG stream (downscaled to keep Wi-Fi happy) with the delivered
 resolution and a live sharpness number, so you can adjust the mount and focus
@@ -30,6 +31,16 @@ img{width:100%;height:auto;display:block}p{margin:8px 12px}</style></head>
 <body><img src="/stream.mjpg" alt="live camera">
 <p>Full-resolution frame: <a style="color:#9cf" href="/snapshot.jpg">snapshot.jpg</a></p>
 </body></html>"""
+
+
+def lan_ip() -> str:
+    """This computer's address on the local network (no traffic is sent)."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.168.0.1", 9))
+            return s.getsockname()[0]
+    except OSError:
+        return "localhost"
 
 
 class PreviewServer:
@@ -103,7 +114,7 @@ class PreviewServer:
         self._server = ThreadingHTTPServer(("0.0.0.0", self.port), self._handler())
         self._server.daemon_threads = True
         threading.Thread(target=self._server.serve_forever, name="preview", daemon=True).start()
-        print(f"Live preview at http://{socket.gethostname()}:{self.port}  (or http://localhost:{self.port})")
+        print(f"Live preview at http://{lan_ip()}:{self.port}  (or http://{socket.gethostname()}:{self.port})")
         return self
 
     def stop(self) -> None:
@@ -115,12 +126,22 @@ class PreviewServer:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--source", default="0")
+    p.add_argument("--phone", nargs="?", const=8080, type=int, metavar="PORT",
+                   help="use the Android phone's camera app (Wi-Fi if IPWEBCAM_HOST is set, else USB)")
     p.add_argument("--port", type=int, default=8090)
     p.add_argument("--width", type=int)
     p.add_argument("--height", type=int)
+    p.add_argument("--rotate", type=int, default=0, choices=[0, 90, 180, 270])
+    p.add_argument("--max-width", type=int, default=1280, help="downscale the stream to this width (1920 for a TV)")
+    p.add_argument("--fps", type=float, default=8.0, help="stream frame rate")
     args = p.parse_args(argv)
-    with Camera(parse_source(args.source), width=args.width, height=args.height) as cam:
-        PreviewServer(cam, port=args.port).start()
+    source = args.source
+    if args.phone:
+        from vision import phone
+
+        source = phone.urls(phone.connect(args.phone))["video"]
+    with Camera(parse_source(source), width=args.width, height=args.height, rotate=args.rotate) as cam:
+        PreviewServer(cam, port=args.port, max_width=args.max_width, fps=args.fps).start()
         print("Ctrl-C to stop.")
         try:
             while True:

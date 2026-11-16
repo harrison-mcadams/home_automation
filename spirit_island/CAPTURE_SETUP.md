@@ -74,6 +74,17 @@ This forwards the phone's port 8080 to `http://localhost:8080` over USB, and
 prints the video size and full-photo size it gets. The first time, accept the
 "Allow USB debugging?" prompt on the phone.
 
+**Over Wi-Fi instead of USB:** add the phone's address (shown at the bottom of
+IP Webcam's screen) to the same `.env` file, and `--phone` uses Wi-Fi with no
+cable or adb needed:
+
+```
+IPWEBCAM_HOST=192.168.1.60
+```
+
+Reserve that address for the phone in your router so it doesn't change. Remove
+the line to go back to USB.
+
 *Simpler fallback:* Android 14 and later can also act as a plain USB webcam (pull
 down the notification after plugging in, choose *Webcam*). Then it behaves like
 Option B, but you lose the full-resolution stills, so prefer the app.

@@ -76,3 +76,17 @@ def test_credentials_fall_back_to_home_folder(monkeypatch, tmp_path):
     monkeypatch.setattr(phone, "REPO_ROOT", tmp_path / "repo-without-env")
     monkeypatch.setattr(phone.Path, "home", lambda: tmp_path)
     assert phone.credentials() == ("pixelcam", "x")
+
+
+def test_connect_prefers_wifi_host(monkeypatch, tmp_path, fake_adb):
+    _, calls = fake_adb
+    monkeypatch.delenv("IPWEBCAM_HOST", raising=False)
+    (tmp_path / ".env").write_text("IPWEBCAM_HOST=192.168.1.60\n")
+    monkeypatch.setattr(phone, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(phone.Path, "home", lambda: tmp_path / "nohome")
+    assert phone.connect() == "http://192.168.1.60:8080"
+    assert calls == []  # no adb needed over Wi-Fi
+    assert phone.connect(host="10.0.0.5", port=9000) == "http://10.0.0.5:9000"
+    (tmp_path / ".env").unlink()
+    monkeypatch.setattr(phone, "find_adb", lambda: "adb")
+    assert phone.connect() == "http://localhost:8080"  # falls back to USB

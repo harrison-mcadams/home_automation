@@ -91,7 +91,7 @@ def forward(port: int = DEFAULT_PORT, serial: Optional[str] = None, adb: Optiona
     return f"http://localhost:{port}"
 
 
-USER_VAR, PASS_VAR = "IPWEBCAM_USER", "IPWEBCAM_PASS"
+USER_VAR, PASS_VAR, HOST_VAR = "IPWEBCAM_USER", "IPWEBCAM_PASS", "IPWEBCAM_HOST"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -121,13 +121,32 @@ def credentials(user: Optional[str] = None, password: Optional[str] = None,
     the IPWEBCAM_USER / IPWEBCAM_PASS environment variables, then the same keys
     in the repo's .env file (git-ignored), then ~/.ipwebcam/credentials.txt, so the password is set once and never
     committed or typed on the command line."""
+    env = _settings(env_file)
+    user = user or os.environ.get(USER_VAR) or env.get(USER_VAR)
+    password = password or os.environ.get(PASS_VAR) or env.get(PASS_VAR)
+    return user, password
+
+
+def _settings(env_file: Optional[Path] = None) -> dict:
     env = {}
     for path in ([env_file] if env_file else [REPO_ROOT / ".env", Path.home() / ".ipwebcam" / "credentials.txt"]):
         for key, value in read_env_file(path).items():
             env.setdefault(key, value)  # the repo .env wins over the home-folder copy
-    user = user or os.environ.get(USER_VAR) or env.get(USER_VAR)
-    password = password or os.environ.get(PASS_VAR) or env.get(PASS_VAR)
-    return user, password
+    return env
+
+
+def wifi_host(host: Optional[str] = None) -> Optional[str]:
+    """The phone's Wi-Fi address, if it is used over Wi-Fi: the argument, else
+    IPWEBCAM_HOST from the environment or .env (e.g. IPWEBCAM_HOST=192.168.1.60)."""
+    return host or os.environ.get(HOST_VAR) or _settings().get(HOST_VAR) or None
+
+
+def connect(port: int = DEFAULT_PORT, host: Optional[str] = None, serial: Optional[str] = None) -> str:
+    """Base URL of the phone's camera app: over Wi-Fi if a host is known, else over USB via adb."""
+    host = wifi_host(host)
+    if host:
+        return f"http://{host}:{port}"
+    return forward(port, serial)
 
 
 def urls(base: str, user: Optional[str] = None, password: Optional[str] = None) -> dict:
@@ -155,18 +174,19 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help="the camera app's port on the phone")
     p.add_argument("--serial", help="which phone, if several are attached")
+    p.add_argument("--host", help="phone's Wi-Fi address instead of USB (default: IPWEBCAM_HOST from env or .env)")
     p.add_argument("--user", help="camera app login (default: IPWEBCAM_USER from env or .env)")
     p.add_argument("--password", help="camera app password (default: IPWEBCAM_PASS from env or .env)")
     args = p.parse_args(argv)
     try:
-        base = forward(args.port, args.serial)
-        print(f"Phone forwarded to {base}")
+        base = connect(args.port, args.host, args.serial)
+        print(f"Phone at {base}")
         result = check(base, args.user, args.password)
     except PhoneError as exc:
         print(f"Problem: {exc}")
         return 1
     except Exception as exc:  # camera app not running, wrong port, etc.
-        print(f"Forwarded, but the camera app did not answer: {exc}\n"
+        print(f"Reached {base}, but the camera app did not answer: {exc}\n"
               "Open the camera app on the phone and start its server, then try again. "
               "If the app has a login, put IPWEBCAM_USER and IPWEBCAM_PASS in the repo's .env file.")
         return 1
