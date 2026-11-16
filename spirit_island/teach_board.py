@@ -55,7 +55,12 @@ def teach(image: np.ndarray, out_root: Path, boards_dir: Path = BOARDS, expect: 
     # The table's outline finder can grab the whole frame (wood grain, cards); then just
     # match the art across the whole photo.
     hint = board.mask if board is not None and board.area_frac < 0.5 else None
-    found = match_board(image, hint, boards_dir)
+    # Knowing which board was put down lets a closer match count.
+    ratio = 2 if expect else 3
+    # Try with and without the outline hint and keep the stronger lock.
+    tries = [match_board(image, m, boards_dir, ratio) for m in ([hint, None] if hint is not None else [None])]
+    tries = [t for t in tries if t]
+    found = max(tries, key=lambda t: t[3][t[0]]) if tries else None
     if not found:
         raise SystemExit("Couldn't tell which board this is (glare, or pieces covering it?).")
     letter, H, _scan, scores = found

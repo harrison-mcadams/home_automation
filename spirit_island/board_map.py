@@ -26,7 +26,7 @@ def _small(image, side=1600):
     return cv2.resize(image, None, fx=k, fy=k, interpolation=cv2.INTER_AREA), k
 
 
-def match_board(reference: np.ndarray, board_mask: np.ndarray | None, boards_dir: Path):
+def match_board(reference: np.ndarray, board_mask: np.ndarray | None, boards_dir: Path, ratio: float = 3):
     """Which clean board scan the camera's reference photo shows, and how it lines up.
 
     Matches the printed art (SIFT features) against each scan in `boards_dir`
@@ -69,7 +69,7 @@ def match_board(reference: np.ndarray, board_mask: np.ndarray | None, boards_dir
     scores = {r[1]: r[0] for r in results}
     best = results[0] if results else None
     runner_up = results[1][0] if len(results) > 1 else 0
-    if best is None or best[2] is None or best[0] < 30 or best[0] < 3 * max(1, runner_up):
+    if best is None or best[2] is None or best[0] < 30 or best[0] < ratio * max(1, runner_up):
         return None
     return best[1], best[2], best[3], scores
 
