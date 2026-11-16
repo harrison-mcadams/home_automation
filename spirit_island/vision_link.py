@@ -115,7 +115,9 @@ class VisionLink:
 
     def __init__(self, url: str = "http://localhost:8091", every: float = 3.0, on_change=None, board_map=None):
         self.url = url.rstrip("/")
-        self.map = board_map       # BoardMap for the drawn board view, or None
+        # BoardMap(s) for the drawn board view: one, or {letter: BoardMap} when the camera
+        # knows several boards and says which one it sees.
+        self.maps = board_map if isinstance(board_map, dict) else             ({getattr(board_map, "letter", None) or "?": board_map} if board_map is not None else {})
         self.pieces: list = []     # piece positions from the last settled photo
         self.view = "board" if board_map is not None else "photo"  # what the screens show: photo | board
         self.every = every
@@ -129,6 +131,13 @@ class VisionLink:
         self.stopping = threading.Event()
         self._thread = None
         self.history: list = []    # recent settled readings (board_state), newest last
+
+    @property
+    def map(self):
+        if not self.maps:
+            return None
+        seen = (self.raw or {}).get("board")
+        return self.maps.get(seen) or next(iter(self.maps.values()))
 
     # -- polling --
     def fetch_once(self) -> bool:

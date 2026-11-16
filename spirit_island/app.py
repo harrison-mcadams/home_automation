@@ -28,7 +28,11 @@ def load_board_map(path, boards_dir=None):
     if not path:
         return None
     try:
+        from pathlib import Path
         from .board_map import BoardMap
+        if not (Path(path) / "reference.jpg").exists():  # a folder of boards, one per letter
+            return {d.name: BoardMap(d, boards_dir) for d in sorted(Path(path).iterdir())
+                    if (d / "lands.json").exists()} or None
         return BoardMap(path, boards_dir)
     except Exception as e:  # missing folder, no OpenCV, ...: the photo view still works
         print(f"No drawn board view ({type(e).__name__}: {e})")

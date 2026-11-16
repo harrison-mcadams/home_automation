@@ -89,14 +89,17 @@ def _overlap(a, b) -> float:
 class BoardView:
     def __init__(self, reference_dir: Path, grab, every: float = 5.0, max_side: int = 1600,
                  confirm: int = 3, save_dir: Path | None = None):
-        self.reference = cv2.imread(str(reference_dir / "reference.jpg"))
-        self.board_mask = cv2.imread(str(reference_dir / "board_mask.png"), cv2.IMREAD_GRAYSCALE)
-        if self.reference is None or self.board_mask is None:
+        # One reference folder, or a folder of them named by board letter (A, B, C, D):
+        # then the page follows whichever board is under the camera.
+        reference_dir = Path(reference_dir)
+        if (reference_dir / "reference.jpg").exists():
+            folders = {self._letter(reference_dir): reference_dir}
+        else:
+            folders = {d.name: d for d in sorted(reference_dir.iterdir()) if (d / "reference.jpg").exists()}
+        if not folders:
             raise SystemExit(f"No reference in {reference_dir}.")
-        labels, names = land_map.load(reference_dir)
-        self.lands = (labels, names) if labels is not None else None
-        self.rotate = json.loads((reference_dir / "reference.json").read_text()).get("rotate", 0) \
-            if (reference_dir / "reference.json").exists() else 0
+        self.boards = {letter: self._load(d) for letter, d in folders.items()}
+        self.misses = 0
         self.grab = grab
         self.every = every
         self.max_side = max_side
@@ -110,14 +113,62 @@ class BoardView:
         self.recent: list[str] = []
         self.save_dir = save_dir
         self.last_seen: dict | None = None
-        # Remember pieces between photos so changing light can't make them vanish.
-        self.memory = PieceMemory(self.reference, self.lands)
         self.last_large: list = []
+        self.use(next(iter(self.boards)))
+
+    @staticmethod
+    def _letter(folder: Path) -> str:
+        meta = folder / "reference.json"
+        letter = json.loads(meta.read_text()).get("letter") if meta.exists() else None
+        return letter or folder.name
+
+    @staticmethod
+    def _load(folder: Path) -> dict:
+        reference = cv2.imread(str(folder / "reference.jpg"))
+        mask = cv2.imread(str(folder / "board_mask.png"), cv2.IMREAD_GRAYSCALE)
+        if reference is None or mask is None:
+            raise SystemExit(f"No reference in {folder}.")
+        labels, names = land_map.load(folder)
+        lands = (labels, names) if labels is not None else None
+        meta = folder / "reference.json"
+        rotate = json.loads(meta.read_text()).get("rotate", 0) if meta.exists() else 0
+        # Remember pieces between photos so changing light can't make them vanish.
+        return {"reference": reference, "mask": mask, "lands": lands, "rotate": rotate,
+                "memory": PieceMemory(reference, lands)}
+
+    def use(self, letter: str) -> None:
+        """Switch to another board's reference; its readings start afresh."""
+        b = self.boards[letter]
+        self.board = letter
+        self.reference, self.board_mask, self.lands = b["reference"], b["mask"], b["lands"]
+        self.rotate, self.memory = b["rotate"], b["memory"]
+        self.stable, self.recent, self.last_large, self.misses = None, [], [], 0
+
+    def _other_board(self, image) -> tuple[str, dict] | None:
+        """After a couple of photos that don't line up, see if another known board does."""
+        for letter, b in self.boards.items():
+            if letter == self.board:
+                continue
+            result = detect.detect_pieces(b["reference"], b["mask"], detect.rotate(image, b["rotate"]),
+                                          lands=b["lands"])
+            if result["registered"]:
+                return letter, result
+        return None
 
     def update_once(self) -> dict:
         started = time.time()
-        image = detect.rotate(self.grab(), self.rotate)
+        raw = self.grab()
+        image = detect.rotate(raw, self.rotate)
         result = detect.detect_pieces(self.reference, self.board_mask, image, lands=self.lands)
+        if result["registered"]:
+            self.misses = 0
+        elif len(self.boards) > 1:
+            self.misses += 1
+            if self.misses >= 2:
+                other = self._other_board(raw)
+                if other:
+                    self.use(other[0])
+                    image, result = detect.rotate(raw, self.rotate), other[1]
         self.memory.update(result)
         result["board_state"] = detect.board_state(result["pieces"])
         picture = detect.draw_pieces(image, result)
@@ -126,6 +177,7 @@ class BoardView:
             picture = cv2.resize(picture, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
         ok, buf = cv2.imencode(".jpg", picture, [cv2.IMWRITE_JPEG_QUALITY, 85])
         public = {k: v for k, v in result.items() if not k.startswith("_")}
+        public["board"] = self.board
         public["stamp"] = datetime.now().strftime("%H:%M:%S")
         public["seconds"] = round(time.time() - started, 1)
         public["status"] = "ok" if result["registered"] else "could not line up with the reference"
