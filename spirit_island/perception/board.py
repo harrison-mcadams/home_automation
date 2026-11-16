@@ -22,6 +22,7 @@ class BoardOutline:
     quad: np.ndarray  # 4x2 float32, corners ordered TL, TR, BR, BL
     mask: np.ndarray  # uint8 255 inside the board, full resolution
     area_frac: float  # share of the frame the board covers
+    touches_edge: bool = False  # board runs off the frame, so the quad's corners are unreliable
 
     @property
     def bbox(self) -> tuple[int, int, int, int]:
@@ -65,7 +66,13 @@ def find_board(
     hsv = cv2.cvtColor(cv2.GaussianBlur(small, (5, 5), 0), cv2.COLOR_BGR2HSV)
     sat = hsv[..., 1]
     otsu, _ = cv2.threshold(sat, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    mask = (sat > max(min_saturation, otsu)).astype(np.uint8) * 255
+    hue, val = hsv[..., 0], hsv[..., 2]
+    colourful = sat > max(min_saturation, otsu)
+    # Mountains (grey) and wetlands (pale blue) are barely saturated, some even less
+    # than a wooden table, but they are cool-toned while wood, rugs and floors are warm.
+    # Measured on a real board: pale lands hue 97-106, table/rug/floor hue ~18-20.
+    cool_pale = (hue > 85) & (hue < 130) & (val > 130) & (sat > 12)
+    mask = (colourful | cool_pale).astype(np.uint8) * 255
     if exclude is not None:
         ex = cv2.resize(exclude, (small.shape[1], small.shape[0]), interpolation=cv2.INTER_NEAREST)
         mask[ex > 0] = 0
@@ -122,4 +129,8 @@ def find_board(
         quad=_quad_from_contour(contour),
         mask=full_mask,
         area_frac=round(float(cv2.contourArea(best)) / frame_area, 4),
+        touches_edge=bool(
+            (contour[..., 0] <= 2).any() or (contour[..., 1] <= 2).any()
+            or (contour[..., 0] >= w - 3).any() or (contour[..., 1] >= h - 3).any()
+        ),
     )

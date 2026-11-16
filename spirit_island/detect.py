@@ -93,6 +93,7 @@ def board_summary(board: Optional[BoardOutline]) -> dict:
         "found": True,
         "bbox": board.bbox,
         "area_frac": board.area_frac,
+        "touches_frame_edge": board.touches_edge,
         "quad": [[round(float(x)), round(float(y))] for x, y in board.quad],
     }
 
@@ -110,6 +111,8 @@ def cmd_outline(args) -> int:
     summary = board_summary(board)
     (out / "outline.json").write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary))
+    if board is not None and board.touches_edge:
+        print("Note: the board runs off the edge of the picture; aim so it is fully in view.")
     print(f"Annotated picture: {path}")
     return 0 if board else 1
 
