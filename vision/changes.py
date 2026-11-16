@@ -23,6 +23,7 @@ class Blob:
     mean_bgr: tuple[float, float, float]  # colour of the blob in the new picture
     score: float  # mean colour difference inside the blob
     thickness: float = 0.0  # radius of the largest circle that fits inside, in reference pixels
+    label: int = 0  # value of this blob in the label image returned by find_changes(..., return_labels=True)
 
 
 def change_map(
@@ -121,7 +122,9 @@ def split_touching(
             markers[~sel] = len(seeds) + 1  # background
             for n, (sx, sy, r) in enumerate(seeds, 1):
                 disc = np.zeros(sel.shape, np.uint8)
-                cv2.circle(disc, (sx, sy), max(1, int(r / 2)), 1, -1)
+                # Full-radius seeds: each piece's whole inscribed disc is claimed up front,
+                # so the watershed only decides the strip between pieces (the visible gap).
+                cv2.circle(disc, (sx, sy), max(1, int(r * 0.9)), 1, -1)
                 markers[(disc > 0) & sel] = n
             g = grad[y0:y1, x0:x1]
             cv2.watershed(cv2.merge([g, g, g]), markers)
@@ -156,7 +159,8 @@ def find_changes(
     work_side: int = 1600,
     split: bool = True,
     min_split_thickness: float = 0.0,
-) -> tuple[list[Blob], np.ndarray]:
+    return_labels: bool = False,
+):
     """Blobs where `aligned` differs from `reference`, inside `region` (255 = look).
 
     Returns (blobs sorted largest first, binary change mask at reference size).
@@ -219,8 +223,12 @@ def find_changes(
                 mean_bgr=tuple(round(float(v), 1) for v in new[sel].mean(axis=0)),
                 score=round(float(diff[sel].mean()), 1),
                 thickness=round(float(piece_dist.max() / scale), 1),
+                label=i,
             )
         )
     blobs.sort(key=lambda b: b.area, reverse=True)
     full_mask = cv2.resize(mask, (full_w, full_h), interpolation=cv2.INTER_NEAREST)
+    if return_labels:
+        # Labels stay at working resolution (with its scale) to keep them light.
+        return blobs, full_mask, labels, scale
     return blobs, full_mask

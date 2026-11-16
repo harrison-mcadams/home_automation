@@ -31,7 +31,10 @@ from typing import Optional
 import cv2
 import numpy as np
 
+from spirit_island.perception import lands as land_map
 from spirit_island.perception.board import BoardOutline, find_board
+from spirit_island.perception.lands import piece_land
+from spirit_island.perception.pieces import classify, describe, measure
 from vision.changes import find_changes
 from vision.register import register, valid_mask, warp_to_reference
 
@@ -139,7 +142,8 @@ def cmd_reference(args) -> int:
 
 
 def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarray,
-                  max_piece_frac: float = 0.03, min_thickness: float = 0.02, **kwargs) -> dict:
+                  max_piece_frac: float = 0.03, min_thickness: float = 0.02,
+                  lands: Optional[tuple] = None, **kwargs) -> dict:
     """Register `image` onto the reference and find what changed on the board."""
     reg = register(reference, image, reference_mask=board_mask)
     if reg is None or not reg.ok:
@@ -183,7 +187,10 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     region = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * rim + 1, 2 * rim + 1)))
     board_area = max(1, int((region > 0).sum()))
     kwargs.setdefault("min_split_thickness", 1.2 * min_thickness * np.sqrt(board_area))
-    blobs, change_mask = find_changes(reference, aligned, region, **kwargs)
+    blobs, change_mask, labels, scale = find_changes(reference, aligned, region, return_labels=True, **kwargs)
+    work = cv2.resize(aligned, (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_AREA)
+    full_board_area = float((board_mask > 0).sum()) * scale * scale  # in working pixels
+    land_labels, land_names = lands if lands else (None, None)
     H_inv = np.linalg.inv(reg.homography)
     pieces, large = [], []
     for b in blobs:
@@ -200,6 +207,15 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
             "change_score": b.score,
             "thickness_px": b.thickness,
         }
+        piece_mask = labels == b.label
+        feats = measure(work, piece_mask, full_board_area)
+        entry.update(classify(feats))
+        entry["features"] = describe(feats)
+        if land_labels is not None:
+            ys, xs = np.nonzero(piece_mask)
+            pts = np.stack([(xs / scale).astype(int).clip(0, land_labels.shape[1] - 1),
+                            (ys / scale).astype(int).clip(0, land_labels.shape[0] - 1)], axis=1)
+            entry["land"] = piece_land(land_labels, land_names, pts)
         if b.area > max_piece_frac * board_area:
             large.append(entry)  # far bigger than any piece: a hand, a moved object, or the board moved
             continue
@@ -222,13 +238,47 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     }
 
 
+def board_state(pieces: list) -> dict:
+    """Pieces counted by land and type, e.g. {"2": {"city": 1, "town": 1}}."""
+    state: dict = {}
+    for p in pieces:
+        land = p.get("land") or "?"
+        kind = p.get("type", "unknown") + (f" ({p['colour']})" if p.get("colour") else "")
+        state.setdefault(land, {})
+        state[land][kind] = state[land].get(kind, 0) + 1
+    return dict(sorted(state.items()))
+
+
+def cmd_lands(args) -> int:
+    ref_dir = Path(args.reference)
+    reference = cv2.imread(str(ref_dir / "reference.jpg"))
+    board_mask = cv2.imread(str(ref_dir / "board_mask.png"), cv2.IMREAD_GRAYSCALE)
+    if reference is None or board_mask is None:
+        print(f"No reference in {ref_dir}.")
+        return 1
+    seeds = {}
+    for item in args.seed:
+        name, _, xy = item.partition("=")
+        x, y = (float(v) for v in xy.split(","))
+        seeds[name] = (x, y)
+    labels, names = land_map.segment_lands(reference, board_mask, seeds)
+    land_map.save(ref_dir, labels, names, seeds)
+    path = save(ref_dir, "lands_overlay.jpg", land_map.draw(reference, labels, names))
+    for i, name in enumerate(names, 1):
+        print(f"  {name}: {int((labels == i).sum())} px")
+    print(f"Check the land map: {path}")
+    return 0
+
+
 def draw_pieces(image: np.ndarray, result: dict) -> np.ndarray:
     out = image.copy()
     t = _thickness(out)
     for i, p in enumerate(result["pieces"], 1):
         cv2.polylines(out, [np.int32(p["outline"])], True, (0, 0, 255), t)
         x, y = p["centroid"]
-        cv2.putText(out, str(i), (x + 15, y - 15), cv2.FONT_HERSHEY_SIMPLEX, t * 0.8, (0, 0, 255), t * 2)
+        tag = f"{i} {p.get('type', '')}" + (f" @{p['land']}" if p.get("land") else "")
+        cv2.putText(out, tag, (x + 15, y - 15), cv2.FONT_HERSHEY_SIMPLEX, t * 0.7, (0, 0, 0), t * 3)
+        cv2.putText(out, tag, (x + 15, y - 15), cv2.FONT_HERSHEY_SIMPLEX, t * 0.7, (255, 255, 255), t)
     for p in result.get("large_changes", []):
         cv2.polylines(out, [np.int32(p["outline"])], True, (0, 165, 255), t)
     label = f"{len(result['pieces'])} piece(s)" if result["registered"] else "could not line up with reference"
@@ -248,7 +298,10 @@ def cmd_find(args) -> int:
         return 1
     rot = json.loads((ref_dir / "reference.json").read_text()).get("rotate", 0) if args.rotate is None else args.rotate
     image = rotate(grab_image(args), rot)
-    result = detect_pieces(reference, board_mask, image)
+    land_labels, land_names = land_map.load(ref_dir)
+    lands = (land_labels, land_names) if land_labels is not None else None
+    result = detect_pieces(reference, board_mask, image, lands=lands)
+    result["board_state"] = board_state(result["pieces"])
 
     out = Path(args.out or ROOT / datetime.now().strftime("find-%H%M%S"))
     out.mkdir(parents=True, exist_ok=True)
@@ -267,8 +320,13 @@ def cmd_find(args) -> int:
               f"Found {len(result['pieces'])} piece(s):")
         for i, p in enumerate(result["pieces"], 1):
             note = "  (big: may be several pieces touching)" if p.get("maybe_several") else ""
-            print(f"  {i}: at {p['centroid']}, {p['area_px']} px, colour BGR {p['mean_bgr']}, "
-                  f"change {p['change_score']}{note}")
+            what = p.get("type", "?") + (f" ({p['colour']})" if p.get("colour") else "")
+            where = f" on land {p['land']}" if p.get("land") else ""
+            print(f"  {i}: {what}{where} at {p['centroid']}  [{p.get('why', '')}]{note}")
+        if result["board_state"]:
+            print("Board state:")
+            for land, counts in result["board_state"].items():
+                print(f"  land {land}: " + ", ".join(f"{n} {k}" for k, n in counts.items()))
         for p in result["large_changes"]:
             print(f"  (large change, not counted as a piece: at {p['centroid']}, {p['area_px']} px; "
                   "a hand, a moved object, or the board moved)")
@@ -279,6 +337,11 @@ def cmd_find(args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="command", required=True)
+    s = sub.add_parser("lands", help="map the lands on the reference from one point inside each land")
+    s.set_defaults(func=cmd_lands)
+    s.add_argument("--reference", default=str(DEFAULT_REFERENCE))
+    s.add_argument("--seed", action="append", required=True, metavar="NAME=X,Y",
+                   help="a point inside a land on the reference photo, e.g. --seed 1=2925,1775 --seed ocean=2300,2200")
     for name, fn, help_text in [
         ("outline", cmd_outline, "outline the board in one photo"),
         ("reference", cmd_reference, "save a photo of the empty board as the reference"),

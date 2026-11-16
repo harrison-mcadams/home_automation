@@ -140,3 +140,30 @@ def test_board_turned_and_slid_still_finds_only_the_token(scene):
     assert len(result["pieces"]) == 1, result["pieces"]
     cx, cy = result["pieces"][0]["centroid"]
     assert np.hypot(cx - token_xy[0], cy - token_xy[1]) < 30
+
+
+def test_lands_and_types_on_synthetic_board(scene, tmp_path):
+    """Land map from one point per land; pieces get a land and a type."""
+    from spirit_island.perception import lands as land_map
+
+    reference, _, _ = scene
+    mask = find_board(reference).mask
+    board = flat_board()
+    # Seeds at the centres of the five colour columns of the flat board, mapped into the photo.
+    _, M = place(board, BOARD, table())
+    pts = cv2.perspectiveTransform(np.float32([[[100 + 200 * i, 350]] for i in range(5)]), M).reshape(-1, 2)
+    seeds = {str(i + 1): (float(x), float(y)) for i, (x, y) in enumerate(pts)}
+    labels, names = land_map.segment_lands(reference, mask, seeds)
+    assert set(names) == {"1", "2", "3", "4", "5"}
+    for name, (x, y) in seeds.items():
+        assert land_map.land_at(labels, names, x, y) == name
+
+    piece_board = board.copy()
+    cv2.circle(piece_board, (500, 300), 38, (40, 40, 200), -1)  # vivid red presence disc, column 3
+    cv2.circle(piece_board, (300, 500), 36, (55, 55, 60), -1)  # dark blight, column 2
+    image, _ = place(piece_board, BOARD, table(seed=6))
+    result = detect.detect_pieces(reference, mask, image, lands=(labels, names))
+    found = {(p["type"], p["land"]) for p in result["pieces"]}
+    assert ("presence", "3") in found and ("blight", "2") in found, result["pieces"]
+    state = detect.board_state(result["pieces"])
+    assert state["3"] == {"presence (red)": 1}
