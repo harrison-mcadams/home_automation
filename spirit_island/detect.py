@@ -174,7 +174,11 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         cv2.drawContours(now_mask, contours, -1, 255, thickness=cv2.FILLED)
         grow = int(0.02 * size) | 1
         now_mask = cv2.dilate(now_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (grow, grow)))
-        region = cv2.bitwise_and(region, now_mask)
+        # Trust it only near the board's rim, where table can creep in when the board
+        # slides; the interior of the board always stays in.
+        band = int(0.04 * size) | 1
+        interior = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * band + 1, 2 * band + 1)))
+        region = cv2.bitwise_or(interior, cv2.bitwise_and(region, now_mask))
     rim = max(5, int(0.012 * np.sqrt(max(1, int((region > 0).sum())))))
     region = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * rim + 1, 2 * rim + 1)))
     board_area = max(1, int((region > 0).sum()))

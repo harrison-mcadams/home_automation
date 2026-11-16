@@ -47,6 +47,30 @@ def change_map(
     return np.sqrt((diff**2).sum(axis=2))
 
 
+def _part_ok(part: np.ndarray, blob_area: int, min_frac: float, min_thickness: float) -> bool:
+    thickness = cv2.distanceTransform(part.astype(np.uint8), cv2.DIST_L2, 5).max()
+    return part.sum() >= min_frac * blob_area and thickness >= min_thickness
+
+
+def _merge_weak_parts(parts: list, blob_area: int, min_frac: float, min_thickness: float) -> list:
+    """Fold each too-small or too-thin part into the neighbour it shares the longest
+    border with, until every part is a plausible piece (or only one part is left).
+    A sliver of a town merges back into the town instead of vetoing the city/town split,
+    and an explorer's staff merges back into its figure."""
+    kernel = np.ones((3, 3), np.uint8)
+    while len(parts) > 1:
+        weak = [i for i, p in enumerate(parts) if not _part_ok(p, blob_area, min_frac, min_thickness)]
+        if not weak:
+            break
+        i = min(weak, key=lambda j: parts[j].sum())  # smallest first
+        ring = cv2.dilate(parts[i].astype(np.uint8), kernel, iterations=2).astype(bool) & ~parts[i]
+        shared = [(int((ring & p).sum()), j) for j, p in enumerate(parts) if j != i]
+        _, target = max(shared)
+        parts[target] = parts[target] | parts[i]
+        del parts[i]
+    return parts
+
+
 def split_touching(
     mask: np.ndarray,
     dist: np.ndarray,
@@ -101,14 +125,10 @@ def split_touching(
                 markers[(disc > 0) & sel] = n
             g = grad[y0:y1, x0:x1]
             cv2.watershed(cv2.merge([g, g, g]), markers)
-            parts = []
-            for n in range(1, len(seeds) + 1):
-                part = (markers == n) & sel
-                part_dist = cv2.distanceTransform(part.astype(np.uint8), cv2.DIST_L2, 5)
-                if part.sum() < min_part_frac * area or part_dist.max() < min_part_thickness:
-                    parts = None  # a bad cut: keep the blob whole
-                    break
-                parts.append(part)
+            parts = [(markers == n) & sel for n in range(1, len(seeds) + 1)]
+            parts = _merge_weak_parts([p for p in parts if p.any()], area, min_part_frac, min_part_thickness)
+            if len(parts) < 2:
+                parts = None  # nothing worth splitting: keep the blob whole
 
         region = labels[y0:y1, x0:x1]
         if parts:
