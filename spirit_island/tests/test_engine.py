@@ -221,3 +221,13 @@ def test_next_walks_items_before_screens():
     assert g.state["step"] == "setup.players" and g.state["sub"] == 0
     g.dispatch({"type": "back"})
     assert g.state["step"] == "setup.welcome" and g.state["sub"] == n - 1
+
+
+def test_place_start_puts_printed_pieces_and_presence():
+    from spirit_island.engine import Game
+    g = Game()
+    g.dispatch({"type": "configure", "players": [{"name": "H", "spirit": "River Surges in Sunlight"}], "boards": ["C"]})
+    g.dispatch({"type": "place_start"})
+    L = g.state["lands"]
+    assert L["C2"]["cities"] == 1 and L["C5"]["dahan"] == 2 and L["C5"]["blight"] == 1
+    assert L["C8"]["presence"] == 1 and L["C4"]["dahan"] == 0

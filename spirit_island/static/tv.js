@@ -19,6 +19,22 @@ const PIECES = ["explorers", "towns", "cities", "dahan", "blight", "presence"];
 const SHORT = { explorers: "explorer", towns: "town", cities: "city", dahan: "Dahan", blight: "blight", presence: "presence" };
 const TERRAIN_VAR = { J: "var(--J)", W: "var(--W)", S: "var(--S)", M: "var(--M)", C: "var(--C)" };
 
+// Starting-piece check: each land the camera covers, what should be there vs what it sees.
+function pieceCheck() {
+  const v = S.vision || {}, seen = v.seen, lands = S.state.lands;
+  if (!S.state.start_placed) return null;
+  if (!seen) return { ok: null, rows: [], note: v.connected ? "The camera can't line up the board yet." : "The camera isn't connected." };
+  const P = ["explorers", "towns", "cities", "dahan", "blight", "presence"];
+  const word = { explorers: "explorer", towns: "town", cities: "city", dahan: "Dahan", blight: "blight", presence: "presence" };
+  const txt = (c) => P.filter((p) => c[p]).map((p) => `${c[p]} ${word[p]}`).join(", ") || "empty";
+  const rows = Object.keys(seen).sort().map((lid) => {
+    const want = lands[lid] || {}, got = seen[lid];
+    const ok = P.every((p) => (want[p] || 0) === (got[p] || 0));
+    return { lid, ok, want: txt(want), got: txt(got) };
+  });
+  return { ok: rows.every((r) => r.ok), rows, board: v.board, settled: v.settled };
+}
+
 function el(tag, attrs = {}, ...kids) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -188,6 +204,27 @@ function forItem(pics, sub) {
   return (pics || []).filter((p) => !p.items || p.items.includes(sub));
 }
 
+// Mark the starting-piece check on the board picture: a tick or the mismatch at each land.
+function markCheck(c, h) {
+  if (!c || !c.rows.length || !h || !h.points) return;
+  const fig = document.querySelector("#gallery figure");
+  const img = fig && fig.querySelector("img");
+  if (!img) return;
+  const layer = el("div", { class: "disc-layer check-layer" });
+  for (const r of c.rows) {
+    const pt = h.points[r.lid];
+    if (!pt) continue;
+    const tag = el("div", { class: "check-tag " + (r.ok ? "ok" : "bad") },
+      r.ok ? "✓" : el("span", {}, el("b", {}, "should be "), r.want, el("br"), el("b", {}, "sees "), r.got));
+    tag.style.left = pt[0] * 100 + "%"; tag.style.top = pt[1] * 100 + "%";
+    layer.append(tag);
+  }
+  const place = () => Object.assign(layer.style, { left: img.offsetLeft + "px", top: img.offsetTop + "px",
+    width: img.offsetWidth + "px", height: img.offsetHeight + "px" });
+  img.addEventListener("load", place); requestAnimationFrame(place);
+  fig.append(layer);
+}
+
 function renderNow() {
   const g = S.guide, s = S.state;
   document.body.classList.toggle("over", s.status === "won" || s.status === "lost");
@@ -197,8 +234,17 @@ function renderNow() {
   // Next walks the numbered items one at a time: the current one is lit, and only its
   // pictures are shown.
   const sub = g.sub || 0;
-  $("n-do").replaceChildren(...g.do.map((t, i) => el("li", { class: i === sub ? "now" : i < sub ? "done" : "" }, t)));
+  $("n-do").replaceChildren(...g.do.map((t, i) => el("li", { class: g.single || i === sub ? "now" : i < sub ? "done" : "" }, t)));
   const focus = focusRows(g.helper);
+  const c = g.helper && g.helper.kind === "verify" ? pieceCheck() : null;
+  if (c) {
+    if (c.note) focus.push(el("div", { class: "focus bad" }, c.note));
+    else {
+      const bad = c.rows.filter((r) => !r.ok).length;
+      focus.push(el("div", { class: "focus" + (c.ok ? "" : " bad") }, el("b", {}, c.ok ? "✓ All good" : `${bad} land${bad > 1 ? "s" : ""} to check`),
+        `camera on board ${c.board}${c.settled ? "" : ", still settling"}`));
+    }
+  }
   if (g.helper && g.helper.kind === "configure") {
     const roster = g.helper.roster || [];
     if (!roster.length) focus.push(el("div", { class: "focus" }, "Add players on the phone."));
@@ -210,6 +256,7 @@ function renderNow() {
   if (g.helper && g.helper.kind === "fear_cards") focus.push(el("div", { class: "focus" }, el("b", {}, g.helper.left), "fear card(s) to read and resolve"));
   $("n-focus").replaceChildren(...focus);
   renderGallery(forItem(g.pictures, sub), s.status === "setup");
+  markCheck(c, g.helper);
   // Build the screen up as the game goes: setup shows only the step itself; the invader
   // cards, lands and camera join at the first explore, the status bar once play starts.
   document.body.classList.toggle("bare", s.status === "setup" && s.step !== "setup.first_explore");

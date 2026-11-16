@@ -267,6 +267,25 @@ class Game:
         self.state = self.history.pop()
         return self.state
 
+    def _do_place_start(self, action):
+        """Put the printed starting pieces (and each spirit's starting presence) into the
+        tracked game, so the camera can be checked against them."""
+        from .guide import start_presence
+        s = self.state
+        for b in s["boards"]:
+            for n in range(1, rules.LANDS_PER_BOARD + 1):
+                land = s["lands"].get(f"{b}{n}")
+                if land is None:
+                    continue
+                want = rules.START_PIECES.get(b, {}).get(n, {})
+                for p in rules.LAND_PIECES:
+                    land[p] = want.get(p, 0)
+        for lid, n in start_presence(s).items():
+            if lid in s["lands"]:
+                s["lands"][lid]["presence"] += n
+        s["start_placed"] = True
+        return "Starting pieces placed"
+
     def _do_back(self, action):
         """Go back one item, or to the last item of the previous setup screen, keeping
         everything already chosen."""
@@ -324,7 +343,8 @@ class Game:
 
     def _items(self):
         from .guide import describe  # the screen's numbered items; imported here to avoid a cycle
-        return len(describe(self.state)["do"])
+        d = describe(self.state)
+        return 1 if d.get("single") else len(d["do"])
 
     def _do_next(self, action):
         s = self.state

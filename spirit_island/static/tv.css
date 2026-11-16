@@ -230,3 +230,15 @@ body.gallery #n-do li:not(.now) { font-size: 1.9vh; }
 @keyframes a-drop1 { from { opacity: 0; transform: translateY(-140px); } to { opacity: 1; transform: none; } }
 @keyframes a-fade1 { from { opacity: 0; } to { opacity: 1; } }
 @keyframes a-remove1 { 0% { opacity: 0; } 20% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(160px); } }
+
+/* starting-piece check */
+.check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6vh .6vw; width: 100%; margin-top: .6vh; }
+.check { background: var(--panel2); border-radius: 1vh; padding: .5vh .7vw; font-size: 1.8vh; border-left: .6vh solid var(--accent); }
+.check.bad { border-left-color: var(--bad); }
+.check b { font-size: 2.2vh; margin-right: .5vw; }
+
+.check-tag { position: absolute; transform: translate(-50%, -50%); border-radius: 1vh; font-weight: 700;
+  box-shadow: 0 .3vh 1vh rgba(0,0,0,.6); white-space: nowrap; }
+.check-tag.ok { background: #2f8a45; color: #fff; font-size: 3.4vh; width: 5vh; height: 5vh; display: grid; place-items: center; border-radius: 50%; }
+.check-tag.bad { background: rgba(160, 40, 30, .93); color: #fff; font-size: 1.55vh; font-weight: 500; padding: .4vh .6vw; line-height: 1.25; }
+.check-tag.bad b { font-weight: 800; }

@@ -97,6 +97,14 @@ START_PRESENCE = {
     "Vital Strength of the Earth": [("M", 2), ("J", 1)],
 }
 
+# Starting pieces printed on each balanced board (expansion icons left out).
+START_PIECES = {
+    "A": {2: {"cities": 1, "dahan": 1}, 3: {"dahan": 2}, 4: {"blight": 1}, 6: {"dahan": 1}, 7: {"dahan": 2}, 8: {"towns": 1}},
+    "B": {1: {"dahan": 1}, 2: {"cities": 1}, 3: {"dahan": 2}, 4: {"blight": 1}, 6: {"towns": 1}, 7: {"dahan": 1}, 8: {"dahan": 2}},
+    "C": {1: {"dahan": 1}, 2: {"cities": 1}, 3: {"dahan": 2}, 5: {"dahan": 2, "blight": 1}, 6: {"dahan": 1}, 7: {"towns": 1}},
+    "D": {1: {"dahan": 2}, 2: {"cities": 1, "dahan": 1}, 5: {"dahan": 1, "blight": 1}, 7: {"towns": 1, "dahan": 2}},
+}
+
 # Size of the clean board scans (assets/boards/*.png) that board_seeds.json points into.
 SCAN_SIZE = (3800, 2542)
 

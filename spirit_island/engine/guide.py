@@ -34,7 +34,7 @@ def describe(state):
            "why": "", "tips": [], "helper": None, "pictures": []}
     if fn:
         out.update(fn(state))
-    out["sub"] = max(0, min(state.get("sub", 0), len(out["do"]) - 1))
+    out["sub"] = 0 if out.get("single") else max(0, min(state.get("sub", 0), len(out["do"]) - 1))
     if state["status"] in ("won", "lost"):
         r = state["result"]
         out.update({
@@ -296,30 +296,49 @@ def _invader_board(s):
     }
 
 
-# Starting pieces printed on the balanced side of each board, read off the board scans.
-STARTING_PIECES = {
-    "C": {1: "1 Dahan", 2: "1 city", 3: "2 Dahan", 5: "2 Dahan, 1 blight", 6: "1 Dahan", 7: "1 town"},
-}
+_PIECE_WORDS = {"dahan": ("Dahan", "Dahan"), "cities": ("city", "cities"), "towns": ("town", "towns"),
+                "blight": ("blight", "blight"), "explorers": ("explorer", "explorers"), "presence": ("presence", "presence")}
+
+
+def piece_text(counts):
+    return ", ".join(f"{n} {_PIECE_WORDS[p][n != 1]}" for p, n in counts.items() if n) or "nothing"
+
+
+def start_presence(s):
+    """{land id: discs} for every player's starting presence."""
+    out = {}
+    for i, p in enumerate(s["players"]):
+        b = s["boards"][i] if i < len(s["boards"]) else None
+        for t, n in rules.START_PRESENCE.get(p["spirit"], []):
+            lid = _highest_id(s, t, b)
+            if lid:
+                out[lid] = out.get(lid, 0) + n
+    return out
 
 
 def _pieces(s):
     rows = []
     for b in s["boards"]:
-        if b in STARTING_PIECES:
-            rows.append(f"Board {b}: " + ", ".join(f"{n}: {what}" for n, what in
-                                                     sorted(STARTING_PIECES[b].items())) + ". The rest start empty.")
+        if b in rules.START_PIECES:
+            rows.append(f"Board {b}: " + "; ".join(f"land {n}: {piece_text(c)}" for n, c in
+                                                    sorted(rules.START_PIECES[b].items())) + ". The rest start empty.")
     return {
         "title": "Place the starting pieces",
+        "single": True,
         "do": [
             "The small black icons by each land number are its starting pieces.",
         ] + rows + [
             "Dahan: cream wooden discs. Town: small white house. City: tall white tower. "
             "Blight: grey-blue bumpy piece (from the box, not the blight card).",
             "Ignore the paw and spiral icons; they're for an expansion.",
+            "Done? Tap Verify on the phone: the camera checks every land against what should be there.",
         ],
         "why": "This is the island as the invaders first find it.",
-        "tips": ["To have the app track the board, enter each land's pieces in the Island panel. "
-                 "It is optional: the step-by-step guide works without it."],
+        "tips": [],
+        "helper": {"kind": "verify", "placed": bool(s.get("start_placed")),
+                   # where each land sits on the single-board picture, for marking the check on it
+                   "points": ({f"{s['boards'][0]}{n}": _land_point(f"{s['boards'][0]}{n}", s["boards"][0])
+                               for n in range(1, 9)} if len(s["boards"]) == 1 else {})},
         "pictures": ([{"src": f"layout/{s['boards'][0]}-{s['boards'][1]}.jpg", "wide": True,
                        "caption": f"Boards {s['boards'][0]} and {s['boards'][1]}: starting-piece icons by each land number"}]
                      if len(s["boards"]) == 2 else

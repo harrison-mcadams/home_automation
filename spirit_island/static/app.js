@@ -13,6 +13,22 @@ const SETUP_STEPS = ["setup.welcome", "setup.players", "setup.island", "setup.sp
 const ROUND_STEPS = ["spirit.growth", "spirit.energy", "spirit.powers", "fast", "invader.blighted",
   "invader.fear", "invader.ravage", "invader.build", "invader.explore", "invader.advance", "slow", "time_passes"];
 
+// Starting-piece check: each land the camera covers, what should be there vs what it sees.
+function pieceCheck() {
+  const v = S.vision || {}, seen = v.seen, lands = S.state.lands;
+  if (!S.state.start_placed) return null;
+  if (!seen) return { ok: null, rows: [], note: v.connected ? "The camera can't line up the board yet." : "The camera isn't connected." };
+  const P = ["explorers", "towns", "cities", "dahan", "blight", "presence"];
+  const word = { explorers: "explorer", towns: "town", cities: "city", dahan: "Dahan", blight: "blight", presence: "presence" };
+  const txt = (c) => P.filter((p) => c[p]).map((p) => `${c[p]} ${word[p]}`).join(", ") || "empty";
+  const rows = Object.keys(seen).sort().map((lid) => {
+    const want = lands[lid] || {}, got = seen[lid];
+    const ok = P.every((p) => (want[p] || 0) === (got[p] || 0));
+    return { lid, ok, want: txt(want), got: txt(got) };
+  });
+  return { ok: rows.every((r) => r.ok), rows, board: v.board, settled: v.settled };
+}
+
 function el(tag, attrs = {}, ...kids) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -111,7 +127,7 @@ function renderGuide() {
   $("g-phase").textContent = g.phase;
   $("g-title").textContent = g.title;
   const sub = g.sub || 0;
-  $("g-do").replaceChildren(...g.do.map((t, i) => el("li", { class: i === sub ? "now" : i < sub ? "done" : "" }, t)));
+  $("g-do").replaceChildren(...g.do.map((t, i) => el("li", { class: g.single || i === sub ? "now" : i < sub ? "done" : "" }, t)));
   $("g-why").textContent = g.why || "";
   $("g-tips").replaceChildren(...(g.tips || []).map((t) => el("li", {}, t)));
   $("g-pics").replaceChildren(...pictures((g.pictures || []).filter((p) => !p.items || p.items.includes(sub))));
@@ -126,6 +142,23 @@ function landRow(lid, what, button) {
 }
 
 const HELPERS = {
+  verify(h) {
+    const box = el("div", { class: "helper" });
+    box.append(el("button", { class: "primary", onclick: () => act({ type: "place_start" }) },
+      h.placed ? "Check again" : "Verify with the camera"));
+    const c = pieceCheck();
+    if (c) {
+      if (c.note) box.append(el("p", {}, c.note));
+      else {
+        box.append(el("p", {}, c.ok ? `✓ Board ${c.board}: everything is where it should be.` :
+          `Board ${c.board}: ${c.rows.filter((r) => !r.ok).length} land(s) don't match${c.settled ? "" : " (camera still settling)"}.`));
+        for (const r of c.rows.filter((r) => !r.ok)) {
+          box.append(landRow(r.lid, el("span", {}, `should be ${r.want}; camera sees ${r.got}`), null));
+        }
+      }
+    }
+    return box;
+  },
   configure() {
     const s = S.state;
     const box = el("div", { class: "helper form" });
