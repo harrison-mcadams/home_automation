@@ -47,6 +47,42 @@ def change_map(
     return np.sqrt((diff**2).sum(axis=2))
 
 
+def split_touching(mask: np.ndarray, dist: np.ndarray, core_ratio: float = 0.55,
+                   min_core_frac: float = 0.35) -> np.ndarray:
+    """Label blobs, splitting ones made of several touching objects (two pieces side by side).
+
+    Each object has a thick core (high distance-to-edge); the neck between two touching
+    objects is thinner. Cores are seeds for a watershed over the distance map. A core
+    only counts if it is at least `min_core_frac` as thick as the blob's thickest point,
+    so one lumpy object is not cut up.
+    """
+    count, cc = cv2.connectedComponents(mask, connectivity=8)
+    markers = np.zeros(mask.shape, np.int32)
+    next_label = 1
+    for i in range(1, count):
+        sel = cc == i
+        peak = float(dist[sel].max())
+        core = (sel & (dist > core_ratio * peak)).astype(np.uint8)
+        n, core_lab = cv2.connectedComponents(core, connectivity=8)
+        kept = [j for j in range(1, n) if float(dist[core_lab == j].max()) >= min_core_frac * peak]
+        if len(kept) <= 1:
+            markers[sel] = next_label
+            next_label += 1
+            continue
+        for j in kept:
+            markers[core_lab == j] = next_label
+            next_label += 1
+    if next_label == 1:
+        return markers
+    # Unassigned pixels inside a split blob get the label of the nearest core, following the distance map.
+    relief = cv2.normalize(-dist, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    ws_markers = markers.copy()
+    ws_markers[mask == 0] = next_label  # background seed
+    cv2.watershed(cv2.merge([relief, relief, relief]), ws_markers)
+    ws_markers[(ws_markers == next_label) | (ws_markers < 0) | (mask == 0)] = 0
+    return ws_markers
+
+
 def find_changes(
     reference: np.ndarray,
     aligned: np.ndarray,
@@ -54,6 +90,7 @@ def find_changes(
     min_area_frac: float = 0.0003,
     threshold: Optional[float] = None,
     work_side: int = 1600,
+    split: bool = True,
 ) -> tuple[list[Blob], np.ndarray]:
     """Blobs where `aligned` differs from `reference`, inside `region` (255 = look).
 
@@ -88,26 +125,32 @@ def find_changes(
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
 
     min_area = max(4, int(min_area_frac * int((reg > 0).sum())))
-    count, labels, stats, cents = cv2.connectedComponentsWithStats(mask, 8)
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(mask, 8)
+    for i in range(1, count):
+        if stats[i][4] < min_area:
+            mask[labels == i] = 0
     # Thickness tells a compact object from a thin line of change along a printed
     # edge (which can be long and curved, so its bounding box looks big).
     inside_dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+    labels = split_touching(mask, inside_dist) if split else cv2.connectedComponents(mask, connectivity=8)[1]
+
     blobs = []
-    for i in range(1, count):
-        x, y, w, h, area = stats[i]
-        if area < min_area:
-            mask[labels == i] = 0
-            continue
+    for i in range(1, int(labels.max()) + 1):
         sel = labels == i
-        mean_bgr = tuple(round(float(v), 1) for v in new[sel].mean(axis=0))
+        area = int(sel.sum())
+        if area == 0:
+            continue
+        ys, xs = np.nonzero(sel)
+        x, y, w, h = int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
+        piece_dist = cv2.distanceTransform(sel.astype(np.uint8), cv2.DIST_L2, 5)
         blobs.append(
             Blob(
                 bbox=(int(x / scale), int(y / scale), int(w / scale), int(h / scale)),
-                centroid=(float(cents[i][0] / scale), float(cents[i][1] / scale)),
+                centroid=(float(xs.mean() / scale), float(ys.mean() / scale)),
                 area=int(area / scale / scale),
-                mean_bgr=mean_bgr,
+                mean_bgr=tuple(round(float(v), 1) for v in new[sel].mean(axis=0)),
                 score=round(float(diff[sel].mean()), 1),
-                thickness=round(float(inside_dist[sel].max() / scale), 1),
+                thickness=round(float(piece_dist.max() / scale), 1),
             )
         )
     blobs.sort(key=lambda b: b.area, reverse=True)

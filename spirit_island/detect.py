@@ -139,7 +139,7 @@ def cmd_reference(args) -> int:
 
 
 def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarray,
-                  max_piece_frac: float = 0.03, min_thickness: float = 0.025, **kwargs) -> dict:
+                  max_piece_frac: float = 0.03, min_thickness: float = 0.02, **kwargs) -> dict:
     """Register `image` onto the reference and find what changed on the board."""
     reg = register(reference, image, reference_mask=board_mask)
     if reg is None or not reg.ok:
