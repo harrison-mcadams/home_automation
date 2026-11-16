@@ -182,6 +182,7 @@ MEASURED = [
     ((101, 38, 220, 22, .086, .035, 1.76, .39), "town"),
     ((21, 105, 142, 25.5, .096, .047, 1.2, .80), "energy"),  # warm sunlight, after the camera moved
     ((23, 48, 176, 25.2, .072, .034, 1.1, .82), "dahan"),  # dim, textured dahan: must not be energy
+    ((31, 28, 187, 23.5, .0705, .0268, 2.08, .64), "explorer"),  # white figure on tan sand reads warm
     ((17, 105, 91, 14, .045, .020, 1.5, .60), "table"),  # dark table wood at the moved board's rim
 ]
 

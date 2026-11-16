@@ -33,6 +33,8 @@ RULES = {
     "warm_hue": (5, 35),  # cream dahan (H 21-24) and tan cardboard (H 19-21); white plastic is H 70-109
     "pale_max_saturation": 70,  # white plastic S 27-58 (bluish white balance), dahan S 38-58
     "pale_min_value": 170,
+    "disc_max_elongation": 1.5,  # dahan 1.08-1.35; explorers 1.7-2.1
+    "disc_min_fill": 0.72,  # dahan 0.78-0.84; an explorer with sand in its gaps 0.64
     "dahan_min_value": 130,  # dahan V 202-219; leaves room for shade
     "energy_min_texture": 20,  # printed card: texture 25-32; dahan 7-25 (dim light), presence 4-17
     "energy_min_size": 0.085,  # energy marker 0.093-0.096; dahan 0.065-0.072, presence up to 0.082
@@ -107,6 +109,9 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
     warm = lo <= f.hue <= hi
     blo, bhi = rules["blight_hue"]
     out: dict
+    # Dahan are round discs. A long, ragged blob with a warm hue is a white figure with tan
+    # sand showing through its gaps, which pulls the average colour warm.
+    disc = f.elongation <= rules["disc_max_elongation"] and f.fill >= rules["disc_min_fill"]
     blue_grey = blo <= f.hue <= bhi and f.saturation >= rules["blight_min_saturation"]
     # The energy marker is both printed and clearly larger than a disc; a dim dahan can get
     # as textured (up to 25), so size must agree.
@@ -122,7 +127,7 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
         out = {"type": "presence", "colour": hue_name(f.hue), "why": f"vivid {hue_name(f.hue)} (sat {f.saturation})"}
     elif blue_grey and f.value <= rules["blight_max_value"]:
         out = {"type": "blight", "why": f"blue-grey (hue {f.hue}, sat {f.saturation}, value {f.value})"}
-    elif warm and f.value >= rules["dahan_min_value"]:
+    elif warm and f.value >= rules["dahan_min_value"] and disc:
         out = {"type": "dahan", "why": f"plain cream (hue {f.hue}, texture {f.texture})"}
     elif f.saturation <= rules["pale_max_saturation"] and f.value >= rules["pale_min_value"]:
         if f.thickness <= rules["explorer_max_thickness"]:
