@@ -127,13 +127,24 @@ body.lost #now { border-color: var(--bad); }
 #cam-status { z-index: 2; }
 .land .cam.odd { color: var(--bad); }
 
-/* component pictures on setup steps: one row under the steps */
-#n-pics { display: grid; gap: .8vw; margin-top: 1.4vh; align-items: end; }
-#n-pics:empty { display: none; }
-#n-pics figure { margin: 0; min-width: 0; }
-#n-pics img { width: 100%; border-radius: .8vh; display: block; }
-#n-pics figcaption { font-size: 1.5vh; color: var(--muted); margin-top: .3vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#now.has-pics #n-do { font-size: 2.35vh; line-height: 1.3; }
-#now.has-pics #n-do li { margin-bottom: .6vh; }
-#now.has-pics #n-why { display: none; }
-#n-pics figure.wide:only-child img { width: auto; max-width: 100%; max-height: 34vh; }
+/* setup: no game status yet, and steps with pictures get a big gallery instead of the side panel */
+body.setup #status { display: none; }
+body.setup #tv { grid-template-rows: auto 1fr auto; }
+body.gallery main { grid-template-columns: .8fr 1.7fr; }
+body.gallery #side, body.gallery #n-words, body.gallery #n-why { display: none; }
+body.gallery #n-title { font-size: 4.4vh; }
+body.gallery #n-do { font-size: 2.5vh; line-height: 1.32; }
+body.gallery #n-do li { margin-bottom: .9vh; }
+#gallery { overflow: hidden; display: flex; flex-direction: column; gap: 1.6vh; min-height: 0; align-items: center; justify-content: center; }
+#gallery figure { margin: 0; text-align: center; }
+#gallery figcaption { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.8vh; color: var(--muted); margin-top: .4vh; }
+#g-hero { min-height: 0; flex: 1 1 auto; display: flex; justify-content: center; }
+#g-hero figure { display: flex; flex-direction: column; min-height: 0; }
+#g-hero img { max-height: 100%; max-width: 100%; min-height: 0; object-fit: contain; border-radius: 1.2vh; }
+#g-hero.hidden + #g-rest { flex: 1 1 auto; align-content: center; }
+#g-rest { display: flex; flex-wrap: wrap; gap: 1.2vh 1vw; justify-content: center; }
+#g-rest:empty { display: none; }
+#g-rest.row { display: grid; width: 100%; gap: 1vw; align-items: end; flex: 0 0 auto; }
+#g-rest.row figure { min-width: 0; }
+#g-rest.row img { height: auto; width: 100%; }
+#g-rest img { height: var(--h, 27vh); border-radius: 1vh; display: block; }

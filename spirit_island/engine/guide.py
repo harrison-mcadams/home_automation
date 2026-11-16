@@ -120,7 +120,7 @@ def _highest(s, terrain):
 # Starting presence printed on each panel's back, where it can be worked out for you.
 _START = {
     "River Surges in Sunlight": lambda s: (
-        f"River puts 1 presence in the highest-numbered Wetland: {_highest(s, 'W')}."
+        f"Starting presence: 1 disc on {_highest(s, 'W')} (the highest-numbered Wetland)."
         if _highest(s, "W") else None),
 }
 
@@ -148,16 +148,12 @@ def _spirits(s):
     return {
         "title": "Set up each spirit",
         "do": [
-            "Spirit panel: the big, thick double-sided card with your spirit's art (pictured below). "
-            "Lay it in front of you, front side up.",
-            "Power cards: find the 4 normal-sized cards with your spirit's name. Those are your "
-            "starting hand. Leave the Minor and Major power decks aside for now.",
-            "Presence: choose a colour of wooden discs. The middle of the panel has two rows of "
-            "circles: Energy on top, Card Plays below. Put a disc on every circle except the first "
-            "(leftmost) one in each row; those first numbers are what you start with.",
-            "Starting presence: the SETUP box on the back of the panel says where your first discs "
-            "go on the island. Place them now.",
-        ] + starts,
+            "Spirit panel: the big double-sided card (large picture). Lay it front side up.",
+            "Starting hand: the 4 power cards with your spirit's name (bottom row of pictures).",
+            "Presence: in the middle of the panel are two rows of circles. Put a disc of your colour "
+            "on every circle except the first one in each row.",
+        ] + (starts or ["Starting presence: the SETUP box on the back of the panel says where your "
+                        "first discs go on the island. Place them now."]),
         "why": "Each disc you later move from a track onto the island uncovers a bigger number, so "
                "you gain more energy or more card plays as you spread.",
         "tips": ["Tap the Presence counts in the Island panel if you want the app to track them."],
@@ -177,18 +173,14 @@ def _invader_board(s):
     return {
         "title": "Set up the invader board",
         "do": [
-            "The invader board is the long board with spaces for the fear pool, the blight card, and "
-            "the invader cards (Ravage, Build, Explore). Put it beside the island.",
-            f"Fear pool: put {f['pool_size']} fear markers (small round tokens) in the fear pool "
-            "(4 per player).",
-            f"Fear deck: shuffle the fear cards (grey backs, 'FEAR') and build a deck of {sum(f['deck'])}: "
-            f"{f['deck'][0]} cards, the Terror Level II divider, {f['deck'][1]} cards, the Terror "
-            f"Level III divider, then {f['deck'][2]} cards at the bottom.",
-            f"Blight card: put one, Healthy Island side up, with {s['blight']['pool']} blight on it "
-            "(2 per player plus 1).",
-            "Invader deck: sort invader cards by the I, II, III on the back. Remove one random card of "
-            "each stage without looking. Stack them face down: Stage III at the bottom, Stage II in "
-            "the middle, Stage I on top: 3 + 4 + 5 = 12 cards.",
+            "Invader board: the long board with spaces for fear, blight and the invader cards. "
+            "Put it beside the island.",
+            f"Fear pool: {f['pool_size']} fear markers (4 per player).",
+            f"Fear deck, top to bottom: {f['deck'][0]} fear cards, Terror II divider, "
+            f"{f['deck'][1]} cards, Terror III divider, {f['deck'][2]} cards.",
+            f"Blight card: Healthy Island side up, with {s['blight']['pool']} blight on it.",
+            "Invader deck: remove 1 random card of each stage without looking, then stack face "
+            "down with Stage I on top and Stage III at the bottom (12 cards).",
         ],
         "why": "The fear deck is your victory clock; the invader deck is your defeat clock.",
         "tips": ["An adversary changes these numbers. If you use one, follow its setup and correct the "
@@ -215,18 +207,16 @@ def _pieces(s):
     rows = []
     for b in s["boards"]:
         if b in STARTING_PIECES:
-            rows.append(f"Board {b}: " + "; ".join(f"land {n}: {what}" for n, what in
-                                                     sorted(STARTING_PIECES[b].items())) + ". Other lands start empty.")
+            rows.append(f"Board {b}: " + ", ".join(f"{n}: {what}" for n, what in
+                                                     sorted(STARTING_PIECES[b].items())) + ". The rest start empty.")
     return {
         "title": "Place the starting pieces",
         "do": [
-            "Each land shows small black icons next to its number: those are its starting pieces "
-            "(see the board picture).",
-            "The pieces: Dahan are plain cream wooden discs. Explorers are small white figures, towns "
-            "small white houses, cities taller white towers. Blight is the dark grey-blue bumpy piece.",
+            "The small black icons by each land number are its starting pieces.",
         ] + rows + [
-            "Paw and spiral icons belong to the Branch & Claw expansion; skip them unless you play with it.",
-            "Blight placed during setup comes from the box, not from the blight card.",
+            "Dahan: cream wooden discs. Town: small white house. City: tall white tower. "
+            "Blight: grey-blue bumpy piece (from the box, not the blight card).",
+            "Ignore the paw and spiral icons; they're for an expansion.",
         ],
         "why": "This is the island as the invaders first find it.",
         "tips": ["To have the app track the board, enter each land's pieces in the Island panel. "

@@ -114,6 +114,34 @@ function words(g) {
     .map(([k, v]) => el("div", {}, el("b", {}, k + ": "), v));
 }
 
+function figure(p, cls) {
+  const img = el("img", { src: "/assets/" + p.src, alt: p.caption });
+  const fig = el("figure", { class: cls || "" }, img, el("figcaption", {}, p.caption.split(":")[0].split(" (")[0]));
+  img.onerror = () => fig.remove();
+  return fig;
+}
+
+// Setup steps with pictures hand most of the screen to a gallery: the first wide picture
+// (a spirit panel or board) big on top, the cards in a row underneath.
+function renderGallery(pics, setup) {
+  const on = pics.length > 0;
+  document.body.classList.toggle("setup", setup);
+  document.body.classList.toggle("gallery", on);
+  $("gallery").classList.toggle("hidden", !on);
+  const heroIdx = pics.findIndex((p) => p.wide);
+  const hero = heroIdx >= 0 ? pics[heroIdx] : null;
+  const rest = pics.filter((_, i) => i !== heroIdx);
+  $("g-hero").replaceChildren(...(hero ? [figure(hero, "hero")] : []));
+  $("g-hero").classList.toggle("hidden", !hero);
+  const r = $("g-rest");
+  // Under a hero, one row whose column widths follow each picture's shape (panels ~1.5:1,
+  // cards ~0.7:1) so everything shares one height. Without a hero, big wrapped cards.
+  r.classList.toggle("row", !!hero);
+  r.style.gridTemplateColumns = hero ? rest.map((p) => (p.wide ? "2.1fr" : "1fr")).join(" ") : "";
+  r.style.setProperty("--h", (rest.length <= 3 ? 50 : rest.length === 4 ? 38 : 34) + "vh");
+  r.replaceChildren(...rest.map((p) => figure(p)));
+}
+
 function renderNow() {
   const g = S.guide, s = S.state;
   document.body.classList.toggle("over", s.status === "won" || s.status === "lost");
@@ -125,16 +153,7 @@ function renderNow() {
   if (g.helper && g.helper.kind === "configure") focus.push(el("div", { class: "focus" }, "Pick players and spirits on the phone."));
   if (g.helper && g.helper.kind === "fear_cards") focus.push(el("div", { class: "focus" }, el("b", {}, g.helper.left), "fear card(s) to read and resolve"));
   $("n-focus").replaceChildren(...focus);
-  const pics = g.pictures || [];
-  $("now").classList.toggle("has-pics", pics.length > 0);
-  // Panels are ~1.5x wider than tall and cards ~0.71x, so these column widths give one even row.
-  $("n-pics").style.gridTemplateColumns = pics.map((p) => (p.wide ? "2.1fr" : "1fr")).join(" ");
-  $("n-pics").replaceChildren(...pics.map((p) => {
-    const img = el("img", { src: "/assets/" + p.src, alt: p.caption });
-    const fig = el("figure", { class: p.wide ? "wide" : "" }, img, el("figcaption", {}, p.caption.split(":")[0].split(" (")[0]));
-    img.onerror = () => fig.remove();
-    return fig;
-  }));
+  renderGallery(g.pictures || [], s.status === "setup");
   $("n-why").textContent = g.why || "";
   $("n-why").classList.toggle("hidden", !g.why);
   $("n-words").replaceChildren(...words(g));
