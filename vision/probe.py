@@ -89,6 +89,7 @@ def run_probe(
     marker_mm: Optional[float] = None,
     fov_width_mm: Optional[float] = None,
     still_url: Optional[str] = None,
+    rotate: int = 0,
     sweep: bool = True,
     settle_seconds: float = 2.0,
     sample_seconds: float = 3.0,
@@ -108,9 +109,10 @@ def run_probe(
 
     size = f"{width}x{height}" if width else "its default size"
     print(f"Opening camera at {size} and letting exposure settle...")
-    with Camera(source, width=width, height=height, fourcc=fourcc, still_url=still_url) as cam:
+    with Camera(source, width=width, height=height, fourcc=fourcc, still_url=still_url, rotate=rotate) as cam:
         time.sleep(settle_seconds)  # auto-exposure and auto-focus need a moment
         start_index = cam.frames_read
+        start_distinct = cam.distinct_frames
         start = time.monotonic()
         frames = []
         last = cam.read().index
@@ -124,9 +126,13 @@ def run_probe(
         elapsed = time.monotonic() - start
         report["camera"] = cam.describe()
         # A file can run out during the settle wait, and Windows' clock is coarse: guard both.
-        report["camera"]["measured_fps"] = (
-            round((cam.frames_read - start_index) / elapsed, 1) if elapsed > 0 else 0.0
-        )
+        # measured_fps counts only frames that changed; raw_read_fps counts every read,
+        # which can be inflated when a stream reader returns the same picture twice.
+        def rate(n):
+            return round(n / elapsed, 1) if elapsed > 0 else 0.0
+
+        report["camera"]["measured_fps"] = rate(cam.distinct_frames - start_distinct)
+        report["camera"]["raw_read_fps"] = rate(cam.frames_read - start_index)
         snapshot = cam.read().image
 
     report["image"] = {
@@ -163,7 +169,9 @@ def run_probe(
 
     if still_url:
         t0 = time.monotonic()
-        still = fetch_still(still_url)
+        from vision.capture import _rotate
+
+        still = _rotate(fetch_still(still_url), rotate)
         fetch_s = round(time.monotonic() - t0, 2)
         report["still"] = {
             "url": redact(still_url),
@@ -248,6 +256,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--marker-mm", type=float, help="printed side length of the ArUco markers in view, in mm")
     p.add_argument("--fov-width-mm", type=float, help="width of the area in view, in mm (if no markers)")
     p.add_argument("--still-url", help="full-resolution photo endpoint, e.g. http://phone:8080/photo.jpg")
+    p.add_argument("--rotate", type=int, default=0, choices=[0, 90, 180, 270],
+                   help="rotate frames clockwise by this many degrees (for a sideways-mounted camera)")
     p.add_argument("--no-sweep", action="store_true", help="skip the resolution sweep")
     return p
 
@@ -271,6 +281,7 @@ def main(argv=None) -> int:
         marker_mm=args.marker_mm,
         fov_width_mm=args.fov_width_mm,
         still_url=args.still_url,
+        rotate=args.rotate,
         sweep=not args.no_sweep,
     )
     print()

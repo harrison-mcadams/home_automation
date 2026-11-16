@@ -224,6 +224,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--fourcc", help="request a pixel format, e.g. MJPG")
     p.add_argument("--video-fps", type=float, default=10.0)
     p.add_argument("--still-every", type=float, default=2.0, help="seconds between stills, 0 for none")
+    p.add_argument("--rotate", type=int, default=0, choices=[0, 90, 180, 270],
+                   help="rotate frames clockwise by this many degrees")
     p.add_argument("--duration", type=float, help="stop after this many seconds")
     p.add_argument("--preview-port", type=int, help="also serve a live preview on this port")
     return p
@@ -233,7 +235,7 @@ def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     out = Path(args.out or Path("recordings") / datetime.now().strftime("%Y%m%d-%H%M%S"))
     with Camera(parse_source(args.source), width=args.width, height=args.height,
-                fourcc=args.fourcc, still_url=args.still_url) as cam:
+                fourcc=args.fourcc, still_url=args.still_url, rotate=args.rotate) as cam:
         recorder = SessionRecorder(cam, out, video_fps=args.video_fps, still_every=args.still_every)
         if args.preview_port:
             from vision.preview import PreviewServer

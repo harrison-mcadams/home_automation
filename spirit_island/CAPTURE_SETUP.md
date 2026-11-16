@@ -142,7 +142,8 @@ The kit runs three steps:
     `fear card earned`. These become the answer key for later stages. Type `q`
     and Enter to stop.
 
-To get only the camera report, add `--probe-only`.
+To get only the camera report, add `--probe-only`. If the picture comes in
+sideways (a phone mounted upright), add `--rotate 90` (or 180 / 270, clockwise).
 
 ## 5. What you get
 

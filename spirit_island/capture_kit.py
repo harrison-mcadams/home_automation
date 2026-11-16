@@ -64,8 +64,8 @@ def game_verdict(report: dict, smallest_piece_mm: float = SMALLEST_PIECE_MM) -> 
     return f"A {smallest_piece_mm:g} mm piece spans about {px:.0f} px in the {source}. {grade}"
 
 
-def aim(source, still_url: Optional[str], port: int) -> None:
-    with Camera(source, still_url=still_url) as cam:
+def aim(source, still_url: Optional[str], port: int, rotate: int = 0) -> None:
+    with Camera(source, still_url=still_url, rotate=rotate) as cam:
         server = PreviewServer(cam, port=port).start()
         print(f"Camera delivers {cam.width}x{cam.height} by default.")
         print("Position the camera over the board, then press Enter to continue.")
@@ -75,8 +75,9 @@ def aim(source, still_url: Optional[str], port: int) -> None:
             server.stop()
 
 
-def record(source, still_url, out_dir: Path, width, height, video_fps, still_every, port, extra) -> dict:
-    with Camera(source, width=width, height=height, still_url=still_url) as cam:
+def record(source, still_url, out_dir: Path, width, height, video_fps, still_every, port, extra,
+           rotate: int = 0) -> dict:
+    with Camera(source, width=width, height=height, still_url=still_url, rotate=rotate) as cam:
         server = PreviewServer(cam, port=port).start() if port else None
         recorder = SessionRecorder(cam, out_dir, video_fps=video_fps, still_every=still_every, extra_metadata=extra)
         gb = estimate_bytes_per_hour(cam.width, cam.height, video_fps, still_every) / 1e9
@@ -110,6 +111,8 @@ def main(argv=None) -> int:
     p.add_argument("--port", type=int, default=8090, help="live preview port, 0 to disable")
     p.add_argument("--video-fps", type=float, default=10.0)
     p.add_argument("--still-every", type=float, default=2.0)
+    p.add_argument("--rotate", type=int, default=0, choices=[0, 90, 180, 270],
+                   help="rotate frames clockwise by this many degrees (for a sideways-mounted phone)")
     p.add_argument("--skip-aim", action="store_true")
     p.add_argument("--probe-only", action="store_true", help="stop after the camera report")
     p.add_argument("--out", help="session folder (default spirit_island/recordings/<date-time>)")
@@ -132,7 +135,7 @@ def main(argv=None) -> int:
     session.mkdir(parents=True, exist_ok=True)
 
     if not args.skip_aim and args.port:
-        aim(source, args.still_url, args.port)
+        aim(source, args.still_url, args.port, args.rotate)
 
     report = run_probe(
         source=source,
@@ -140,6 +143,7 @@ def main(argv=None) -> int:
         marker_mm=args.marker_mm,
         fov_width_mm=args.fov_width_mm,
         still_url=args.still_url,
+        rotate=args.rotate,
     )
     verdict = game_verdict(report, args.smallest_piece_mm)
     report["spirit_island_verdict"] = verdict
@@ -166,6 +170,7 @@ def main(argv=None) -> int:
         args.still_every,
         args.port,
         extra={"purpose": "spirit_island", "probe_summary": summary},
+        rotate=args.rotate,
     )
     print(f"\nSaved {stats['video_frames']} video frames, {stats['stills']} stills and "
           f"{stats['notes']} notes to {session}")

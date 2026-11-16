@@ -102,6 +102,19 @@ def redact(value):
     return f"{scheme}://***@{netloc.rsplit('@', 1)[1]}{sep}{path}"
 
 
+_ROTATIONS = {
+    0: None,
+    90: cv2.ROTATE_90_CLOCKWISE,
+    180: cv2.ROTATE_180,
+    270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+}
+
+
+def _rotate(image: np.ndarray, degrees: int) -> np.ndarray:
+    code = _ROTATIONS[degrees % 360]
+    return image if code is None else cv2.rotate(image, code)
+
+
 def _default_backend(source: Source) -> int:
     """Pick the native backend for webcams; let OpenCV choose for files/URLs."""
     if not _is_device(source):
@@ -173,6 +186,7 @@ class Camera:
         backend: Optional[int] = None,
         pace_files: bool = True,
         reconnect_delay: float = 2.0,
+        rotate: int = 0,
         still_url: Optional[str] = None,
     ):
         self.source = parse_source(source)
@@ -181,6 +195,11 @@ class Camera:
         self.backend = backend
         self.pace_files = pace_files
         self.reconnect_delay = reconnect_delay
+        if rotate % 360 not in _ROTATIONS:
+            raise ValueError("rotate must be 0, 90, 180 or 270 (degrees clockwise)")
+        self.rotate = rotate % 360
+        self._distinct = 0  # frames whose pixels differ from the previous one
+        self._last_thumb = None
 
         self._cap: Optional[cv2.VideoCapture] = None
         self._lock = threading.Lock()
@@ -265,6 +284,13 @@ class Camera:
                 if delay > 0:
                     time.sleep(delay)
 
+            image = _rotate(image, self.rotate)
+            # Some network MJPEG readers hand back the same picture more than once;
+            # count only frames that actually changed, for an honest frame rate.
+            thumb = cv2.resize(image, (64, 36), interpolation=cv2.INTER_AREA)
+            if self._last_thumb is None or cv2.absdiff(thumb, self._last_thumb).max() > 0:
+                self._distinct += 1
+            self._last_thumb = thumb
             packet = FramePacket(image=image, timestamp=time.time(), index=self._count)
             with self._new_frame:
                 self._latest = packet
@@ -302,11 +328,17 @@ class Camera:
     def grab_still(self) -> np.ndarray:
         """A full-resolution still from `still_url` if set, else the newest video frame."""
         if self.still_url:
-            return fetch_still(self.still_url)
+            return _rotate(fetch_still(self.still_url), self.rotate)
         packet = self.read()
         if packet is None:
             raise RuntimeError("No frame available yet")
         return packet.image
+
+    @property
+    def distinct_frames(self) -> int:
+        """Frames read whose pixels changed from the previous frame."""
+        with self._lock:
+            return self._distinct
 
     @property
     def frames_read(self) -> int:
@@ -333,6 +365,7 @@ class Camera:
             "delivered_height": self.height,
             "driver_reported_fps": round(self.reported_fps, 2),
             "still_url": redact(self.still_url),
+            "rotate": self.rotate,
         }
 
 

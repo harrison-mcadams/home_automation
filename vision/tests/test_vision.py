@@ -200,3 +200,24 @@ def test_fetch_still_with_basic_auth_and_redaction():
     finally:
         server.shutdown()
     assert redact(0) == 0 and redact("clip.mp4") == "clip.mp4"
+
+
+def test_rotate_and_distinct_frame_rate(tmp_path):
+    """A sideways phone: rotate 90 turns 1280x720 into 720x1280. Duplicate frames don't count toward fps."""
+    clip = tmp_path / "dupes.avi"
+    writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"MJPG"), 20, (1280, 720))
+    for i in range(30):
+        frame = make_scene(seed=i // 2)  # every picture appears twice in a row
+        writer.write(frame)
+    writer.release()
+    cam = Camera(str(clip), pace_files=False, rotate=90).start()
+    deadline = time.time() + 10
+    while not cam.ended and time.time() < deadline:
+        time.sleep(0.05)
+    assert (cam.width, cam.height) == (720, 1280)
+    assert cam.frames_read == 30
+    assert 15 <= cam.distinct_frames <= 18  # MJPG re-encoding can make a few repeats differ slightly
+    assert cam.describe()["rotate"] == 90
+    cam.stop()
+    with pytest.raises(ValueError):
+        Camera(0, rotate=45)
