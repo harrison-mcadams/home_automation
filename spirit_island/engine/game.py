@@ -461,6 +461,11 @@ class Game:
         s.setdefault("growth_suggest", {}).pop(str(i), None)
         return f"{s['players'][i]['name']} chose growth option {n}" if n else "Growth choice cleared"
 
+    def _do_growth_base(self, action):
+        """How many presence were on the island when Growth began (to count new discs)."""
+        self.state["presence_at_growth"] = int(action["value"])
+        return QUIET
+
     def _do_growth_suggest(self, action):
         """The camera's guess at a growth option; the player confirms it (Next, or 1/2/3)."""
         s = self.state

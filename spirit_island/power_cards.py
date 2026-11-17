@@ -125,4 +125,8 @@ class PowerWatch:
             self.state = {"active": True, "cards": cards, "stamp": time.time(),
                           "cost": sum(c["cost"] or 0 for c in cards)}
         if changed:
+            try:
+                self.store.growth_from_presence()
+            except Exception as e:
+                print(f"growth suggestion failed: {e}")
             self.store.broadcast(self.store.snapshot())

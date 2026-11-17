@@ -149,22 +149,32 @@ class Store:
                     return
                 except ActionError as e:
                     print(f"camera sync failed: {e}")
+        self.growth_from_presence()
         self.broadcast(self.snapshot())
 
     def growth_from_presence(self):
-        """During Growth, the number of new presence discs tells the option for spirits
-        whose options each add a different number (River: 0 -> 1, 1 -> 3, 2 -> 2)."""
-        from .engine.guide import GROWTH_BY_PRESENCE
+        """During Growth, suggest the option from what's new on the table: new presence
+        discs (River: 0 -> 1, 1 -> 3, 2 -> 2), backed up by a new progression card in view.
+        It stays a suggestion until the player confirms (→) or picks with 1/2/3."""
+        from .engine.guide import GROWTH_BY_PRESENCE, GROWTH_GAINS_CARD
+        from .engine import rules as R
         s = self.game.state
-        if s["step"] != "spirit.growth" or len(s["players"]) != 1:
+        if s["step"] != "spirit.growth" or len(s["players"]) != 1 or s.get("growth_choice", {}).get("0"):
             return
-        table = GROWTH_BY_PRESENCE.get(s["players"][0]["spirit"])
+        spirit = s["players"][0]["spirit"]
+        table = GROWTH_BY_PRESENCE.get(spirit)
         base = s.get("presence_at_growth")
         if not table or base is None:
             return
         added = sum(l["presence"] for l in s["lands"].values()) - base
         option = table.get(added)
-        if option and not s.get("growth_choice", {}).get("0") and s.get("growth_suggest", {}).get("0") != option:
+        # A new power card in view means an option that gains one (River: 1 or 3).
+        pw = self.power_watch.public() if getattr(self, "power_watch", None) else {}
+        prog = {c for c, _ in R.PROGRESSION.get(spirit, [])}
+        new_card = any(c["name"] in prog for c in pw.get("cards", []))
+        if option is None or (new_card and option not in GROWTH_GAINS_CARD.get(spirit, set())):
+            return
+        if s.get("growth_suggest", {}).get("0") != option:
             self.dispatch({"type": "growth_suggest", "option": option}, "camera")
 
     def broadcast(self, payload):
