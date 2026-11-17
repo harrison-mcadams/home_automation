@@ -21,7 +21,7 @@ import numpy as np
 
 CARD_DIR = Path(__file__).resolve().parent / "assets" / "components" / "invader"
 WORK_SIDE = 1400          # frames are shrunk to this before matching
-MIN_INLIERS = 14          # matches agreeing on one card shape
+MIN_INLIERS = 13          # matches agreeing on one card shape
 LEAD = 1.6                # ... and this many times more than the best other card
 
 
@@ -39,10 +39,24 @@ class CardReader:
             kp, des = self.sift.detectAndCompute(gray, None)
             if des is not None:
                 self.cards.append({"code": code, "stage": int(stage), "kp": kp, "des": des,
-                                   "size": (img.shape[1], img.shape[0])})
+                                   "size": (img.shape[1], img.shape[0]), "colours": _half_colours(img)})
 
     def read(self, frame: np.ndarray) -> dict:
-        k = min(1.0, WORK_SIDE / max(frame.shape[:2]))
+        """Best reading over two scales: a card held close reads well small, a card lying
+        far off needs the full resolution."""
+        best = None
+        for side in (1600, 3200):
+            r = self._read(frame, side)
+            if r.get("card"):
+                return r
+            if best is None or max(r.get("scores", {}).values() or [0]) > max(best.get("scores", {}).values() or [0]):
+                best = r
+            if max(frame.shape[:2]) <= side:
+                break
+        return best
+
+    def _read(self, frame: np.ndarray, work_side: int) -> dict:
+        k = min(1.0, work_side / max(frame.shape[:2]))
         small = cv2.resize(frame, None, fx=k, fy=k, interpolation=cv2.INTER_AREA) if k < 1 else frame
         kp, des = self.sift.detectAndCompute(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), None)
         if des is None or len(kp) < 10:
@@ -71,6 +85,13 @@ class CardReader:
                 quad = (corners.reshape(-1, 2) / k).tolist()
                 if not _plausible(corners.reshape(-1, 2), small.shape):
                     n = 0
+            if n and H is not None:
+                # The features can line up by chance on similar textures; the card's colours
+                # (green jungle, pale wetland, orange sands, grey mountain) must agree too.
+                w, h = c["size"]
+                seen = cv2.warpPerspective(small, np.linalg.inv(H), (w, h))
+                if _colour_distance(_half_colours(seen), c["colours"]) > 28:
+                    n = 0
             results.append((n, c, quad))
         best_by_code: dict = {}
         for n, c, quad in results:
@@ -89,6 +110,22 @@ class CardReader:
                     "why": f"unsure between {c['code']} and {ranked[1][1]['code']}"}
         return {"card": c["code"], "stage": c["stage"], "score": n, "scores": scores, "quad": quad,
                 "why": f"{n} matching features"}
+
+
+def _half_colours(img: np.ndarray) -> np.ndarray:
+    """Mean Lab colour (a, b, and lightness) of the inner top and bottom halves of a card."""
+    h, w = img.shape[:2]
+    lab = cv2.cvtColor(cv2.resize(img, (60, 90), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2LAB).astype(np.float32)
+    top, bottom = lab[12:40, 10:50], lab[50:78, 10:50]
+    return np.array([top.reshape(-1, 3).mean(0), bottom.reshape(-1, 3).mean(0)])
+
+
+def _colour_distance(a: np.ndarray, b: np.ndarray) -> float:
+    """Worst half's colour difference, ignoring an overall brightness shift (the room light)."""
+    shift = (a[:, 0] - b[:, 0]).mean()
+    d = a.copy()
+    d[:, 0] -= shift
+    return float(np.max(np.linalg.norm((d - b) * np.array([0.5, 1, 1]), axis=1)))
 
 
 def _plausible(quad: np.ndarray, shape) -> bool:

@@ -158,6 +158,7 @@ class BoardView:
     def update_once(self) -> dict:
         started = time.time()
         raw = self.grab()
+        self.raw = raw  # the latest full-resolution photo, for reading cards held under the camera
         image = detect.rotate(raw, self.rotate)
         result = detect.detect_pieces(self.reference, self.board_mask, image, lands=self.lands)
         if result["registered"]:
@@ -281,6 +282,13 @@ class BoardView:
                         self.send_error(503, "no photo yet")
                         return
                     self._send(body, "image/jpeg")
+                elif path == "/photo.jpg":
+                    raw = getattr(view, "raw", None)
+                    if raw is None:
+                        self.send_error(503, "no photo yet")
+                        return
+                    ok, buf = cv2.imencode(".jpg", raw, [cv2.IMWRITE_JPEG_QUALITY, 92])
+                    self._send(buf.tobytes(), "image/jpeg")
                 elif path == "/state.json":
                     with view.lock:
                         body = json.dumps(view.state).encode()

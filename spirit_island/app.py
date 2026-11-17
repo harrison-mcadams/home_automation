@@ -46,7 +46,7 @@ def load_config():
     cfg = {"host": "0.0.0.0", "port": 5055, "data_dir": "games",
            "board_camera_url": "http://localhost:8091", "public_urls": [],
            "board_reference": "", "board_art_dir": "assets/boards",
-           "camera_snapshot_url": "http://localhost:8090/snapshot.jpg"}
+           "camera_snapshot_url": "http://localhost:8091/photo.jpg"}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             cfg.update(json.load(f))
