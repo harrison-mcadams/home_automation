@@ -197,6 +197,8 @@ class Store:
         WORD = {"explorers": "explorer", "towns": "town", "cities": "city", "dahan": "Dahan",
                 "blight": "blight", "presence": "presence"}
         out = []
+        # Pieces taken off come first: a push is a removal here and an arrival next door.
+        events = sorted(events, key=lambda e: e["delta"])
         for e in events:
             s = self.game.state
             lid, piece, delta = e["land"], e["piece"], e["delta"]
@@ -205,7 +207,25 @@ class Store:
                 continue
             step, did = s["step"], None
             try:
-                if piece in WHITE and delta > 0 and step == "invader.build":
+                push = self._card_push(lid) if piece in WHITE and delta < 0 and step in ("fast", "slow") else None
+                if push:
+                    # A played card pushes invaders out of this land: the white pieces leaving
+                    # are the ones it can push (never a city), and they arrive next door.
+                    card, o = push
+                    moved = []
+                    for kind in o["push"]:
+                        while land.get(kind, 0) > 0 and len(moved) < o["up_to"]:
+                            self.dispatch({"type": "land", "land": lid, "piece": kind, "delta": -1}, "camera")
+                            moved.append(kind)
+                    self.pushed = moved
+                    self.dispatch({"type": "card_resolved", "card": card, "land": lid, "fear": o["fear"]}, "camera")
+                    did = f"{card}: pushed {', '.join(WORD[k] for k in moved)} out of land {lid[1:]}"
+                elif piece in WHITE and delta > 0 and getattr(self, "pushed", None):
+                    for kind in self.pushed:
+                        self.dispatch({"type": "land", "land": lid, "piece": kind, "delta": 1}, "camera")
+                    did = f"pushed {', '.join(WORD[k] for k in self.pushed)} into land {lid[1:]}"
+                    self.pushed = []
+                elif piece in WHITE and delta > 0 and step == "invader.build":
                     marks = describe(s).get("marks") or {}
                     key = f"built:{s['round']}"
                     if marks.get(lid, {}).get("text", "nothing") != "nothing" and lid not in s.get(key, []):
@@ -243,6 +263,16 @@ class Store:
         self.growth_from_presence()
         self.after_camera_events()
         return out
+
+    def _card_push(self, lid):
+        """(card, option) when a played card still to resolve pushes invaders out of this land."""
+        for c in self.card_focus():
+            if not c["now"] or c["resolved"]:
+                continue
+            for o in c["options"]:
+                if o["land"] == lid and o.get("push"):
+                    return c["name"], o
+        return None
 
     def after_camera_events(self):
         """Move on when the step's work has all been seen."""

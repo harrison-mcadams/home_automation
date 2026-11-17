@@ -105,7 +105,8 @@ def _option(card: str, land: dict, presence_here: bool) -> dict | None:
         return {"text": f"{2 if coastal else 1} damage", "fear": 0, "expect": {"invaders": -1}} if inv else None
     if card == "Wash Away":
         n = land.get("explorers", 0) + land.get("towns", 0)
-        return {"text": f"push up to {min(3, n)} explorer/town", "fear": 0, "expect": {"invaders": -1}} if n else None
+        return {"text": f"push up to {min(3, n)} explorer/town", "fear": 0, "expect": {"invaders": -1},
+                "push": ["towns", "explorers"], "up_to": min(3, n)} if n else None
     if card == "River's Bounty":
         return {"text": "gather up to 2 Dahan" + (", then +1 Dahan, +1 energy" if land.get("dahan", 0) >= 2 else ""),
                 "fear": 0, "expect": {"dahan": 1}}
@@ -120,7 +121,8 @@ def _option(card: str, land: dict, presence_here: bool) -> dict | None:
         return {"text": "2 fear, 4 damage", "fear": 2, "expect": {"invaders": -1} if inv else {}}
     if card == "Song of Sanctity":
         if land.get("explorers"):
-            return {"text": "push all explorers", "fear": 0, "expect": {"explorers": -1}}
+            return {"text": "push all explorers", "fear": 0, "expect": {"explorers": -1},
+                    "push": ["explorers"], "up_to": land.get("explorers", 0)}
         return {"text": "remove 1 blight", "fear": 0, "expect": {"blight": -1}} if land.get("blight") else None
     if card == "Tsunami":
         return {"text": "2 fear, 8 damage, destroy 2 Dahan", "fear": 2, "expect": {"invaders": -1}}
