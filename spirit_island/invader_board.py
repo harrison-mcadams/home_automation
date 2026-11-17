@@ -59,6 +59,10 @@ class InvaderBoardReader:
             if back is not None:
                 self.refs.append(("back", None, s, _sig(back)))
         self.art = art
+        # The backs all share one detailed picture (explorers landing): found by features,
+        # which the colour comparison can't tell from a face.
+        back = cv2.imread(str(BACKS / "stage1_back.jpg"))
+        self.back_kp, self.back_des = self.sift.detectAndCompute(cv2.cvtColor(back, cv2.COLOR_BGR2GRAY), None)
         self.empty = {}
         aw, ah = self.art_size
         for slot, (x, y, w, h) in SLOTS.items():
@@ -81,6 +85,21 @@ class InvaderBoardReader:
         if H is None or inl.sum() < 25:
             return None
         return np.diag([1 / k, 1 / k, 1]) @ H
+
+    def _is_back(self, frame, quad) -> bool:
+        """A face-down invader card (the deck) in this space, by matching the back's art."""
+        big = cv2.getPerspectiveTransform(quad.astype(np.float32), np.float32([[0, 0], [400, 0], [400, 600], [0, 600]]))
+        crop = cv2.warpPerspective(frame, big, (400, 600))
+        kp, des = self.sift.detectAndCompute(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), None)
+        if des is None or len(kp) < 10:
+            return False
+        good = [a for a, b in (p for p in cv2.BFMatcher().knnMatch(self.back_des, des, k=2) if len(p) == 2)
+                if a.distance < 0.75 * b.distance]
+        if len(good) < 10:
+            return False
+        H, inl = cv2.findHomography(np.float32([self.back_kp[g.queryIdx].pt for g in good]),
+                                    np.float32([kp[g.trainIdx].pt for g in good]), cv2.RANSAC, 6)
+        return H is not None and inl.sum() >= 25  # the deck gives ~80; card faces and the board under 15
 
     def read(self, frame: np.ndarray) -> dict:
         H = self.locate(frame)
@@ -107,9 +126,18 @@ class InvaderBoardReader:
             W, Hh = 240, 360
             M = cv2.getPerspectiveTransform(quad, np.float32([[0, 0], [W, 0], [W, Hh], [0, Hh]]))
             card = cv2.warpPerspective(frame, M, (W, Hh))
+            if self._is_back(frame, quad):
+                out["slots"][slot] = {"card": None, "kind": "back", "dist": 0.0}
+                continue
             sig = _sig(card, shift)
+            flipped = _sig(cv2.rotate(card, cv2.ROTATE_180), shift)  # cards can lie either way up
             empty = float(np.sqrt(((sig - self.empty[slot]) ** 2).sum(-1)).mean())
-            scored = sorted((float(np.sqrt(((sig - r[3]) ** 2).sum(-1)).mean()), r) for r in self.refs)
+
+            def dist(ref):
+                return min(float(np.sqrt(((sig - ref) ** 2).sum(-1)).mean()),
+                           float(np.sqrt(((flipped - ref) ** 2).sum(-1)).mean()))
+            scored = sorted(((dist(r[3]), i, r) for i, r in enumerate(self.refs)), key=lambda t: t[0])
+            scored = [(d, r) for d, _, r in scored]
             d, (kind, code, stage, _) = scored[0]
             if empty < d:
                 out["slots"][slot] = {"card": None, "kind": "empty", "dist": round(empty, 1)}
