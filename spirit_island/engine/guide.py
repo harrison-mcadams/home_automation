@@ -487,6 +487,19 @@ def _growth(s):
             if card and n in GROWTH_GAINS_CARD.get(p["spirit"], set()):
                 pics.append({"src": f"powers/{rules.picture_slug(card[0])}.jpg", "items": [n],
                              "caption": f"You'd take: {card[0]}"})
+        if chosen:
+            # Chosen (by the camera or a key): show just that option, big, and let → move on.
+            title, text = GROWTH[p["spirit"]][chosen - 1]
+            return {
+                "title": f"Growth: option {chosen} ✓",
+                "single": True,
+                "do": [f"Chosen: option {chosen}, {title}. " + text.format(nextcard=nxt),
+                       "Wrong? Press 1, 2 or 3 to change it. Otherwise press → for Gain energy."],
+                "pictures": [pp for pp in pics if pp.get("items") == [chosen]],
+                "why": "The camera worked it out from your new presence discs.",
+                "helper": {"kind": "growth", "options": len(GROWTH[p["spirit"]]), "chosen": chosen},
+                "tips": [],
+            }
         items.append((f"You chose option {chosen}. " if chosen else
                       "Choose with the number keys 1, 2, 3 on the remote/keyboard (or on the phone). ")
                      + "Do it at the table: the camera adds new presence discs by itself. Then Next.")
