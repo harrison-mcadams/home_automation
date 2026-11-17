@@ -37,11 +37,12 @@ RULES = {
     "disc_min_fill": 0.72,  # dahan 0.78-0.84; an explorer with sand in its gaps 0.64
     "dahan_min_value": 130,  # dahan V 202-219; leaves room for shade
     "energy_min_texture": 20,  # printed card: texture 25-32; dahan 7-25 (dim light), presence 4-17
-    "energy_min_size": 0.09,  # a dahan on busy jungle art can read 0.085 and textured
+    "energy_min_size": 0.09,  # energy marker 0.093-0.096
+    "energy_max_saturation": 95,  # marker S 69-78; a tan dahan with its shadow reads as big but S 100+
     # Evening light (2026-11-16): the wooden dahan (domed, tan) read saturated tan, H 14-22,
     # S 99-178, V 173-224, size 0.055-0.085: as saturated as a painted disc, so a warm,
     # tan, roundish piece is a dahan before it is presence.
-    "tan_hue": (8, 24),
+    "tan_hue": (8, 26),  # a dahan merged with its shadow can read H 24-25
     "tan_min_saturation": 80,
     "tan_max_elongation": 1.9,  # a dahan's shadow can stretch it
     "pale_dahan_max_size": 0.08,  # a pale warm piece this small is a dahan; bigger is a city/town  # energy marker 0.093-0.096; dahan 0.065-0.072, presence up to 0.082
@@ -128,12 +129,13 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
     # as textured (up to 25), so size must agree.
     # The marker is a round disc; two touching dahan make a long, textured tan blob instead.
     printed = (f.texture >= rules["energy_min_texture"] and f.size >= rules["energy_min_size"]
-               and f.elongation <= 1.4)
-    if f.white_frac >= 0.15 and f.size >= 0.03 and f.elongation <= 2.0 and not (lo <= f.hue <= hi and f.saturation >= rules["tan_min_saturation"]
+               and f.elongation <= 1.4 and (f.saturation < rules["energy_max_saturation"] or f.value < 160))
+    # (Blight is darker than this; its bumps catch specks of light too.)
+    if f.white_frac >= 0.15 and f.size >= 0.03 and f.elongation <= 2.0 and f.value > rules["dark_max_value"] and not (lo <= f.hue <= hi and f.saturation >= rules["tan_min_saturation"]
                                                          and f.white_frac < 0.3):
         # Mostly in its own shadow, but a good part of it is lit white plastic: a building
         # or figure seen from the shaded side (dim evening light).
-        if f.size < 0.035:
+        if f.size < 0.028:
             kind = "explorer"
         elif f.size >= 0.095:
             kind = "city"
@@ -165,13 +167,22 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
             f.saturation <= rules["pale_max_saturation"] and f.size > rules["pale_dahan_max_size"]):
         out = {"type": "dahan", "why": f"plain cream (hue {f.hue}, texture {f.texture})"}
     elif f.saturation <= rules["pale_max_saturation"] and f.value >= rules["pale_min_value"]:
-        if f.thickness <= rules["explorer_max_thickness"]:
+        # Explorers are spindly figures (elongation 1.7-2.1); a squat outline is a town seen
+        # in shade even when it reads as thin.
+        if f.thickness <= rules["explorer_max_thickness"] and f.elongation >= 1.45:
             kind = "explorer"
         elif f.size >= rules["city_min_size"] and (f.elongation <= rules["city_max_elongation"] or f.size >= 0.1):
             kind = "city"
         else:
             kind = "town"
         out = {"type": kind, "why": f"white plastic, thickness {f.thickness}, size {f.size}, elongation {f.elongation}"}
+    elif (warm and f.saturation >= 90 and f.texture >= 35 and f.size <= 0.13
+          and rules["tan_hue"][0] <= f.hue <= rules["tan_hue"][1]):
+        # A dahan together with its long evening shadow: tan, but the shadow drags the
+        # median brightness down. Table wood is flat (little texture); this is a bright
+        # dome next to dark shade.
+        n = 2 if f.size >= 0.095 else 1
+        out = {"type": "dahan", "count": n, "why": f"tan wood with shadow (value {f.value}, texture {f.texture})"}
     elif warm and f.value < rules["dahan_min_value"]:
         # Darker than any cream or tan piece, brownish: the wooden table, uncovered at the
         # rim when the board slides.

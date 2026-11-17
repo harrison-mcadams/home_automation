@@ -259,7 +259,9 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         bx, by, bw, bh = b
         return bx <= ax + aw / 2 <= bx + bw and by <= ay + ah / 2 <= by + bh or             ax <= bx + bw / 2 <= ax + aw and ay <= by + bh / 2 <= ay + ah
     pieces = [p for p in pieces if not (
-        p["type"] in ("explorer", "unknown", "town") and p.get("features", {}).get("fill", 1) < 0.55
+        p["type"] in ("explorer", "unknown", "town")
+        and (p.get("features", {}).get("fill", 1) < 0.55
+             or (p["type"] == "unknown" and p.get("features", {}).get("value", 255) < 120))
         and any(o is not p and o.get("features", {}).get("fill", 0) >= 0.7
                 and _centre_in(p["reference_bbox"], o["reference_bbox"]) for o in pieces))]
     # A long blob counted as two touching pieces, while one of the two was cut out as its
