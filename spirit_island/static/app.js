@@ -523,6 +523,18 @@ function render(snapshot) {
 
 // ---------- wiring ----------
 $("btn-next").onclick = () => act({ type: "next" });
+$("btn-read-slots").onclick = async () => {
+  toast("Reading the invader board...", true);
+  try {
+    const r = await fetch("/api/read_slots", { method: "POST" });
+    const data = await r.json();
+    if (!r.ok) return toast(data.error || "Couldn't read the cards");
+    render(data);
+    const got = data.read || {};
+    toast(Object.keys(got).length ? "Read: " + Object.entries(got).map(([k, v]) => `${k} ${v ? cardLabel(v) : "empty"}`).join(", ")
+      : "No card readable; check the board is in view", true);
+  } catch (e) { toast("Can't reach the game server"); }
+};
 $("btn-undo").onclick = () => act({ type: S.state.status === "setup" ? "back" : "undo" });
 $("btn-fear").onclick = () => act({ type: "fear", amount: 1 });
 document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => { tab = b.dataset.tab; renderTabs(); });

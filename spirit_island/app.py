@@ -257,6 +257,39 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
         (store.cards.start if (request.get_json(silent=True) or {}).get("on", True) else store.cards.stop)()
         return jsonify(store.snapshot())
 
+    @app.post("/api/read_slots")
+    def read_slots():
+        """Read the invader cards on the invader board's Ravage, Build and Explore spaces from
+        the camera's newest photo, and set the slots to what's clearly readable."""
+        import urllib.request
+        import cv2
+        import numpy as np
+        from .invader_board import InvaderBoardReader
+        if not hasattr(store, "slot_reader"):
+            store.slot_reader = InvaderBoardReader()
+        try:
+            with urllib.request.urlopen(cfg["camera_snapshot_url"], timeout=6) as r:
+                frame = cv2.imdecode(np.frombuffer(r.read(), np.uint8), cv2.IMREAD_COLOR)
+        except OSError as e:
+            return jsonify({"error": f"camera not reachable ({type(e).__name__})"}), 503
+        result = store.slot_reader.read(frame)
+        if not result.get("found"):
+            return jsonify({"error": "can't see the invader board in the camera's picture"}), 422
+        read = {}
+        slots = store.game.state["invaders"]["slots"]
+        for slot, info in result["slots"].items():
+            if info["kind"] == "face" and info.get("margin", 0) >= 2:
+                read[slot] = info["card"]
+            elif info["kind"] == "empty" and slot != "explore":
+                read[slot] = None
+        for slot, card in read.items():
+            if slots.get(slot) != card:
+                store.dispatch({"type": "set_slot", "slot": slot, "card": card}, "camera")
+        out = store.snapshot()
+        out["read"] = read
+        out["slot_reading"] = result["slots"]
+        return jsonify(out)
+
     @app.get("/api/card_scan.jpg")
     def card_scan_photo():
         body = store.cards.jpeg if store.cards else b""
