@@ -310,7 +310,7 @@ function renderNow() {
   if (g.helper && g.helper.kind === "fear_cards") focus.push(el("div", { class: "focus" }, el("b", {}, g.helper.left), "fear card(s) to read and resolve"));
   // Power cards the camera sees lying face up (spirit phase): what's played and its cost.
   const pw = S.power_watch || {};
-  if (pw.active && (pw.cards || []).length) {
+  if (pw.active && (pw.cards || []).length && s.step.startsWith("spirit.")) {
     const powers = s.step === "spirit.powers";
     focus.push(el("div", { class: "focus" }, el("b", {}, powers ? "Played (camera):" : "Power cards in view:"),
       powers ? `total cost ${pw.cost} energy` : ""));
