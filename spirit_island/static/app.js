@@ -149,6 +149,12 @@ function renderGuide() {
   const h = $("g-helper"); h.replaceChildren();
   const chips = powerChips();
   if (chips) h.append(chips);
+  const st = (S.derived.spirits || [])[0];
+  if (st && S.state.status === "playing" && S.state.step.startsWith("spirit.")) {
+    h.append(el("div", { class: "helper" }, landRow("⚡", el("span", {}, `${st.energy} energy · ${st.card_plays} card play${st.card_plays !== 1 ? "s" : ""} · +${st.energy_per_turn}/turn`),
+      el("span", {}, el("button", { onclick: () => act({ type: "energy", delta: -1 }) }, "−"), " ",
+        el("button", { onclick: () => act({ type: "energy", delta: 1 }) }, "+")))));
+  }
   if (!g.helper) return;
   const fn = HELPERS[g.helper.kind];
   if (fn) h.append(fn(g.helper));
