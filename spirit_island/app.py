@@ -100,8 +100,12 @@ class Store:
             return {}
 
     def dispatch(self, action, source):
-        # Leaving Play powers: pay for the cards the camera sees played.
-        if action.get("type") == "next" and self.game.state["step"] == "spirit.powers"                 and getattr(self, "power_watch", None) is not None:
+        # With a card in view, Next leaves the step in one go (the card screen is one step).
+        if action.get("type") == "next" and self.game.state["step"] in ("spirit.powers", "fast", "slow")                 and self.card_focus():
+            action = {**action, "screen": True}
+        # Leaving Play powers: pay for the cards the camera sees played (only when really
+        # leaving the step, not when Next walks through its numbered items).
+        if action.get("type") == "next" and self.game.state["step"] == "spirit.powers"                 and (action.get("screen") or self.game.state.get("sub", 0) >= self.game._items() - 1)                 and getattr(self, "power_watch", None) is not None:
             cost = self.power_watch.public().get("cost") or 0
             if cost:
                 try:
