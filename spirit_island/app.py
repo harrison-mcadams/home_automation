@@ -134,6 +134,8 @@ class Store:
             out["card_scan"] = self.cards.public()
         if getattr(self, "slot_watch", None) is not None:
             out["slot_watch"] = self.slot_watch.public()
+        if getattr(self, "change_watch", None) is not None:
+            out["changes"] = self.change_watch.public()
         if getattr(self, "power_watch", None) is not None:
             out["power_watch"] = pw = self.power_watch.public()
             # Where the cards in view could be used, for the drawn board.
@@ -164,30 +166,88 @@ class Store:
         With auto-sync on, a settled reading that differs from the tracked game is copied
         in (logged as coming from the camera, and Undo-able like any other change).
         """
-        v = self.vision
-        if v is not None and v.auto and v.settled() and self.game.state["status"] == "playing":
-            # Only believable suggestions: held for a few readings, camera not blind,
-            # and fitting the step. Unusual ones wait for a tap on the phone.
-            diffs = [d for d in v.public(self.game.state)["diffs"]
-                     if d["confirmed"] and d["verdict"] in ("expected", "plausible")]
-            # Only presence is copied in by itself for now: it's colour-checked and reliable.
-            # Other differences wait for a tap (shaded white figures still flicker).
-            # Only additions: a disc the camera briefly loses (merged with a piece it touches)
-            # must not be taken off the tracker. Removals wait for a tap.
-            lands = {d["land"]: {"presence": d["camera"]["presence"]} for d in diffs if d["delta"].get("presence", 0) > 0}
-            if lands:
-                try:
-                    self.dispatch({"type": "observe", "lands": lands}, "camera")
-                    self.growth_from_presence()
-                    return
-                except ActionError as e:
-                    print(f"camera sync failed: {e}")
+        # (Pieces are entered by the change tracker, see camera_events; the piece-by-piece
+        # reading is only shown, e.g. on the starting-pieces step.)
         self.growth_from_presence()
-        try:
-            self.resolve_cards_from_camera()
-        except ActionError as e:
-            print(f"card resolve failed: {e}")
         self.broadcast(self.snapshot())
+
+    def camera_events(self, events):
+        """Pieces the camera saw put down or taken off since the board was last still.
+
+        Each is entered in the light of the step: a white piece arriving during Build or
+        Explore is that step's building or explorer; otherwise the piece is entered as seen
+        (white pieces by size, or by what the land holds when one leaves). Returns the
+        events with what was done about them, for the screens."""
+        from .engine import game as G
+        from .engine.guide import describe
+        from .engine.targets import done as option_done
+        WHITE = ("explorers", "towns", "cities")
+        WORD = {"explorers": "explorer", "towns": "town", "cities": "city", "dahan": "Dahan",
+                "blight": "blight", "presence": "presence"}
+        out = []
+        for e in events:
+            s = self.game.state
+            lid, piece, delta = e["land"], e["piece"], e["delta"]
+            land = s["lands"].get(lid)
+            if land is None:
+                continue
+            step, did = s["step"], None
+            try:
+                if piece in WHITE and delta > 0 and step == "invader.build":
+                    marks = describe(s).get("marks") or {}
+                    key = f"built:{s['round']}"
+                    if marks.get(lid, {}).get("text", "nothing") != "nothing" and lid not in s.get(key, []):
+                        kind = G.build_preview(land)
+                        self.dispatch({"type": "apply_build", "land": lid}, "camera")
+                        self.dispatch({"type": "note", "key": key, "add": lid}, "camera")
+                        did = f"+1 {'city' if kind == 'cities' else 'town'} on land {lid[1:]} (build)"
+                elif piece in WHITE and delta > 0 and step in ("invader.explore", "setup.first_explore"):
+                    self.dispatch({"type": "apply_explore", "land": lid}, "camera")
+                    self.dispatch({"type": "note", "key": f"explored:{s['round']}", "add": lid}, "camera")
+                    did = f"+1 explorer on land {lid[1:]} (explore)"
+                if did is None:
+                    if piece in WHITE and delta < 0:
+                        here = [p for p in WHITE if land.get(p, 0) > 0]
+                        if not here:
+                            continue
+                        piece = piece if piece in here else here[0]
+                    if delta < 0 and land.get(piece, 0) <= 0:
+                        continue
+                    self.dispatch({"type": "land", "land": lid, "piece": piece, "delta": delta}, "camera")
+                    did = f"{'+1' if delta > 0 else '-1'} {WORD[piece]} on land {lid[1:]}"
+            except ActionError as err:
+                did = f"a change on land {lid[1:]} that could not be entered ({err})"
+            out.append({**e, "did": did})
+            # A played card whose choice this carries out is done.
+            try:
+                for c in [c for c in self.card_focus() if c["now"] and not c["resolved"]]:
+                    for o in c["options"]:
+                        if o["land"] == lid and option_done(o, {e["piece"]: delta}):
+                            self.dispatch({"type": "card_resolved", "card": c["name"], "land": lid,
+                                           "fear": o["fear"]}, "camera")
+                            break
+            except ActionError:
+                pass
+        self.growth_from_presence()
+        self.after_camera_events()
+        return out
+
+    def after_camera_events(self):
+        """Move on when the step's work has all been seen."""
+        from .engine.guide import describe
+        s = self.game.state
+        g = describe(s)
+        if s["step"] == "invader.build":
+            want = {l for l, m in (g.get("marks") or {}).items() if m["text"] != "nothing"}
+            if want and want <= set(s.get(f"built:{s['round']}", [])):
+                self.dispatch({"type": "next", "screen": True}, "camera")
+        elif s["step"] == "invader.explore":
+            rows = (g.get("helper") or {}).get("rows") or []
+            want = {r["land"] for r in rows if r.get("explore") == "yes"}
+            if want and want <= set(s.get(f"explored:{s['round']}", [])):
+                self.dispatch({"type": "next", "screen": True}, "camera")
+        else:
+            self.advance_if_cards_done()
 
     def step_done_from_camera(self, lands):
         """The camera saw the build / explore carried out: enter it and move on."""
@@ -455,9 +515,10 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
         store.slot_watch = SlotWatch(store, cfg["camera_snapshot_url"])
         from .step_watch import StepWatch
         if cfg.get("board_reference"):
-            store.step_watch = StepWatch(store, cfg["camera_snapshot_url"], cfg["board_reference"])
+            from .change_watch import ChangeWatch
+            store.change_watch = ChangeWatch(store, cfg["camera_snapshot_url"], cfg["board_reference"])
             if start_vision and url:
-                store.step_watch.start()
+                store.change_watch.start()
         from .power_cards import PowerWatch
         store.power_watch = PowerWatch(store, cfg["camera_snapshot_url"])
         if start_vision and url:

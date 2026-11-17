@@ -503,6 +503,13 @@ class Game:
         t[track] = max(0, t[track] + int(action.get("delta", 1)))
         return f"Presence taken from the {track} track"
 
+    def _do_note(self, action):
+        """Remember a small fact for the step (e.g. which lands have built this round)."""
+        lst = self.state.setdefault(action["key"], [])
+        if action["add"] not in lst:
+            lst.append(action["add"])
+        return QUIET
+
     def _do_mark_energy_start(self, action):
         self.state["energy_at_step"] = int(action["value"])
         return QUIET

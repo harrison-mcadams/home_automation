@@ -267,3 +267,5 @@ body.gallery.watch #side { display: grid; }
 
 /* colour-coded card choices, matching the board */
 #n-do li.opt { list-style: none; margin-left: -1.4em; border-left: 1vh solid var(--opt); padding-left: 1vw; color: var(--opt); font-weight: 700; }
+
+#reads .ev { color: var(--accent); font-size: 1.8vh; }

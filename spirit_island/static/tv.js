@@ -95,9 +95,9 @@ function renderReads() {
   const sw = S.slot_watch || {}, pw = S.power_watch || {}, v = S.vision || {};
   const slotTxt = (k) => { const c = (sw.slots || {})[k]; return !c ? "?" : c === "empty" ? "empty" : c === "back" ? "deck (face down)" : label(c); };
   const rows = [];
-  const diffs = (v.diffs || []).length;
-  rows.push(el("div", { class: "read" + (diffs ? " warn" : "") }, el("b", {}, "Island"),
-    !v.connected ? "camera off" : v.status === "settled" || v.settled ? (diffs ? `${diffs} land${diffs > 1 ? "s" : ""} differ from the tracker` : "matches the tracker") : "settling..."));
+  const ch = S.changes || {};
+  rows.push(el("div", { class: "read" + (ch.status && ch.status !== "watching" ? " warn" : "") }, el("b", {}, "Island camera"),
+    ch.status || "off", ...(ch.recent || []).slice(0, 3).map((e) => el("div", { class: "ev" }, "Saw: " + (e.did || "a change")))));
   if (pw.active) rows.push(el("div", { class: "read" }, el("b", {}, "Power cards in view"),
     (pw.cards || []).length ? pw.cards.map((c) => c.name).join(", ") : "none"));
   box.replaceChildren(...rows);
@@ -398,6 +398,24 @@ async function loadMap(letter) {
   } catch (e) { mapLoaded = null; }
 }
 
+function trackedPieces(map, v) {
+  const out = [], colour = ((v.presence_colours || [])[0]) || "blue";
+  const order = [["cities", "city"], ["towns", "town"], ["explorers", "explorer"], ["dahan", "dahan"], ["blight", "blight"], ["presence", "presence"]];
+  for (const l of map.lands) {
+    const land = S.state.lands[(v.board || "") + l.name];
+    if (!land) continue;
+    const list = [];
+    for (const [k, type] of order) for (let i = 0; i < (land[k] || 0); i++) list.push(type);
+    const per = Math.min(3, Math.max(1, list.length)), gap = 60, rows = Math.ceil(list.length / per);
+    list.forEach((type, i) => {
+      const r = Math.floor(i / per), c = i % per, inRow = Math.min(per, list.length - r * per);
+      out.push({ type, colour: type === "presence" ? colour : undefined,
+        x: l.centre[0] + (c - (inRow - 1) / 2) * gap, y: l.centre[1] + (r - (rows - 1) / 2) * gap });
+    });
+  }
+  return out;
+}
+
 function drawMap(v) {
   if (!mapView) return;
   if (mapView.rot !== (S.state.board_rotation || 0)) BoardMap.setRotation(mapView, S.state.board_rotation || 0);
@@ -426,7 +444,9 @@ function drawMap(v) {
   }
   BoardMap.setLands(mapView, info);
   BoardMap.setTags(mapView, tags);
-  BoardMap.setPieces(mapView, v.pieces || []);
+  // The drawn board shows the tracked game (the truth), laid out neatly in each land,
+  // not the camera's guess at every piece.
+  BoardMap.setPieces(mapView, trackedPieces(mapView.map, v));
 }
 
 function renderCamera() {
@@ -451,10 +471,9 @@ function renderCamera() {
       "· keeping the tracked board as it is");
     return;
   }
-  st.replaceChildren(
-    el("span", { class: v.settled ? "ok" : "warn" }, v.settled ? "Camera: settled" : "Camera: " + (v.status || "waiting")),
-    ` · ${v.stamp || ""} · board ${v.board || "?"}`,
-    n ? el("span", { class: "warn" }, ` · ${n} land${n > 1 ? "s" : ""} differ from the tracker${v.auto ? " (auto-sync on)" : ""}`) : " · matches the tracker");
+  const ch = S.changes || {};
+  st.replaceChildren(el("span", { class: ch.status === "watching" ? "ok" : "warn" }, "Camera: " + (ch.status || v.status || "waiting")),
+    ` · board ${v.board || "?"} · showing the tracked game`);
 }
 
 function render(snap) {
