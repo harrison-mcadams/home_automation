@@ -495,7 +495,7 @@ def _growth(s):
                 "single": True,
                 "do": [f"Chosen: option {chosen}, {title}. " + text.format(nextcard=nxt),
                        "Wrong? Press 1, 2 or 3 to change it. Otherwise press → for Gain energy."],
-                "pictures": [pp for pp in pics if pp.get("items") == [chosen]],
+                "pictures": [dict(pp, items=[0]) for pp in pics if pp.get("items") == [chosen]],
                 "why": "The camera worked it out from your new presence discs.",
                 "helper": {"kind": "growth", "options": len(GROWTH[p["spirit"]]), "chosen": chosen},
                 "tips": [],

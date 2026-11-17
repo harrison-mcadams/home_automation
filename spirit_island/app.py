@@ -139,7 +139,9 @@ class Store:
                      if d["confirmed"] and d["verdict"] in ("expected", "plausible")]
             # Only presence is copied in by itself for now: it's colour-checked and reliable.
             # Other differences wait for a tap (shaded white figures still flicker).
-            lands = {d["land"]: {"presence": d["camera"]["presence"]} for d in diffs if "presence" in d["delta"]}
+            # Only additions: a disc the camera briefly loses (merged with a piece it touches)
+            # must not be taken off the tracker. Removals wait for a tap.
+            lands = {d["land"]: {"presence": d["camera"]["presence"]} for d in diffs if d["delta"].get("presence", 0) > 0}
             if lands:
                 try:
                     self.dispatch({"type": "observe", "lands": lands}, "camera")
