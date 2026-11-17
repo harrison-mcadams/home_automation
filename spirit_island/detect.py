@@ -264,6 +264,18 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
              or (p["type"] == "unknown" and p.get("features", {}).get("value", 255) < 120))
         and any(o is not p and o.get("features", {}).get("fill", 0) >= 0.7
                 and _centre_in(p["reference_bbox"], o["reference_bbox"]) for o in pieces))]
+    # Two "towns" in one land where one is much smaller: the small one is an explorer
+    # (both read only as dim outlines in shade, and an explorer is the smaller figure).
+    by_land: dict = {}
+    for p in pieces:
+        if p["type"] == "town" and p.get("land"):
+            by_land.setdefault(p["land"], []).append(p)
+    for group in by_land.values():
+        if len(group) >= 2:
+            big = max(p["features"]["size"] for p in group)
+            for p in group:
+                if p["features"]["size"] < 0.7 * big:
+                    p.update({"type": "explorer", "why": p["why"] + "; smaller than the town beside it: an explorer"})
     # A long blob counted as two touching pieces, while one of the two was cut out as its
     # own piece too (the long blob is then the other piece plus shadow): count it once.
     for p in pieces:
