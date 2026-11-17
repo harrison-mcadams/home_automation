@@ -33,6 +33,7 @@ def change_map(
     blur: int = 7,
     zones: Optional[np.ndarray] = None,
     white_boost: float = 0.0,
+    edge_boost: float = 0.0,
 ) -> np.ndarray:
     """Per-pixel colour difference (float32, roughly CIE delta-E) after evening out
     a global lighting change inside `region`, or one per zone (e.g. per printed land)
@@ -70,7 +71,30 @@ def change_map(
         # them (close small gaps) so it comes out as one piece, not fragments.
         bright = cv2.morphologyEx(bright, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
         out[(bright > 0) & sel] += white_boost
+    if edge_boost:
+        out[new_edges(reference, aligned, sel) > 0] += edge_boost
     return out
+
+
+def new_edges(reference: np.ndarray, aligned: np.ndarray, sel: np.ndarray, level: float = 30.0) -> np.ndarray:
+    """Filled outlines that are in the photo but not on the empty board.
+
+    A piece has crisp outlines the printed art doesn't have at that spot, and outlines
+    barely care about the light: a white town on a pale mountain differs little in colour
+    but shows clear edges. The board's own edges (dilated a little, for small
+    misalignment) are subtracted, then the new outlines are closed and filled.
+    """
+    def grad(im):
+        g = cv2.GaussianBlur(cv2.cvtColor(im, cv2.COLOR_BGR2GRAY).astype(np.float32), (5, 5), 0)
+        return cv2.magnitude(cv2.Sobel(g, cv2.CV_32F, 1, 0), cv2.Sobel(g, cv2.CV_32F, 0, 1))
+    e = grad(aligned) - 1.2 * cv2.dilate(grad(reference), np.ones((7, 7), np.uint8))
+    e = cv2.GaussianBlur(np.clip(e, 0, None), (9, 9), 0)
+    m = ((e > level) & sel).astype(np.uint8) * 255
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11)))
+    contours, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    filled = np.zeros_like(m)
+    cv2.drawContours(filled, contours, -1, 255, thickness=cv2.FILLED)
+    return filled
 
 
 def _part_ok(part: np.ndarray, blob_area: int, min_frac: float, min_thickness: float) -> bool:
@@ -188,6 +212,7 @@ def find_changes(
     zones: Optional[np.ndarray] = None,
     grow: float = 1.0,
     white_boost: float = 0.0,
+    edge_boost: float = 0.0,
 ):
     """Blobs where `aligned` differs from `reference`, inside `region` (255 = look).
 
@@ -208,7 +233,7 @@ def find_changes(
     reg = cv2.erode(reg, np.ones((9, 9), np.uint8))
 
     z = cv2.resize(zones, size, interpolation=cv2.INTER_NEAREST) if zones is not None else None
-    diff = change_map(ref, new, reg, zones=z, white_boost=white_boost)
+    diff = change_map(ref, new, reg, zones=z, white_boost=white_boost, edge_boost=edge_boost)
     inside = diff[reg > 0]
     if inside.size == 0:
         return [], np.zeros((full_h, full_w), np.uint8)

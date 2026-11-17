@@ -195,6 +195,7 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     if lands and lands[0] is not None:
         kwargs.setdefault("zones", lands[0])
     kwargs.setdefault("white_boost", 30.0)
+    kwargs.setdefault("edge_boost", 30.0)
     blobs, change_mask, labels, scale = find_changes(reference, aligned, region, return_labels=True, **kwargs)
     work = cv2.resize(aligned, (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_AREA)
     full_board_area = float((board_mask > 0).sum()) * scale * scale  # in working pixels
@@ -240,7 +241,7 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
             # A pale plastic town or explorer seen from above can be thin too (a roof edge, a
             # hollow middle the land shows through), but it is compact, not a long line.
             compact_white = (entry["type"] in ("town", "explorer", "city") and feats.size >= 0.022
-                             and feats.value >= 180
+                             and (feats.value >= 180 or feats.white_frac >= 0.15)
                              and closed_thickness >= 0.5 * min_thickness * np.sqrt(board_area)
                              and max(w, h) <= 0.12 * np.sqrt(board_area))
             if closed_thickness < min_thickness * np.sqrt(board_area) and not compact_white:

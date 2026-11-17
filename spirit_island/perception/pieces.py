@@ -66,6 +66,7 @@ class PieceFeatures:
     thickness: float  # inscribed radius / sqrt(board area)
     elongation: float  # long / short side of the minimum-area rectangle
     fill: float  # area / minimum-area rectangle area
+    white_frac: float = 0.0  # share of the piece that is bright and colourless (lit white plastic)
 
 
 def hue_name(hue: float) -> str:
@@ -102,6 +103,9 @@ def measure(image: np.ndarray, piece_mask: np.ndarray, board_area: float) -> Pie
         thickness=round(float(cv2.distanceTransform(mask, cv2.DIST_L2, 5).max() / root), 4),
         elongation=round(float(max(rw, rh) / max(min(rw, rh), 1.0)), 2),
         fill=round(float(area / rect_area), 3),
+        # Lit faces: colourless and clearly brighter than the piece's typical (shaded) pixel.
+        white_frac=round(float(((hsv[..., 1] < 60) & (hsv[..., 2] >= max(165.0, float(np.median(px[:, 2])) + 45)))
+                               [mask > 0].mean()), 3),
     )
 
 
@@ -125,7 +129,18 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
     # The marker is a round disc; two touching dahan make a long, textured tan blob instead.
     printed = (f.texture >= rules["energy_min_texture"] and f.size >= rules["energy_min_size"]
                and f.elongation <= 1.4)
-    if f.value <= rules["dark_max_value"] and (f.saturation < rules["blight_min_saturation"] or blue_grey):
+    if f.white_frac >= 0.15 and f.size >= 0.03 and f.elongation <= 2.0 and not (lo <= f.hue <= hi and f.saturation >= rules["tan_min_saturation"]
+                                                         and f.white_frac < 0.3):
+        # Mostly in its own shadow, but a good part of it is lit white plastic: a building
+        # or figure seen from the shaded side (dim evening light).
+        if f.size < 0.035:
+            kind = "explorer"
+        elif f.size >= 0.095:
+            kind = "city"
+        else:
+            kind = "town"
+        out = {"type": kind, "why": f"white plastic in shade ({f.white_frac:.0%} lit white), size {f.size}"}
+    elif f.value <= rules["dark_max_value"] and (f.saturation < rules["blight_min_saturation"] or blue_grey):
         # Dark and grey or blue-grey. Dark *brown* is table wood showing at a moved board's rim.
         out = {"type": "blight", "why": f"dark (value {f.value})"}
     elif warm and printed and f.value > rules["dark_max_value"]:
