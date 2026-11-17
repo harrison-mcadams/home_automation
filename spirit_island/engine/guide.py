@@ -537,10 +537,12 @@ def _growth(s):
 def _energy(s):
     st = g.spirit_stats(s, 0) if len(s["players"]) == 1 else None
     if st:
+        ask = (["First: which track did your new disc come from? Press E (energy, top) or C (card "
+                "plays, bottom). The numbers below update."] if st["unassigned"] else [])
         return {
             "title": "Gain energy",
             "single": True,
-            "do": [f"Take {st['energy_per_turn']} energy: the highest number uncovered on your energy track. "
+            "do": ask + [f"Take {st['energy_per_turn']} energy: the highest number uncovered on your energy track. "
                    f"You'll have {st['energy'] + st['energy_per_turn']} (the app adds it when you press →).",
                    f"This round you can play up to {st['card_plays']} power card"
                    f"{'s' if st['card_plays'] != 1 else ''} (your card plays track)."],
