@@ -155,6 +155,10 @@ function addDiscs(fig, img, p) {
   fig.append(layer);
 }
 function figure(p, cls) {
+  if (p.scan) {
+    return el("figure", { class: "wide scanfig" }, el("img", { src: "/api/card_scan.jpg?t=" + (p.stamp || 0), alt: "card camera" }),
+      el("figcaption", { class: p.card ? "ok" : "" }, p.caption));
+  }
   if (p.anim) return el("figure", { class: (cls || "") + " anim" }, animScene(p), el("figcaption", {}, p.caption.split(":")[0]));
   const img = el("img", { src: "/assets/" + p.src, alt: p.caption });
   const fig = el("figure", { class: (cls || "") + (p.mark ? " mark" : "") }, img, el("figcaption", {}, p.caption.split(":")[0].split(" (")[0]));
@@ -256,7 +260,13 @@ function renderNow() {
   }
   if (g.helper && g.helper.kind === "fear_cards") focus.push(el("div", { class: "focus" }, el("b", {}, g.helper.left), "fear card(s) to read and resolve"));
   $("n-focus").replaceChildren(...focus);
-  renderGallery(forItem(g.pictures, sub), s.status === "setup");
+  // While a card is being read, the TV shows what the camera sees, outlined when found.
+  const scan = S.card_scan || {};
+  const scanning = scan.active && !s.invaders.slots.explore && g.helper && g.helper.kind === "reveal";
+  renderGallery(scanning ? [{ scan: true, wide: true, stamp: scan.stamp, card: scan.card,
+    caption: scan.card ? `I see: ${label(scan.card)}. Confirm on the phone.` :
+      scan.seen ? "Hold still..." : "Hold the invader card face up under the camera" }] : forItem(g.pictures, sub),
+    s.status === "setup" || scanning);
   markCheck(c, g.helper);
   // Build the screen up as the game goes: setup shows only the step itself; the invader
   // cards, lands and camera join at the first explore, the status bar once play starts.

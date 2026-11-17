@@ -45,7 +45,8 @@ CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 def load_config():
     cfg = {"host": "0.0.0.0", "port": 5055, "data_dir": "games",
            "board_camera_url": "http://localhost:8091", "public_urls": [],
-           "board_reference": "", "board_art_dir": "assets/boards"}
+           "board_reference": "", "board_art_dir": "assets/boards",
+           "camera_snapshot_url": "http://localhost:8090/snapshot.jpg"}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             cfg.update(json.load(f))
@@ -66,6 +67,7 @@ class Store:
         self.listeners = []
         self.game = self._load()
         self.vision = None  # VisionLink, when the board camera page is linked
+        self.cards = None   # CardScanner, reads invader cards held up to the camera
 
     def _load(self):
         if os.path.exists(self.path):
@@ -111,6 +113,8 @@ class Store:
         out = snapshot(self.game)
         if self.vision is not None:
             out["vision"] = self.vision.public(self.game.state)
+        if self.cards is not None:
+            out["card_scan"] = self.cards.public()
         return out
 
     def vision_changed(self):
@@ -236,6 +240,25 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
         hosts = cfg["public_urls"] or [f"http://{lan_address()}:{port}"]
         return jsonify({"phone": [h.rstrip("/") + "/phone" for h in hosts],
                         "tv": [h.rstrip("/") + "/tv" for h in hosts]})
+
+    if cfg.get("camera_snapshot_url"):
+        from .card_reader import CardScanner
+        store.cards = CardScanner(cfg["camera_snapshot_url"], on_change=lambda: store.broadcast(store.snapshot()))
+
+    @app.post("/api/card_scan")
+    def card_scan():
+        """{"on": true} starts reading the invader card held under the camera, {"on": false} stops."""
+        if store.cards is None:
+            return jsonify({"error": "no camera for card reading"}), 404
+        (store.cards.start if (request.get_json(silent=True) or {}).get("on", True) else store.cards.stop)()
+        return jsonify(store.snapshot())
+
+    @app.get("/api/card_scan.jpg")
+    def card_scan_photo():
+        body = store.cards.jpeg if store.cards else b""
+        if not body:
+            return Response("no picture yet", status=503)
+        return Response(body, mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
 
     @app.get("/api/vision/board.jpg")
     def vision_photo():

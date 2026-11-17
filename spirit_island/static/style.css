@@ -164,3 +164,6 @@ svg.scene { display: block; width: 100%; height: auto; }
 @keyframes a-drop1 { from { opacity: 0; transform: translateY(-140px); } to { opacity: 1; transform: none; } }
 @keyframes a-fade1 { from { opacity: 0; } to { opacity: 1; } }
 @keyframes a-remove1 { 0% { opacity: 0; } 20% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(160px); } }
+
+.scan img { width: 100%; border-radius: 8px; display: block; margin-bottom: 6px; }
+.scan p.ok { color: #86dc93; font-weight: 700; font-size: 18px; }

@@ -47,6 +47,13 @@ function toast(msg, ok = false) {
   clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.add("hidden"), 3500);
 }
 
+async function postScan(on) {
+  try {
+    const r = await fetch("/api/card_scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on }) });
+    if (r.ok) render(await r.json());
+  } catch (e) { toast("Can't reach the game server"); }
+}
+
 async function act(action) {
   try {
     const r = await fetch("/api/action", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -242,6 +249,24 @@ const HELPERS = {
   reveal(h) {
     const box = el("div", { class: "helper" });
     const cur = S.state.invaders.slots.explore;
+    const scan = S.card_scan || {};
+    if (!cur && S.card_scan) {
+      // Read the card with the camera: hold it face up under the camera, then confirm.
+      if (!scan.active) {
+        box.append(el("button", { class: "primary", onclick: () => postScan(true) }, "📷 Read the card with the camera"));
+      } else {
+        const label = scan.card ? cardLabel(scan.card) : null;
+        box.append(el("div", { class: "scan" },
+          el("img", { src: "/api/card_scan.jpg?t=" + (scan.stamp || 0), alt: "what the camera sees" }),
+          el("p", { class: scan.card ? "ok" : "" }, scan.card ? `I see: ${label}` :
+            (scan.seen ? `Maybe ${cardLabel(scan.seen)}... hold still` : "Hold the card face up and flat under the camera, over the board, until the outline turns green.")),
+          scan.why && !scan.card ? el("p", { class: "why" }, scan.why) : null,
+          el("div", { class: "btngrid" },
+            scan.card ? el("button", { class: "primary", onclick: () => act({ type: "reveal_invader", card: scan.card }).then(() => postScan(false)) }, `Use ${label}`) : null,
+            el("button", { onclick: () => postScan(false) }, "Stop camera"))));
+      }
+      box.append(el("h3", {}, "...or tap it"));
+    }
     box.append(el("h3", {}, cur ? "Revealed card (tap another to fix a mis-tap)" : "Which card did you turn over?"),
       el("div", { class: "btngrid" }, h.options.concat(cur && !h.options.includes(cur) ? [cur] : []).map((c) =>
         el("button", { class: c === cur ? "sel" : "", onclick: () => act({ type: "reveal_invader", card: c }) }, cardLabel(c)))));
