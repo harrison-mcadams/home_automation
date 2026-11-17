@@ -304,6 +304,17 @@ class Store:
                 print(f"{kind} {lid}: {e}")
         self.dispatch({"type": "next", "screen": True}, "camera")
 
+    @staticmethod
+    def _taken_plausible(s, before, seen):
+        """Discs only leave the tracks to become presence on the island, at most 2 at a time:
+        a reading that doesn't fit (the panel at the photo's edge, glare) is ignored."""
+        from .engine import rules as R
+        start = sum(n for _, n in R.START_PRESENCE.get(s["players"][0]["spirit"], []))
+        on_island = sum(l.get("presence", 0) for l in s["lands"].values())
+        old = sum((before or {}).values())
+        new = sum(seen.values())
+        return new >= on_island - start and (before is None or old <= new <= old + 2)
+
     def panel_sync(self):
         """Follow the spirit panel the camera reads: track discs and energy tokens. Taking
         your energy (Gain energy) or paying for the cards in view (Play powers) with the
@@ -317,7 +328,7 @@ class Store:
         before = G.spirit_stats(s, 0)
         sp = s.get("spirits", {}).get("0", {})
         change = {}
-        if panel["taken"] != sp.get("taken"):
+        if panel["taken"] != sp.get("taken") and self._taken_plausible(s, sp.get("taken"), panel["taken"]):
             change["taken"] = panel["taken"]
         if before is None or panel["tokens"] != before["energy"]:
             change["tokens"] = panel["tokens"]
