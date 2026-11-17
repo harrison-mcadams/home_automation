@@ -311,7 +311,10 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
             return jsonify({"error": "can't see the invader board in the camera's picture"}), 422
         read = {}
         slots = store.game.state["invaders"]["slots"]
+        explore_step = store.game.state["step"] in ("setup.first_explore", "invader.explore")
         for slot, info in result["slots"].items():
+            if slot == "explore" and not explore_step:
+                continue  # the deck sits there face down between explores
             if info["kind"] == "face" and info.get("margin", 0) >= 2:
                 read[slot] = info["card"]
             elif info["kind"] == "empty" and slot != "explore":

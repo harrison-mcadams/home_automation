@@ -135,7 +135,7 @@ class VisionLink:
         self.error: str | None = "not checked yet"
         self.last_ok = 0.0
         self.board = None          # which game board the camera is pointed at (None = auto)
-        self.auto = False          # copy settled camera counts into the game automatically
+        self.auto = True           # copy settled camera presence into the game automatically
         self.stopping = threading.Event()
         self._thread = None
         self.history: list = []    # recent settled readings (board_state), newest last
