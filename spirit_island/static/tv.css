@@ -257,3 +257,9 @@ body.gallery.watch #side { display: grid; }
 .cards-seen .cs { display: flex; flex-direction: column; align-items: center; width: 9vw; }
 .cards-seen img { width: 100%; border-radius: .8vh; }
 .cards-seen span { font-size: 1.5vh; color: var(--muted); text-align: center; margin-top: .3vh; }
+
+/* camera readout (replaces the land tiles) */
+#reads { display: grid; gap: .6vh; }
+#reads .read { background: var(--panel); border: 1px solid var(--line); border-radius: 1.2vh; padding: .8vh 1vw; font-size: 2vh; }
+#reads .read b { display: block; font-size: 1.6vh; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+#reads .read.warn { border-color: var(--warn); }

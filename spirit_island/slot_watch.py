@@ -43,8 +43,11 @@ class SlotWatch:
 
     def _run(self):
         while True:
-            step = self.store.game.state.get("step")
-            if step in WATCH_STEPS:
+            st = self.store.game.state
+            step = st.get("step")
+            # Read the invader board all game long (for the screens); only the explore
+            # steps reveal a card by themselves.
+            if step in WATCH_STEPS or st.get("status") == "playing":
                 try:
                     self._once()
                 except Exception as e:  # camera hiccup: say so, try again
@@ -80,7 +83,7 @@ class SlotWatch:
                           "slots": {k: (v.get("card") if v.get("kind") == "face" else v.get("kind")) for k, v in slots.items()},
                           "explore_seen": seen}
         game = self.store.game.state
-        if seen and len(self.recent) == 2 and self.recent[0] == seen and game["invaders"]["slots"]["explore"] is None:
+        if seen and len(self.recent) == 2 and self.recent[0] == seen and game["invaders"]["slots"]["explore"] is None                 and game.get("step") in WATCH_STEPS:
             try:
                 self.store.dispatch({"type": "reveal_invader", "card": seen}, "camera")
                 return

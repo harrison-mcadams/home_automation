@@ -85,8 +85,29 @@ function renderSpiritStat() {
   box.title = st ? `+${st.energy_per_turn} energy a turn` : "";
 }
 
+// What the camera reads right now, in one place: invader board, cards, island.
+function renderReads() {
+  let box = $("reads");
+  if (!box) {
+    box = el("div", { id: "reads" });
+    $("lands").replaceWith(box);
+  }
+  const sw = S.slot_watch || {}, pw = S.power_watch || {}, v = S.vision || {};
+  const slotTxt = (k) => { const c = (sw.slots || {})[k]; return !c ? "?" : c === "empty" ? "empty" : c === "back" ? "deck (face down)" : label(c); };
+  const rows = [];
+  rows.push(el("div", { class: "read" }, el("b", {}, "Invader board"),
+    sw.found ? `Ravage ${slotTxt("ravage")} · Build ${slotTxt("build")} · Explore ${slotTxt("explore")}` : "not in view"));
+  const diffs = (v.diffs || []).length;
+  rows.push(el("div", { class: "read" + (diffs ? " warn" : "") }, el("b", {}, "Island"),
+    !v.connected ? "camera off" : v.status === "settled" || v.settled ? (diffs ? `${diffs} land${diffs > 1 ? "s" : ""} differ from the tracker` : "matches the tracker") : "settling..."));
+  if (pw.active) rows.push(el("div", { class: "read" }, el("b", {}, "Power cards in view"),
+    (pw.cards || []).length ? pw.cards.map((c) => c.name).join(", ") : "none"));
+  box.replaceChildren(...rows);
+}
+
 function renderStatus() {
   renderSpiritStat();
+  renderReads();
   const s = S.state, d = S.derived;
   const r = $("s-round").querySelector("span");
   r.textContent = s.status === "setup" ? "Setup" : s.status === "playing" ? s.round : s.status === "won" ? "Won!" : "Lost";
@@ -333,7 +354,9 @@ function renderInvaders() {
 }
 
 function renderLands() {
-  const s = S.state, box = $("lands"); box.replaceChildren();
+  const s = S.state, box = $("lands");
+  if (!box) return;  // replaced by the camera readout
+  box.replaceChildren();
   const ids = Object.keys(s.lands);
   if (!ids.length) { box.append(el("div", { class: "board-label" }, "Lands appear once players are chosen")); return; }
   const hits = hitLands();
