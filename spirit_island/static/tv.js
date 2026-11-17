@@ -95,8 +95,6 @@ function renderReads() {
   const sw = S.slot_watch || {}, pw = S.power_watch || {}, v = S.vision || {};
   const slotTxt = (k) => { const c = (sw.slots || {})[k]; return !c ? "?" : c === "empty" ? "empty" : c === "back" ? "deck (face down)" : label(c); };
   const rows = [];
-  rows.push(el("div", { class: "read" }, el("b", {}, "Invader board"),
-    sw.found ? `Ravage ${slotTxt("ravage")} · Build ${slotTxt("build")} · Explore ${slotTxt("explore")}` : "not in view"));
   const diffs = (v.diffs || []).length;
   rows.push(el("div", { class: "read" + (diffs ? " warn" : "") }, el("b", {}, "Island"),
     !v.connected ? "camera off" : v.status === "settled" || v.settled ? (diffs ? `${diffs} land${diffs > 1 ? "s" : ""} differ from the tracker` : "matches the tracker") : "settling..."));

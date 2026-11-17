@@ -56,6 +56,35 @@ def to_game_counts(board_state: dict | None, board: str, presence_colours: set |
     return out
 
 
+INVADERS = ("explorers", "towns", "cities")
+
+
+def reconcile(seen: dict, board_state: dict | None, board: str, lands: dict) -> dict:
+    """Read the camera in the light of what the tracker knows.
+
+    White plastic in dim light is the camera's weak spot: an explorer can read as a town
+    or as an unrecognised scrap. Two cases are taken as agreeing with the tracker:
+    - the land has as many invaders as tracked, just sorted into other kinds;
+    - the land is short of tracked invaders and has unrecognised pieces to make up for it.
+    Anything else (more or fewer pieces) is still reported as a difference.
+    """
+    out = {}
+    for lid, counts in seen.items():
+        counts = dict(counts)
+        tracked = lands.get(lid, {})
+        land = lid[len(board):]
+        unknown = int(((board_state or {}).get(land) or {}).get("unknown", 0))
+        have = sum(counts[p] for p in INVADERS)
+        want = sum(tracked.get(p, 0) for p in INVADERS)
+        if want and have < want and unknown:
+            have = min(want, have + unknown)
+        if want and have == want:
+            for p in INVADERS:
+                counts[p] = tracked.get(p, 0)
+        out[lid] = counts
+    return out
+
+
 def differences(seen: dict, lands: dict) -> list[dict]:
     """Lands where the camera and the tracked game disagree."""
     diffs = []
@@ -216,7 +245,8 @@ class VisionLink:
         if raw is None or board is None or raw.get("board_state") is None:
             return None
         self._learn_colours(state, raw["board_state"], board)
-        return to_game_counts(raw["board_state"], board, self.presence_colours)
+        return reconcile(to_game_counts(raw["board_state"], board, self.presence_colours),
+                         raw["board_state"], board, state.get("lands", {}))
 
     def _learn_colours(self, state: dict, board_state: dict, board: str) -> None:
         for land, kinds in (board_state or {}).items():
@@ -238,7 +268,8 @@ class VisionLink:
         board = self.camera_board(state)
         is_blind = bool(seen) and blind(seen, lands)
         with self.lock:
-            history = [to_game_counts(b, board, self.presence_colours) for b in self.history] if board else []
+            history = [reconcile(to_game_counts(b, board, self.presence_colours), b, board, state.get("lands", {}))
+                       for b in self.history] if board else []
         diffs = differences(seen, lands) if seen else []
         for d in diffs:
             streak = 0
@@ -266,7 +297,8 @@ class VisionLink:
             "pieces": list(self.pieces),
             "seen": seen,
             # the newest photo's reading, before it settles: for live feedback while placing
-            "latest": to_game_counts(raw.get("seen"), board, self.presence_colours)
+            "latest": reconcile(to_game_counts(raw.get("seen"), board, self.presence_colours),
+                                raw.get("seen"), board, lands)
             if board and raw.get("status") == "ok" else None,
             "presence_colours": sorted(self.presence_colours),
             "blind": is_blind,
