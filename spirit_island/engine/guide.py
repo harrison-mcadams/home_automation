@@ -543,7 +543,9 @@ def _energy(s):
             "title": "Gain energy",
             "single": True,
             "do": ask + [f"Take {st['energy_per_turn']} energy: the highest number uncovered on your energy track. "
-                   f"You'll have {st['energy'] + st['energy_per_turn']} (the app adds it when you press →).",
+                   + (f"Put the tokens on your panel's picture ({st['energy']} → {st['energy'] + st['energy_per_turn']}): "
+                      "the game moves on when the camera sees them." if s.get("energy_from_camera") else
+                      f"You'll have {st['energy'] + st['energy_per_turn']} (the app adds it when you press →)."),
                    f"This round you can play up to {st['card_plays']} power card"
                    f"{'s' if st['card_plays'] != 1 else ''} (your card plays track)."],
             "why": "Energy pays for power cards.",

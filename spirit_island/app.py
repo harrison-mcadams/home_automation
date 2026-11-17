@@ -107,7 +107,7 @@ class Store:
         # leaving the step, not when Next walks through its numbered items).
         if action.get("type") == "next" and self.game.state["step"] == "spirit.powers"                 and (action.get("screen") or self.game.state.get("sub", 0) >= self.game._items() - 1)                 and getattr(self, "power_watch", None) is not None:
             cost = self.power_watch.public().get("cost") or 0
-            if cost:
+            if cost and not self.game.state.get("energy_from_camera"):
                 try:
                     with self.lock:
                         self.game.dispatch({"type": "energy", "delta": -cost}, source="camera")
@@ -174,6 +174,35 @@ class Store:
         except ActionError as e:
             print(f"card resolve failed: {e}")
         self.broadcast(self.snapshot())
+
+    def panel_sync(self):
+        """Follow the spirit panel the camera reads: track discs and energy tokens. Taking
+        your energy (Gain energy) or paying for the cards in view (Play powers) with the
+        tokens moves the game on."""
+        pw = self.power_watch.public() if getattr(self, "power_watch", None) else {}
+        panel = pw.get("panel")
+        s = self.game.state
+        if not panel or s["status"] != "playing" or len(s["players"]) != 1:
+            return
+        from .engine import game as G
+        before = G.spirit_stats(s, 0)
+        sp = s.get("spirits", {}).get("0", {})
+        change = {}
+        if panel["taken"] != sp.get("taken"):
+            change["taken"] = panel["taken"]
+        if before is None or panel["tokens"] != before["energy"]:
+            change["tokens"] = panel["tokens"]
+        if change:
+            self.dispatch({"type": "panel_seen", **change}, "camera")
+        start = s.get("energy_at_step")
+        now = panel["tokens"]
+        if start is None:
+            return
+        st = G.spirit_stats(s, 0)
+        if s["step"] == "spirit.energy" and st and now == start + st["energy_per_turn"]:
+            self.dispatch({"type": "next", "screen": True}, "camera")
+        elif s["step"] == "spirit.powers" and pw.get("cost") and now == start - pw["cost"]:
+            self.dispatch({"type": "next", "screen": True}, "camera")
 
     def card_focus(self):
         """The power cards in view during Play powers / Fast / Slow, with their choices."""
@@ -286,7 +315,14 @@ def card_guide(state, focus, base):
         # (The card picture sits under the list; the side keeps the drawn board, with the
         # choices lit in the same colours.)
     if step == "spirit.powers":
-        do.append("Press → to pay and move on.")
+        cost = sum(c["cost"] or 0 for c in focus)
+        have = (state.get("spirits", {}).get("0", {}) or {}).get("energy", 0)
+        if state.get("energy_from_camera") and cost:
+            do.append({"text": f"Pay: take {cost} energy token{'s' if cost > 1 else ''} off your panel "
+                               f"({have} → {have - cost}). The game moves on when the camera sees it.",
+                       "colour": "#ffd968"})
+        else:
+            do.append("Press → to pay and move on.")
     elif any(c["now"] and not c["resolved"] for c in focus):
         do.append("Do it at the table. The camera spots the change and moves on, or press the option's number.")
     return {**base, "title": " + ".join(c["name"] for c in focus), "do": do, "pictures": pics, "single": True,

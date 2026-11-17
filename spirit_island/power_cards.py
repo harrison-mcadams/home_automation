@@ -115,18 +115,31 @@ class PowerWatch:
         with urllib.request.urlopen(self.url, timeout=6) as r:
             frame = cv2.imdecode(np.frombuffer(r.read(), np.uint8), cv2.IMREAD_COLOR)
         names = sorted(f["name"] for f in self.reader.read(frame))
+        # The spirit panel: discs gone from the tracks, energy tokens on it. Kept when two
+        # photos in a row agree.
+        panel = None
+        if spirit in rules.PRESENCE_TRACKS:
+            from .panel_reader import PanelReader
+            if getattr(self, "panel_reader", None) is None or self.panel_reader.spirit != spirit:
+                self.panel_reader = PanelReader(spirit)
+            p = self.panel_reader.read(frame)
+            self.panel_recent = (getattr(self, "panel_recent", []) + [p])[-2:]
+            if p and len(self.panel_recent) == 2 and self.panel_recent[0] == p:
+                panel = p
         # Keep what two photos in a row agree on, so a card being moved doesn't flicker.
         self.recent = (self.recent + [names])[-2:]
         steady = sorted(set(self.recent[0]) & set(self.recent[-1])) if len(self.recent) == 2 else names
         cards = [{"name": n, "cost": rules.POWER_INFO.get(n, (None, None))[0],
                   "speed": rules.POWER_INFO.get(n, (None, None))[1]} for n in steady]
-        changed = cards != self.state.get("cards")
+        changed = cards != self.state.get("cards") or (panel and panel != self.state.get("panel"))
         with self.lock:
             self.state = {"active": True, "cards": cards, "stamp": time.time(),
-                          "cost": sum(c["cost"] or 0 for c in cards)}
+                          "cost": sum(c["cost"] or 0 for c in cards),
+                          "panel": panel or self.state.get("panel")}
         if changed:
-            try:
-                self.store.growth_from_presence()
-            except Exception as e:
-                print(f"growth suggestion failed: {e}")
+            for hook in (self.store.panel_sync, self.store.growth_from_presence):
+                try:
+                    hook()
+                except Exception as e:
+                    print(f"{hook.__name__} failed: {e}")
             self.store.broadcast(self.store.snapshot())

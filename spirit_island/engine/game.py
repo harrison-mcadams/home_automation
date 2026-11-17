@@ -381,7 +381,7 @@ class Game:
             return QUIET
         s["sub"] = 0
         step = s["step"]
-        if step == "spirit.energy":
+        if step == "spirit.energy" and not s.get("energy_from_camera"):
             for i, p in enumerate(s["players"]):
                 st = spirit_stats(s, i)
                 if st:
@@ -440,6 +440,8 @@ class Game:
                 self._end("lost", "The invader deck ran out: time is up and the invaders hold the island.")
                 return "Invader deck empty at Explore"
             s["step"] = nxt
+            if nxt in ("spirit.energy", "spirit.powers"):
+                s["energy_at_step"] = s.get("spirits", {}).get("0", {}).get("energy", 0)
             return f"Next: {nxt}"
 
     def _advance_cards(self):
@@ -500,6 +502,18 @@ class Game:
         t = self._spirit(i)["taken"]
         t[track] = max(0, t[track] + int(action.get("delta", 1)))
         return f"Presence taken from the {track} track"
+
+    def _do_panel_seen(self, action):
+        """The camera's reading of the spirit panel: discs gone from each track, and energy
+        tokens on it. From then on energy follows the tokens on the table."""
+        s = self.state
+        sp = self._spirit(int(action.get("player", 0)))
+        if "taken" in action:
+            sp["taken"] = {"energy": int(action["taken"]["energy"]), "cards": int(action["taken"]["cards"])}
+        if "tokens" in action:
+            sp["energy"] = int(action["tokens"])
+            s["energy_from_camera"] = True
+        return QUIET
 
     def _do_energy(self, action):
         """Adjust a spirit's energy (gain, pay, or a correction)."""
