@@ -73,8 +73,17 @@ def classify(pixels_bgr: np.ndarray, share: float) -> tuple[str, str]:
 
 
 class ChangeTracker:
-    def __init__(self, boards_dir: str | Path):
+    def __init__(self, boards_dir: str | Path, namer="auto"):
         self.boards_dir = Path(boards_dir)
+        # The recogniser trained on Harrison's own pieces (piece_pixels), when there is one.
+        if namer == "auto":
+            try:
+                from .piece_pixels import PixelPieces
+                namer = PixelPieces()
+            except Exception as e:  # no trained model: fall back to colour rules
+                print(f"change tracker: no trained piece model ({e}); using colour rules")
+                namer = None
+        self.namer = namer
         self.boards: dict = {}
         self.letter = None
         self.baseline = None      # lined-up picture of the board when it was last still
@@ -126,6 +135,33 @@ class ChangeTracker:
             out.append((lab == i, share, (diff > 16) & (lab == i)))
         return out, large
 
+    def _name_pixels(self, b: Board, frame: np.ndarray) -> np.ndarray:
+        from .piece_pixels import name_pixels
+        return name_pixels(self.namer.pix, b, frame)
+
+    def _name(self, b: Board, frame, names, mask, has):
+        """(piece, why) from the trained recogniser, for the piece inside this patch."""
+        from .piece_pixels import COLOURS, WHITE, white_features
+        inside = names[mask & has] if (mask & has).any() else names[mask]
+        counts = np.bincount(inside, minlength=len(COLOURS))[1:]
+        if counts.sum() < 30:
+            return None
+        colour = COLOURS[1 + int(counts.argmax())]
+        share = counts.max() / max(1, counts.sum())
+        if colour != "white":
+            return colour, f"trained: {colour} ({share:.0%} of the piece's pixels)"
+        # The piece's white, tidied the way the recogniser was trained (its biggest blob).
+        from .piece_pixels import white_blobs
+        grow = cv2.dilate(mask.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
+        blobs = white_blobs(b, grow & (names == 1))
+        if not blobs:
+            return None
+        white, (x, y, w, h) = max(blobs, key=lambda t: t[0].sum())
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        p = self.namer.white.predict_proba([white_features(b, white, gray, (x, y, w, h))])[0]
+        kind = WHITE[int(p.argmax())]
+        return kind, f"trained: white plastic, shaped like a {kind[:-1] if kind != 'cities' else 'city'} ({p.max():.0%})"
+
     def update(self, image: np.ndarray, letter: str) -> list:
         """Feed one photo; returns the events since the last still board (usually none)."""
         b = self.board(letter)
@@ -157,6 +193,7 @@ class ChangeTracker:
             return []
         events = []
         stuff_old, stuff_new = self._stuff(b, self.baseline), self._stuff(b, now)
+        named = {}  # pixel names per photo, worked out only when needed
         for mask, _, changed in patches:
             vals = b.labels[mask]
             vals = vals[vals > 0]
@@ -177,6 +214,13 @@ class ChangeTracker:
             if len(px) < 20:
                 px = frame[mask]
             piece, why = classify(px, abs(net))
+            if self.namer is not None:
+                key = "now" if delta > 0 else "base"
+                if key not in named:
+                    named[key] = self._name_pixels(b, frame)
+                got = self._name(b, frame, named[key], mask, has)
+                if got:
+                    piece, why = got
             events.append({"land": land, "piece": piece, "delta": delta, "share": round(abs(net), 4), "why": why})
         self.baseline, self.base_corners = now, corners
         self.status = "watching"
