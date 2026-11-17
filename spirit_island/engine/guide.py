@@ -6,7 +6,7 @@ wins (that is also how the real game works).
 """
 
 from . import game as g
-from . import rules
+from . import innate, rules
 
 
 def _lands_for(state, card):
@@ -562,7 +562,7 @@ def _energy(s):
     }
 
 
-def _powers(s):
+def _powers_base(s):
     st = g.spirit_stats(s, 0) if len(s["players"]) == 1 else None
     extra = [f"You have {st['energy']} energy and can play up to {st['card_plays']} card"
              f"{'s' if st['card_plays'] != 1 else ''}. When you press →, the cost of the cards the camera "
@@ -583,7 +583,12 @@ def _powers(s):
     }
 
 
-def _fast(s):
+
+def _powers(s):
+    g = _powers_base(s)
+    return {**g, "do": list(g["do"]) + innate.lines(s, [c["name"] for c in s.get("played", [])])}
+
+def _fast_base(s):
     return {
         "title": "Fast powers",
         "do": [
@@ -597,6 +602,11 @@ def _fast(s):
         "tips": _invader_threat_tips(s),
     }
 
+
+
+def _fast(s):
+    g = _fast_base(s)
+    return {**g, "do": list(g["do"]) + innate.lines(s, [c["name"] for c in s.get("played", [])])}
 
 def _invader_threat_tips(s):
     slots = s["invaders"]["slots"]
@@ -763,7 +773,7 @@ def _advance(s):
     }
 
 
-def _slow(s):
+def _slow_base(s):
     return {
         "title": "Slow powers",
         "do": ["Resolve every slow power card and slow innate power, in any order.",
@@ -772,6 +782,11 @@ def _slow(s):
         "tips": [_victory_text(g.terror_level(s))],
     }
 
+
+
+def _slow(s):
+    g = _slow_base(s)
+    return {**g, "do": list(g["do"]) + innate.lines(s, [c["name"] for c in s.get("played", [])])}
 
 def _time_passes(s):
     return {

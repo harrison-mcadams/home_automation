@@ -386,6 +386,11 @@ class Store:
         if s["step"] not in ("fast", "slow"):
             return
         now = [c for c in self.card_focus() if c["now"]]
+        # An innate power switched on for this step is done at the table too: leave it to Next.
+        from .engine import innate
+        inn = innate.status(s, [c["name"] for c in self.card_focus()])
+        if inn and inn["active"] and inn["speed"] == s["step"] and inn["name"] not in s.get("resolved", {}):
+            return
         if now and all(c["name"] in s.get("resolved", {}) for c in now):
             self.dispatch({"type": "next"}, "camera")
 
@@ -461,6 +466,8 @@ def card_guide(state, focus, base):
             do.append("Press → to pay and move on.")
     elif any(c["now"] and not c["resolved"] for c in focus):
         do.append("Do it at the table. The camera spots the change and moves on, or press the option's number.")
+    from .engine import innate
+    do += innate.lines(state, [c["name"] for c in focus])
     return {**base, "title": " + ".join(c["name"] for c in focus), "do": do, "pictures": pics, "single": True,
             "helper": {"kind": "card_options", "cards": focus}, "why": "", "tips": []}
 
