@@ -100,6 +100,15 @@ class Store:
             return {}
 
     def dispatch(self, action, source):
+        # Leaving Play powers: pay for the cards the camera sees played.
+        if action.get("type") == "next" and self.game.state["step"] == "spirit.powers"                 and getattr(self, "power_watch", None) is not None:
+            cost = self.power_watch.public().get("cost") or 0
+            if cost:
+                try:
+                    with self.lock:
+                        self.game.dispatch({"type": "energy", "delta": -cost}, source="camera")
+                except ActionError:
+                    pass
         with self.lock:
             if action.get("type") == "configure":
                 # Hand-tagged terrains only fill gaps: the printed boards' own terrains win
@@ -202,6 +211,7 @@ def snapshot(game):
         "guide": describe(s),
         "can_undo": bool(game.history),
         "derived": {
+            "spirits": [g.spirit_stats(s, i) for i in range(len(s["players"]))],
             "terror_level": g.terror_level(s),
             "fear_cards_left": g.fear_cards_left(s),
             "invader_cards_left": g.invader_cards_left(s),

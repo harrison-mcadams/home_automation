@@ -89,6 +89,14 @@ PRESENCE_TRACKS = {
     "Vital Strength of the Earth": {"x0": 703, "dx": 117.4, "energy_y": 321, "energy": 6, "cards_y": 489, "cards": 6},
 }
 
+# Numbers printed on the presence tracks, left to right (the first is uncovered at the start).
+# A space without a number keeps the one before it (River's "Reclaim One").
+TRACK_VALUES = {
+    "River Surges in Sunlight": {"energy": [1, 2, 2, 3, 4, 4, 5], "cards": [1, 2, 2, 3, 3, 4, 5]},
+}
+# Energy a growth option gives right away.
+GROWTH_ENERGY = {"River Surges in Sunlight": {1: 1}}
+
 # Starting presence from each panel's back: (terrain, discs) in the highest-numbered land
 # of that terrain on the player's board.
 START_PRESENCE = {

@@ -111,6 +111,21 @@ def invader_cards_left(state):
     return len(inv["deck_stages"]) - len(inv["drawn"])
 
 
+def spirit_stats(state, i):
+    """Energy per turn and card plays from the discs taken off each track, or None."""
+    p = state["players"][i] if i < len(state["players"]) else None
+    vals = rules.TRACK_VALUES.get(p["spirit"]) if p else None
+    if not vals:
+        return None
+    sp = state.get("spirits", {}).get(str(i), {"taken": {"energy": 0, "cards": 0}, "energy": 0})
+    te, tc = sp["taken"]["energy"], sp["taken"]["cards"]
+    start = sum(n for _, n in rules.START_PRESENCE.get(p["spirit"], []))
+    on_island = sum(l["presence"] for l in state["lands"].values())
+    return {"energy_per_turn": vals["energy"][min(te, len(vals["energy"]) - 1)],
+            "card_plays": vals["cards"][min(tc, len(vals["cards"]) - 1)],
+            "energy": sp["energy"], "unassigned": max(0, on_island - start - te - tc) if len(state["players"]) == 1 else 0}
+
+
 def next_invader_stage(state):
     inv = state["invaders"]
     i = len(inv["drawn"])
@@ -366,6 +381,11 @@ class Game:
             return QUIET
         s["sub"] = 0
         step = s["step"]
+        if step == "spirit.energy":
+            for i, p in enumerate(s["players"]):
+                st = spirit_stats(s, i)
+                if st:
+                    self._spirit(i)["energy"] += st["energy_per_turn"]
         if step == "spirit.growth":
             # Next confirms the camera's suggestion when nothing was picked by hand.
             for i, n in list(s.get("growth_suggest", {}).items()):
@@ -373,6 +393,10 @@ class Game:
                     self._do_growth_choice({"player": int(i), "option": n})
             s["growth_suggest"] = {}
             s["growth_done"] = dict(s.get("growth_choice", {}))
+            for i, n in s["growth_done"].items():
+                bonus = rules.GROWTH_ENERGY.get(s["players"][int(i)]["spirit"], {}).get(n, 0)
+                if bonus:
+                    self._spirit(int(i))["energy"] += bonus
             s["growth_choice"] = {}
         if step == "time_passes" or step == "setup.first_explore":
             # Entering Growth next: note the presence on the island, to tell the option later.
@@ -460,6 +484,26 @@ class Game:
             choices.pop(str(i), None)
         s.setdefault("growth_suggest", {}).pop(str(i), None)
         return f"{s['players'][i]['name']} chose growth option {n}" if n else "Growth choice cleared"
+
+    def _spirit(self, i):
+        sp = self.state.setdefault("spirits", {})
+        return sp.setdefault(str(i), {"taken": {"energy": 0, "cards": 0}, "energy": 0})
+
+    def _do_take_presence(self, action):
+        """A presence disc left a track (E/C after placing it); delta -1 undoes."""
+        i = int(action.get("player", 0))
+        track = action.get("track")
+        if track not in ("energy", "cards"):
+            raise ActionError("track must be energy or cards")
+        t = self._spirit(i)["taken"]
+        t[track] = max(0, t[track] + int(action.get("delta", 1)))
+        return f"Presence taken from the {track} track"
+
+    def _do_energy(self, action):
+        """Adjust a spirit's energy (gain, pay, or a correction)."""
+        sp = self._spirit(int(action.get("player", 0)))
+        sp["energy"] = max(0, sp["energy"] + int(action.get("delta", 0)))
+        return f"Energy {'+' if int(action.get('delta', 0)) >= 0 else ''}{int(action.get('delta', 0))} (now {sp['energy']})"
 
     def _do_growth_base(self, action):
         """How many presence were on the island when Growth began (to count new discs)."""

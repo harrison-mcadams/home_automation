@@ -488,6 +488,10 @@ def _growth(s):
             if card and n in GROWTH_GAINS_CARD.get(p["spirit"], set()):
                 pics.append({"src": f"powers/{rules.picture_slug(card[0])}.jpg", "items": [n],
                              "caption": f"You'd take: {card[0]}"})
+        st = g.spirit_stats(s, 0)
+        track_q = ([f"Which track did your new disc{'s' if st['unassigned'] > 1 else ''} come from? "
+                    "Press E (energy, top) or C (card plays, bottom)" + (f", {st['unassigned']} to go." if st['unassigned'] > 1 else ".")]
+                   if st and st["unassigned"] else [])
         if chosen or suggested:
             # Picked with a key, or suggested by the camera: show just that option, big.
             # A suggestion is only taken when you press → (or a number key).
@@ -499,7 +503,7 @@ def _growth(s):
                 "do": ([f"Chosen: option {n}, {title}. " + text.format(nextcard=nxt),
                         "Press 1, 2 or 3 to change it, or → for Gain energy."] if chosen else
                        [f"The camera thinks you took option {n}, {title}: " + text.format(nextcard=nxt),
-                        f"Right? Press → to confirm it and go on to Gain energy. Otherwise press 1, 2 or 3."]),
+                        f"Right? Press → to confirm it and go on to Gain energy. Otherwise press 1, 2 or 3."]) + track_q,
                 "pictures": [dict(pp, items=[0]) for pp in pics if pp.get("items") == [n]],
                 "why": "Worked out from your new presence discs." if not chosen else "",
                 "helper": {"kind": "growth", "options": len(GROWTH[p["spirit"]]), "chosen": chosen},
@@ -531,6 +535,18 @@ def _growth(s):
 
 
 def _energy(s):
+    st = g.spirit_stats(s, 0) if len(s["players"]) == 1 else None
+    if st:
+        return {
+            "title": "Gain energy",
+            "single": True,
+            "do": [f"Take {st['energy_per_turn']} energy: the highest number uncovered on your energy track. "
+                   f"You'll have {st['energy'] + st['energy_per_turn']} (the app adds it when you press →).",
+                   f"This round you can play up to {st['card_plays']} power card"
+                   f"{'s' if st['card_plays'] != 1 else ''} (your card plays track)."],
+            "why": "Energy pays for power cards.",
+            "tips": [],
+        }
     return {
         "title": "Gain energy",
         "do": [
@@ -543,9 +559,13 @@ def _energy(s):
 
 
 def _powers(s):
+    st = g.spirit_stats(s, 0) if len(s["players"]) == 1 else None
+    extra = [f"You have {st['energy']} energy and can play up to {st['card_plays']} card"
+             f"{'s' if st['card_plays'] != 1 else ''}. When you press →, the cost of the cards the camera "
+             "sees played is paid from your energy."] if st else []
     return {
         "title": "Choose and pay for powers",
-        "do": [
+        "do": extra + [
             "Each spirit plays power cards from hand face up in front of them, up to the number "
             "visible on their card-plays track. Lay them in the camera's view, off the island: "
             "the screen lists them with their total cost.",

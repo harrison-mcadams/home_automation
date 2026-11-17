@@ -73,7 +73,20 @@ function hitLands() {
 }
 
 // ---------- pieces ----------
+function renderSpiritStat() {
+  const st = (S.derived.spirits || [])[0];
+  let box = $("s-spirit");
+  if (!box) {
+    box = el("div", { class: "stat", id: "s-spirit" }, el("b", {}, "Energy · card plays"), el("span", {}, "-"));
+    $("status").append(box);
+    $("status").style.gridTemplateColumns = "1fr 1.1fr 2fr 2fr 1.2fr 1.4fr";
+  }
+  box.querySelector("span").textContent = st ? `⚡${st.energy} · ${st.card_plays} card${st.card_plays !== 1 ? "s" : ""}` : "-";
+  box.title = st ? `+${st.energy_per_turn} energy a turn` : "";
+}
+
 function renderStatus() {
+  renderSpiritStat();
   const s = S.state, d = S.derived;
   const r = $("s-round").querySelector("span");
   r.textContent = s.status === "setup" ? "Setup" : s.status === "playing" ? s.round : s.status === "won" ? "Won!" : "Lost";
@@ -419,7 +432,10 @@ async function act(action, msg) {
 document.addEventListener("keydown", (e) => {
   if (!S) return;
   const k = e.key;
+  if ((k === "e" || k === "E") && S.state.status === "playing") { e.preventDefault(); act({ type: "take_presence", track: "energy" }, "Disc from the energy track"); return; }
   if (/^[1-3]$/.test(k) && S.state.step === "spirit.growth") { e.preventDefault(); act({ type: "growth_choice", option: +k }, "Growth option " + k); return; }
+  const st0 = (S.derived.spirits || [])[0];
+  if ((k === "c" || k === "C") && st0 && st0.unassigned) { e.preventDefault(); act({ type: "take_presence", track: "cards" }, "Disc from the card plays track"); return; }
   if (k === "c" || k === "C") { e.preventDefault(); act({ type: "toggle_camera_view" }); return; }
   if (k === "r" || k === "R") { e.preventDefault(); act({ type: "turn_board" }, "Board turned"); return; }
   if (k === "ArrowRight" || k === "Enter" || k === " " || k === "MediaTrackNext") { e.preventDefault(); act({ type: "next" }, "Next step"); }

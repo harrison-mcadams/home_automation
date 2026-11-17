@@ -161,6 +161,10 @@ function landRow(lid, what, button) {
 const HELPERS = {
   growth(h) {
     const box = el("div", { class: "helper" }, el("h3", {}, "Which growth option?"));
+    const st = (S.derived.spirits || [])[0];
+    if (st && st.unassigned) box.append(el("p", {}, "New disc came from which track?"), el("div", { class: "btngrid" },
+      el("button", { onclick: () => act({ type: "take_presence", track: "energy" }) }, "Energy (top)"),
+      el("button", { onclick: () => act({ type: "take_presence", track: "cards" }) }, "Card plays (bottom)")));
     box.append(el("div", { class: "btngrid" }, [...Array(h.options || 0)].map((_, i) =>
       el("button", { class: h.chosen === i + 1 ? "sel" : "", onclick: () => act({ type: "growth_choice", option: i + 1 }) }, `Option ${i + 1}`))));
     return box;
