@@ -30,7 +30,7 @@ KIND_TO_PIECE = {
 TRACKED = ("explorers", "towns", "cities", "dahan", "blight", "presence")
 
 
-def to_game_counts(board_state: dict | None, board: str) -> dict:
+def to_game_counts(board_state: dict | None, board: str, presence_colours: set | None = None) -> dict:
     """{"2": {"city": 1, "presence (yellow)": 1}} -> {"C2": {"cities": 1, "presence": 1, ...}}.
 
     Pieces in the ocean or with no land are left out. Every land the camera covers
@@ -43,6 +43,14 @@ def to_game_counts(board_state: dict | None, board: str) -> dict:
             continue
         for kind, n in kinds.items():
             piece = KIND_TO_PIECE.get(kind.split(" (")[0])
+            if piece == "presence" and presence_colours and "(" in kind:
+                colour = kind.split("(")[1].rstrip(")")
+                if colour not in presence_colours:
+                    # Not a colour anyone at the table plays: a tan dahan in warm light
+                    # reads orange; anything else is left out.
+                    piece = "dahan" if colour in ("orange", "yellow") and "yellow" not in presence_colours                         and "orange" not in presence_colours else None
+                    if piece is None:
+                        continue
             if piece:
                 out[lid][piece] += int(n)
     return out
@@ -131,6 +139,10 @@ class VisionLink:
         self.stopping = threading.Event()
         self._thread = None
         self.history: list = []    # recent settled readings (board_state), newest last
+        # Presence disc colours in play, learned where the game says presence is and the
+        # camera sees one disc colour (e.g. River's starting land): other "presence" colours
+        # are then misreads.
+        self.presence_colours: set = set()
 
     @property
     def map(self):
@@ -203,7 +215,17 @@ class VisionLink:
             raw = self.raw
         if raw is None or board is None or raw.get("board_state") is None:
             return None
-        return to_game_counts(raw["board_state"], board)
+        self._learn_colours(state, raw["board_state"], board)
+        return to_game_counts(raw["board_state"], board, self.presence_colours)
+
+    def _learn_colours(self, state: dict, board_state: dict, board: str) -> None:
+        for land, kinds in (board_state or {}).items():
+            tracked = state.get("lands", {}).get(f"{board}{land}", {})
+            if not tracked.get("presence"):
+                continue
+            colours = {k.split("(")[1].rstrip(")") for k in kinds if k.startswith("presence (")}
+            if len(colours) == 1:
+                self.presence_colours |= colours
 
     def public(self, state: dict) -> dict:
         with self.lock:
@@ -216,7 +238,7 @@ class VisionLink:
         board = self.camera_board(state)
         is_blind = bool(seen) and blind(seen, lands)
         with self.lock:
-            history = [to_game_counts(b, board) for b in self.history] if board else []
+            history = [to_game_counts(b, board, self.presence_colours) for b in self.history] if board else []
         diffs = differences(seen, lands) if seen else []
         for d in diffs:
             streak = 0
@@ -244,7 +266,9 @@ class VisionLink:
             "pieces": list(self.pieces),
             "seen": seen,
             # the newest photo's reading, before it settles: for live feedback while placing
-            "latest": to_game_counts(raw.get("seen"), board) if board and raw.get("status") == "ok" else None,
+            "latest": to_game_counts(raw.get("seen"), board, self.presence_colours)
+            if board and raw.get("status") == "ok" else None,
+            "presence_colours": sorted(self.presence_colours),
             "blind": is_blind,
             "diffs": diffs,
         }
