@@ -138,6 +138,20 @@ class Store:
             out["power_watch"] = pw = self.power_watch.public()
             # Where the cards in view could be used, for the drawn board.
             focus = self.card_focus()
+            step = self.game.state["step"]
+            if step in ("fast", "slow"):
+                # Only the cards that act now; the others just get a mention.
+                later = [c for c in focus if c["speed"] != step]
+                focus = [c for c in focus if c["speed"] == step]
+                if not focus:
+                    other = "slow" if step == "fast" else "fast"
+                    names = ", ".join(c["name"] for c in later)
+                    out["guide"] = {**out["guide"], "single": True, "pictures": [], "helper": None, "tips": [], "why": "",
+                                    "title": f"No {step} powers this round",
+                                    "do": [f"You played no {step} cards, so nothing happens now. Press → to go on."]
+                                    + ([f"{names} {'is' if len(later) == 1 else 'are'} {other}: "
+                                        + ("it acts after the invaders, in Slow powers." if other == "slow"
+                                           else "it already acted, in Fast powers.")] if later else [])}
             if focus:
                 out["card_focus"] = focus
                 out["targets"] = {c["name"]: {o["land"]: o["text"] for o in c["options"]} for c in focus}
