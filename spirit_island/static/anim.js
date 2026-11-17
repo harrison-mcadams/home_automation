@@ -22,7 +22,7 @@ function dropIn(node, delay, kind = "drop") {
 
 function animScene(p) {
   const svg = svgEl("svg", { viewBox: "0 0 1600 900", class: "scene", preserveAspectRatio: "xMidYMid meet" });
-  const scenes = { pool: poolScene, stack: stackScene, blight: blightScene, board: boardScene, photo: photoScene, setup: setupScene };
+  const scenes = { pool: poolScene, stack: stackScene, blight: blightScene, board: boardScene, photo: photoScene, setup: setupScene, advance: advanceScene };
   (scenes[p.anim] || (() => {}))(svg, p);
   return svg;
 }
@@ -269,4 +269,50 @@ function fearRows([top, mid, bot]) {
 
 function invaderRows() {
   return [["stage1_back", 3, "Stage I: 3 cards"], ["stage2_back", 4, "Stage II: 4 cards"], ["stage3_back", 5, "Stage III: 5 cards"]];
+}
+
+// Advance invader cards: the four spaces in a row, and every card sliding one space left
+// (Ravage to the discard pile, Build to Ravage, Explore to Build). {slots: {ravage, build, explore}}
+function invaderCardSrc(c) {
+  if (!c) return null;
+  if (c.length === 2) {
+    const both = ["JM", "JS", "JW", "SM", "WM", "WS"].find((k) => k.includes(c[0]) && k.includes(c[1]));
+    return `/assets/components/invader/3_${both || c}.jpg`;
+  }
+  return `/assets/components/invader/${c === "C" ? "2" : "1"}_${c}.jpg`;
+}
+
+function advanceScene(svg, p) {
+  const slots = p.slots || {};
+  const names = ["discard", "ravage", "build", "explore"];
+  const labels = { discard: "DISCARD", ravage: "RAVAGE", build: "BUILD", explore: "EXPLORE" };
+  const W = 1600, boxW = 300, boxH = 450, gap = 70, y = 250;
+  const x0 = (W - (4 * boxW + 3 * gap)) / 2;
+  const xs = names.map((_, i) => x0 + i * (boxW + gap));
+  names.forEach((n, i) => {
+    svg.append(svgEl("rect", { x: xs[i], y, width: boxW, height: boxH, rx: 22, fill: "rgba(255,255,255,.04)",
+      stroke: n === "discard" ? "#6b7a70" : "#86dc93", "stroke-width": 5, "stroke-dasharray": n === "discard" ? "16 12" : "none" }));
+    svg.append(svgEl("text", { x: xs[i] + boxW / 2, y: y - 30, "text-anchor": "middle", "font-size": 46, "font-weight": 700,
+      fill: n === "discard" ? "#a3b3a5" : "#f1f5ee" }, labels[n]));
+  });
+  // Arrows between the spaces, pointing left.
+  for (let i = 1; i < 4; i++) {
+    const ax = xs[i] - gap / 2;
+    svg.append(svgEl("path", { d: `M ${ax + 22} ${y + boxH + 70} L ${ax - 22} ${y + boxH + 70} M ${ax - 8} ${y + boxH + 56} L ${ax - 22} ${y + boxH + 70} L ${ax - 8} ${y + boxH + 84}`,
+      stroke: "#ffd23a", "stroke-width": 7, fill: "none", "stroke-linecap": "round" }));
+  }
+  const cw = 240, ch = cw * 600 / 394;
+  names.slice(1).forEach((n, i) => {
+    const src = invaderCardSrc(slots[n]);
+    if (!src) return;
+    const from = xs[i + 1] + (boxW - cw) / 2, to = xs[i] + (boxW - cw) / 2, cy = y + (boxH - ch) / 2;
+    // Hold, slide one space left, hold; repeat every 5 seconds (a card going to the
+    // discard pile fades as it lands).
+    const card = svgEl("g", { class: n === "ravage" ? "a-advance out" : "a-advance" },
+      svgEl("rect", { x: 8, y: 10, width: cw, height: ch, rx: 14, fill: "#000", opacity: 0.35 }),
+      svgEl("image", { href: src, x: 0, y: 0, width: cw, height: ch, preserveAspectRatio: "xMidYMid slice" }));
+    card.style.setProperty("--dx", (to - from) + "px");
+    const g = svgEl("g", { transform: `translate(${from} ${cy})` }, card);
+    svg.append(g);
+  });
 }

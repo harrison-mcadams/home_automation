@@ -171,3 +171,9 @@ svg.scene { display: block; width: 100%; height: auto; }
 .readslots { font-size: 18px; padding: 0 8px; cursor: pointer; }
 
 #g-do li.opt { list-style: none; margin-left: -22px; border-left: 6px solid var(--opt); padding-left: 8px; color: var(--opt); font-weight: 700; }
+
+/* advance invader cards: hold, slide one space left, hold */
+.a-advance { animation: a-advance 5s ease-in-out infinite; }
+.a-advance.out { animation-name: a-advance-out; }
+@keyframes a-advance { 0%, 30% { transform: translateX(0); } 60%, 100% { transform: translateX(var(--dx)); } }
+@keyframes a-advance-out { 0%, 30% { transform: translateX(0); opacity: 1; } 60%, 100% { transform: translateX(var(--dx)); opacity: .45; } }

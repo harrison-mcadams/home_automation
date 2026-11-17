@@ -746,8 +746,12 @@ def _explore(s):
 
 
 def _advance(s):
+    slots = s["invaders"]["slots"]
     return {
         "title": "Advance invader cards",
+        "pictures": [{"anim": "advance", "wide": True, "items": [0],
+                      "slots": {k: slots.get(k) for k in ("ravage", "build", "explore")},
+                      "caption": "Each card slides one space left"}],
         "do": [
             "Slide the invader cards one space left: Ravage card to the discard pile, Build card to "
             "Ravage, Explore card to Build.",

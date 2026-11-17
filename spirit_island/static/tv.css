@@ -269,3 +269,9 @@ body.gallery.watch #side { display: grid; }
 #n-do li.opt { list-style: none; margin-left: -1.4em; border-left: 1vh solid var(--opt); padding-left: 1vw; color: var(--opt); font-weight: 700; }
 
 #reads .ev { color: var(--accent); font-size: 1.8vh; }
+
+/* advance invader cards: hold, slide one space left, hold */
+.a-advance { animation: a-advance 5s ease-in-out infinite; }
+.a-advance.out { animation-name: a-advance-out; }
+@keyframes a-advance { 0%, 30% { transform: translateX(0); } 60%, 100% { transform: translateX(var(--dx)); } }
+@keyframes a-advance-out { 0%, 30% { transform: translateX(0); opacity: 1; } 60%, 100% { transform: translateX(var(--dx)); opacity: .45; } }
