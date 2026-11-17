@@ -788,12 +788,25 @@ def _slow(s):
     g = _slow_base(s)
     return {**g, "do": list(g["do"]) + innate.lines(s, [c["name"] for c in s.get("played", [])])}
 
+DAMAGE_CARDS = {"Flash Floods", "Pull Beneath the Hungry Earth", "Accelerated Rot", "Tsunami", "Massive Flooding"}
+
+
+def _damage_this_round(s):
+    """Did anything take damage this round: a ravage that happened, or a damaging power?"""
+    if DAMAGE_CARDS & set(s.get("resolved", {})):
+        return True
+    return any(e.get("round") == s["round"] and e.get("step") == "invader.ravage" and not e["text"].startswith("Next")
+               for e in s.get("log", []))
+
+
 def _time_passes(s):
     return {
         "title": "Time passes",
         "do": [
             "Every spirit discards the power cards played this round to their own discard pile.",
-            "All damage heals: damaged invaders and Dahan are back to full health.",
+            ("Any damage heals: invaders and Dahan that were hurt but not destroyed are back to full "
+             "health." if _damage_this_round(s) else
+             "Any damage would heal now, but nothing took damage this round, so there's nothing to do."),
             "Elements and any 'this round' effects end. Energy stays.",
         ],
         "why": "Each round starts fresh except for what is on the island and in your energy.",
