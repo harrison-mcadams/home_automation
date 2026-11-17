@@ -455,8 +455,12 @@ GROWTH = {
 }
 
 
+GROWTH_GAINS_CARD = {"River Surges in Sunlight": {1, 3}}
+
+
 def _growth(s):
     pics, items = [], []
+    chosen = s.get("growth_choice", {}).get("0")
     single = len(s["players"]) == 1
     p = s["players"][0] if s["players"] else None
     if single and p and p["spirit"] in GROWTH:
@@ -475,7 +479,9 @@ def _growth(s):
             items.append(f"Option {n}, {title}: " + text.format(nextcard=nxt))
             pics.append({"src": f"spirits/{folder}/growth_{n}.jpg", "wide": True, "items": [n],
                          "caption": f"Option {n}: {title}"})
-        items.append("Done? Do your chosen option at the table (move discs, take cards), then tap Next.")
+        items.append((f"You chose option {chosen}. " if chosen else
+                      "Choose with the number keys 1, 2, 3 on the remote/keyboard (or on the phone). ")
+                     + "Do it at the table: the camera adds new presence discs by itself. Then Next.")
     else:
         items = [
             "Each spirit picks ONE growth option on the top of their panel and does everything in it.",
@@ -492,9 +498,7 @@ def _growth(s):
         "do": items,
         "pictures": pics,
         "why": "Everyone does this at the same time; it does not matter who goes first.",
-        "helper": ({"kind": "gain_power", "players": [{"i": i, "name": p["name"]} for i, p in enumerate(s["players"])
-                                                       if p["spirit"] in rules.PROGRESSION]}
-                   if s.get("progression") else None),
+        "helper": {"kind": "growth", "options": len(GROWTH.get(p["spirit"], [])) if p else 0, "chosen": chosen},
         "tips": ["Running low on cards in hand? A reclaim option is usually the right choice.",
                  "Taking a Major power means forgetting (permanently removing) one card you own."],
     }

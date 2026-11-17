@@ -150,6 +150,12 @@ function landRow(lid, what, button) {
 }
 
 const HELPERS = {
+  growth(h) {
+    const box = el("div", { class: "helper" }, el("h3", {}, "Which growth option?"));
+    box.append(el("div", { class: "btngrid" }, [...Array(h.options || 0)].map((_, i) =>
+      el("button", { class: h.chosen === i + 1 ? "sel" : "", onclick: () => act({ type: "growth_choice", option: i + 1 }) }, `Option ${i + 1}`))));
+    return box;
+  },
   gain_power(h) {
     const box = el("div", { class: "helper" });
     for (const p of h.players || []) {
@@ -569,3 +575,11 @@ function connect() {
   render(await (await fetch("/api/state")).json());
   connect();
 })();
+
+// Keep the phone's screen on while this page is open, so it's ready without unlocking.
+async function keepAwake() {
+  try { if (navigator.wakeLock && document.visibilityState === "visible") await navigator.wakeLock.request("screen"); }
+  catch (e) { /* not allowed here (needs https on some phones) */ }
+}
+document.addEventListener("visibilitychange", keepAwake);
+keepAwake();

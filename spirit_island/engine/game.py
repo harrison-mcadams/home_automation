@@ -366,6 +366,9 @@ class Game:
             return QUIET
         s["sub"] = 0
         step = s["step"]
+        if step == "spirit.growth":
+            s["growth_done"] = dict(s.get("growth_choice", {}))
+            s["growth_choice"] = {}
         if step == "setup.players" and not s["players"]:
             raise ActionError("choose players and spirits first")
         if step == "setup.first_explore":
@@ -425,6 +428,26 @@ class Game:
         inv["drawn"].append(card)
         inv["slots"]["explore"] = card
         return f"Revealed invader card: {rules.card_label(card)}"
+
+    def _do_growth_choice(self, action):
+        """A spirit picks a growth option (by its number on the panel). Options that gain a
+        power card move the progression on, so the next card shown is right."""
+        from .guide import GROWTH_GAINS_CARD
+        s = self.state
+        i, n = int(action.get("player", 0)), int(action.get("option", 0))
+        spirit = s["players"][i]["spirit"]
+        choices = s.setdefault("growth_choice", {})
+        prev = choices.get(str(i))
+        if prev == n:
+            return QUIET
+        nxt = s.setdefault("progression_next", {})
+        gains = GROWTH_GAINS_CARD.get(spirit, set())
+        if prev in gains:
+            nxt[str(i)] = max(0, nxt.get(str(i), 0) - 1)
+        if n in gains:
+            nxt[str(i)] = nxt.get(str(i), 0) + 1
+        choices[str(i)] = n
+        return f"{s['players'][i]['name']} chose growth option {n}"
 
     def _do_toggle_camera_view(self, action):
         """Show or hide the camera's view of the invader board on the TV."""

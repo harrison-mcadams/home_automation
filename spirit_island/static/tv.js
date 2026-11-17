@@ -404,6 +404,7 @@ async function act(action, msg) {
 document.addEventListener("keydown", (e) => {
   if (!S) return;
   const k = e.key;
+  if (/^[1-3]$/.test(k) && S.state.step === "spirit.growth") { e.preventDefault(); act({ type: "growth_choice", option: +k }, "Growth option " + k); return; }
   if (k === "c" || k === "C") { e.preventDefault(); act({ type: "toggle_camera_view" }); return; }
   if (k === "r" || k === "R") { e.preventDefault(); act({ type: "turn_board" }, "Board turned"); return; }
   if (k === "ArrowRight" || k === "Enter" || k === " " || k === "MediaTrackNext") { e.preventDefault(); act({ type: "next" }, "Next step"); }
