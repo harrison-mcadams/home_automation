@@ -121,6 +121,8 @@ class Store:
             out["card_scan"] = self.cards.public()
         if getattr(self, "slot_watch", None) is not None:
             out["slot_watch"] = self.slot_watch.public()
+        if getattr(self, "power_watch", None) is not None:
+            out["power_watch"] = self.power_watch.public()
         return out
 
     def vision_changed(self):
@@ -273,8 +275,11 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
 
         from .slot_watch import SlotWatch
         store.slot_watch = SlotWatch(store, cfg["camera_snapshot_url"])
+        from .power_cards import PowerWatch
+        store.power_watch = PowerWatch(store, cfg["camera_snapshot_url"])
         if start_vision and url:
             store.slot_watch.start()
+            store.power_watch.start()
 
     @app.get("/api/slot_watch.jpg")
     def slot_watch_photo():

@@ -230,6 +230,12 @@ function markCheck(c, h) {
   fig.append(layer);
 }
 
+function cardSrc(name) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const river = ["boon_of_vigor", "flash_floods", "river_s_bounty", "wash_away"];
+  return river.includes(slug) ? `spirits/river/${slug}.jpg` : `powers/${slug}.jpg`;
+}
+
 function finishNow(g) {
   $("n-why").textContent = g.why || "";
   $("n-why").classList.toggle("hidden", !g.why);
@@ -265,6 +271,15 @@ function renderNow() {
       el("div", { class: "pc-style" }, p.style))));
   }
   if (g.helper && g.helper.kind === "fear_cards") focus.push(el("div", { class: "focus" }, el("b", {}, g.helper.left), "fear card(s) to read and resolve"));
+  // Power cards the camera sees lying face up (spirit phase): what's played and its cost.
+  const pw = S.power_watch || {};
+  if (pw.active && (pw.cards || []).length) {
+    const powers = s.step === "spirit.powers";
+    focus.push(el("div", { class: "focus" }, el("b", {}, powers ? "Played (camera):" : "Power cards in view:"),
+      powers ? `total cost ${pw.cost} energy` : ""));
+    focus.push(el("div", { class: "cards-seen" }, ...pw.cards.map((c) => el("div", { class: "cs" },
+      el("img", { src: "/assets/" + cardSrc(c.name) }), el("span", {}, `${c.name} · ${c.cost} · ${c.speed}`)))));
+  }
   $("n-focus").replaceChildren(...focus);
   // While a card is being read, the TV shows what the camera sees, outlined when found.
   const scan = S.card_scan || {};

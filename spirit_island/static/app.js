@@ -130,6 +130,13 @@ function pictures(list) {
   });
 }
 
+function powerChips() {
+  const pw = S.power_watch || {};
+  if (!pw.active || !(pw.cards || []).length) return null;
+  return el("div", { class: "helper" }, el("h3", {}, S.state.step === "spirit.powers" ? `Played (camera): ${pw.cost} energy` : "Power cards in view"),
+    el("p", {}, pw.cards.map((c) => `${c.name} (${c.cost}, ${c.speed})`).join(", ")));
+}
+
 function renderGuide() {
   const g = S.guide;
   $("g-phase").textContent = g.phase;
@@ -140,6 +147,8 @@ function renderGuide() {
   $("g-tips").replaceChildren(...(g.tips || []).map((t) => el("li", {}, t)));
   $("g-pics").replaceChildren(...pictures((g.pictures || []).filter((p) => !p.items || p.items.includes(sub))));
   const h = $("g-helper"); h.replaceChildren();
+  const chips = powerChips();
+  if (chips) h.append(chips);
   if (!g.helper) return;
   const fn = HELPERS[g.helper.kind];
   if (fn) h.append(fn(g.helper));

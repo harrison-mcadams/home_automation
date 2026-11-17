@@ -111,6 +111,14 @@ PROGRESSION = {
         ("Voracious Growth", "Minor"), ("Savage Mawbeasts", "Minor")],
 }
 
+# Energy cost and speed of the power cards the app can recognise.
+POWER_INFO = {
+    "Boon of Vigor": (0, "fast"), "Flash Floods": (2, "fast"), "River's Bounty": (0, "slow"), "Wash Away": (1, "slow"),
+    "Uncanny Melting": (1, "slow"), "Nature's Resilience": (1, "fast"), "Pull Beneath the Hungry Earth": (1, "slow"),
+    "Accelerated Rot": (4, "slow"), "Song of Sanctity": (1, "slow"), "Tsunami": (6, "slow"),
+    "Encompassing Ward": (1, "fast"),
+}
+
 # Starting pieces printed on each balanced board (expansion icons left out).
 START_PIECES = {
     "A": {2: {"cities": 1, "dahan": 1}, 3: {"dahan": 2}, 4: {"blight": 1}, 6: {"dahan": 1}, 7: {"dahan": 2}, 8: {"towns": 1}},

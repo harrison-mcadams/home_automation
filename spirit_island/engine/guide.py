@@ -529,7 +529,8 @@ def _powers(s):
         "title": "Choose and pay for powers",
         "do": [
             "Each spirit plays power cards from hand face up in front of them, up to the number "
-            "visible on their card-plays track.",
+            "visible on their card-plays track. Lay them in the camera's view, off the island: "
+            "the screen lists them with their total cost.",
             "Pay each card's energy cost (top-left corner).",
             "Count the elements on the cards you played (plus any from your tracks). If they meet "
             "a threshold on one of your innate powers, that innate power will happen this round.",

@@ -251,3 +251,9 @@ body.gallery #n-do li:not(.now) { font-size: 1.9vh; }
 /* explore steps: the camera's view of the invader board between the steps and the side panel */
 body.watch main { grid-template-columns: .8fr 1.2fr 1fr; }
 body.gallery.watch #side { display: grid; }
+
+/* power cards the camera sees */
+.cards-seen { display: flex; gap: .8vw; flex-wrap: wrap; width: 100%; }
+.cards-seen .cs { display: flex; flex-direction: column; align-items: center; width: 9vw; }
+.cards-seen img { width: 100%; border-radius: .8vh; }
+.cards-seen span { font-size: 1.5vh; color: var(--muted); text-align: center; margin-top: .3vh; }
