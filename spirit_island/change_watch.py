@@ -35,7 +35,10 @@ class ChangeWatch:
             try:
                 self._once()
             except Exception as e:  # camera hiccup: say so, keep going
+                import traceback
                 self.tracker.status = f"camera: {type(e).__name__}"
+                self.last_error = traceback.format_exc()
+                print(self.last_error)
             time.sleep(max(0.2, self.every - (time.time() - started)))
 
     def _once(self):
