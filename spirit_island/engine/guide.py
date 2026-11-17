@@ -700,7 +700,7 @@ def _build(s):
             what, why = "nothing", "no invaders, so it doesn't build"
         items.append({"text": f"Land {lid[len(lid.rstrip('0123456789')):]}: {what} ({why})", "colour": colours[adds]})
         marks[lid] = {"text": what, "colour": colours[adds]}
-    items.append("Place them, then press →.")
+    items.append("Place them: the game moves on when the camera sees them (or press →).")
     return {
         "title": f"Build: {rules.card_label(card)}",
         "single": True,

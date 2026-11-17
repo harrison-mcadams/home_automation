@@ -189,6 +189,19 @@ class Store:
             print(f"card resolve failed: {e}")
         self.broadcast(self.snapshot())
 
+    def step_done_from_camera(self, lands):
+        """The camera saw the build / explore carried out: enter it and move on."""
+        s = self.game.state
+        kind = {"invader.build": "apply_build", "invader.explore": "apply_explore"}.get(s["step"])
+        if not kind:
+            return
+        for lid in lands:
+            try:
+                self.dispatch({"type": kind, "land": lid}, "camera")
+            except ActionError as e:
+                print(f"{kind} {lid}: {e}")
+        self.dispatch({"type": "next", "screen": True}, "camera")
+
     def panel_sync(self):
         """Follow the spirit panel the camera reads: track discs and energy tokens. Taking
         your energy (Gain energy) or paying for the cards in view (Play powers) with the
@@ -440,6 +453,11 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
 
         from .slot_watch import SlotWatch
         store.slot_watch = SlotWatch(store, cfg["camera_snapshot_url"])
+        from .step_watch import StepWatch
+        if cfg.get("board_reference"):
+            store.step_watch = StepWatch(store, cfg["camera_snapshot_url"], cfg["board_reference"])
+            if start_vision and url:
+                store.step_watch.start()
         from .power_cards import PowerWatch
         store.power_watch = PowerWatch(store, cfg["camera_snapshot_url"])
         if start_vision and url:
