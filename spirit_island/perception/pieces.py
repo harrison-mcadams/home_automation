@@ -32,7 +32,7 @@ RULES = {
     "blight_max_value": 175,
     "warm_hue": (5, 35),  # cream dahan (H 21-24) and tan cardboard (H 19-21); white plastic is H 70-109
     "pale_max_saturation": 70,  # white plastic S 27-58 (bluish white balance), dahan S 38-58
-    "pale_min_value": 170,
+    "pale_min_value": 140,  # white plastic dims to ~170 and below in evening light
     "disc_max_elongation": 1.5,  # dahan 1.08-1.35; explorers 1.7-2.1
     "disc_min_fill": 0.72,  # dahan 0.78-0.84; an explorer with sand in its gaps 0.64
     "dahan_min_value": 130,  # dahan V 202-219; leaves room for shade
