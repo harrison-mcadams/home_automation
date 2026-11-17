@@ -426,6 +426,13 @@ class Game:
         inv["slots"]["explore"] = card
         return f"Revealed invader card: {rules.card_label(card)}"
 
+    def _do_reset_slots(self, action):
+        """Clear the Ravage, Build and Explore spaces (e.g. to redo the first explore)."""
+        if self.state["status"] != "setup":
+            raise ActionError("only during setup; use the slot corrections once playing")
+        self.state["invaders"]["slots"] = {"ravage": None, "build": None, "explore": None}
+        return "Invader card spaces cleared"
+
     def _do_set_slot(self, action):
         """Correction or camera input: set what card sits in a slot."""
         slot = action.get("slot")

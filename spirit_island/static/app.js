@@ -267,6 +267,9 @@ const HELPERS = {
       }
       box.append(el("h3", {}, "...or tap it"));
     }
+    if (S.state.status === "setup" && Object.values(S.state.invaders.slots).some((c) => c)) {
+      box.append(el("button", { class: "ghost", onclick: () => act({ type: "reset_slots" }) }, "Start this step over (clear Ravage, Build, Explore)"));
+    }
     box.append(el("h3", {}, cur ? "Revealed card (tap another to fix a mis-tap)" : "Which card did you turn over?"),
       el("div", { class: "btngrid" }, h.options.concat(cur && !h.options.includes(cur) ? [cur] : []).map((c) =>
         el("button", { class: c === cur ? "sel" : "", onclick: () => act({ type: "reveal_invader", card: c }) }, cardLabel(c)))));
