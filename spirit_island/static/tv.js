@@ -405,7 +405,7 @@ function drawMap(v) {
   const tg = S.targets || {}, tags = {};
   for (const [card, lands] of Object.entries(tg)) {
     for (const [lid, what] of Object.entries(lands)) {
-      if (lid === "spirit") continue;
+      if (lid === "spirit" || /^(nothing|no invaders)/.test(what)) continue;  // only lands where it does something
       const name = lid.slice((v.board || "").length);
       info[name] = info[name] || {};
       info[name].hit = true;
