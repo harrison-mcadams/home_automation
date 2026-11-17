@@ -439,19 +439,58 @@ def _next_powers(s):
     return out
 
 
+# Each spirit's growth options, with a picture cut from the panel (growth_<n>.jpg).
+GROWTH = {
+    "River Surges in Sunlight": [
+        ("Reclaim + power card + energy",
+         "Take every power card from your discard pile back into your hand, gain 1 new power card{nextcard}, "
+         "and gain 1 energy now. Pick this when your hand is running low."),
+        ("Two presence",
+         "Add 2 presence to the island: take discs from either track (leftmost first) and put each in a land "
+         "within 1 of your presence. Spreads you fast and uncovers bigger numbers on your tracks."),
+        ("Power card + presence at range 2",
+         "Gain 1 new power card{nextcard}, and add 1 presence to a land within 2 of your presence. "
+         "A balance of a new power and reach."),
+    ],
+}
+
+
 def _growth(s):
-    return {
-        "title": "Growth",
-        "do": [
+    pics, items = [], []
+    single = len(s["players"]) == 1
+    p = s["players"][0] if s["players"] else None
+    if single and p and p["spirit"] in GROWTH:
+        folder = rules.SPIRIT_ART[p["spirit"]][0]
+        nxt = ""
+        if s.get("progression") and p["spirit"] in rules.PROGRESSION:
+            k = s.get("progression_next", {}).get("0", 0)
+            lst = rules.PROGRESSION[p["spirit"]]
+            if k < len(lst):
+                nxt = f" (the next on your progression: {lst[k][0]})"
+        items = ["Pick ONE of the three growth options at the top of your panel and do everything in it. "
+                 "Here they are, one at a time:"]
+        pics.append({"src": f"spirits/{folder}/growth.jpg", "wide": True, "items": [0],
+                     "caption": "Growth (pick one): three options, separated by the lines"})
+        for n, (title, text) in enumerate(GROWTH[p["spirit"]], 1):
+            items.append(f"Option {n}, {title}: " + text.format(nextcard=nxt))
+            pics.append({"src": f"spirits/{folder}/growth_{n}.jpg", "wide": True, "items": [n],
+                         "caption": f"Option {n}: {title}"})
+        items.append("Done? Do your chosen option at the table (move discs, take cards), then tap Next.")
+    else:
+        items = [
             "Each spirit picks ONE growth option on the top of their panel and does everything in it.",
             "Common pieces of growth: reclaim (take your discarded power cards back into hand), "
             + ("gain a power card (take the next card from your progression stack), " if s.get("progression")
-             else "gain a power card (draw 4 minor or major, keep 1), ")
+               else "gain a power card (draw 4 minor or major, keep 1), ")
             + "add presence (move a disc from a track onto a land within the range shown), gain energy.",
         ] + _next_powers(s) + [
             "Moving presence off a track uncovers a bigger number or a new symbol. That is how a "
             "spirit gets stronger.",
-        ],
+        ]
+    return {
+        "title": "Growth",
+        "do": items,
+        "pictures": pics,
         "why": "Everyone does this at the same time; it does not matter who goes first.",
         "helper": ({"kind": "gain_power", "players": [{"i": i, "name": p["name"]} for i, p in enumerate(s["players"])
                                                        if p["spirit"] in rules.PROGRESSION]}
