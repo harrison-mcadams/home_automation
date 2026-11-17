@@ -192,6 +192,9 @@ class Store:
             change["taken"] = panel["taken"]
         if before is None or panel["tokens"] != before["energy"]:
             change["tokens"] = panel["tokens"]
+        if s["step"] in ("spirit.energy", "spirit.powers") and s.get("energy_at_step") is None and before:
+            # (e.g. after an Undo back into the step) the energy as the step began
+            self.dispatch({"type": "mark_energy_start", "value": before["energy"]}, "camera")
         if change:
             self.dispatch({"type": "panel_seen", **change}, "camera")
         start = s.get("energy_at_step")

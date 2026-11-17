@@ -503,6 +503,10 @@ class Game:
         t[track] = max(0, t[track] + int(action.get("delta", 1)))
         return f"Presence taken from the {track} track"
 
+    def _do_mark_energy_start(self, action):
+        self.state["energy_at_step"] = int(action["value"])
+        return QUIET
+
     def _do_panel_seen(self, action):
         """The camera's reading of the spirit panel: discs gone from each track, and energy
         tokens on it. From then on energy follows the tokens on the table."""
