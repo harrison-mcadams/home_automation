@@ -201,10 +201,23 @@ def build_preview(land):
     return "cities" if land["towns"] > land["cities"] else "towns"
 
 
-def explore_preview(land):
-    """'yes' if it surely gets an explorer, 'check' if it depends on neighbours."""
+def explore_preview(land, state=None, lid=None):
+    """'yes' if it gets an explorer: it touches the ocean, or it or a neighbouring land has a
+    town or city. 'no' when the board's map says no neighbour does; 'check' without a map."""
     if land["coastal"] or land["towns"] or land["cities"]:
         return "yes"
+    if state is not None and lid:
+        from .targets import adjacency
+        for b in state.get("boards", []):
+            if lid.startswith(b):
+                near = adjacency(b).get(lid[len(b):])
+                if near is None:
+                    break
+                for n in near:
+                    other = state["lands"].get(f"{b}{n}")
+                    if other and (other.get("towns") or other.get("cities")):
+                        return "yes"
+                return "no"
     return "check"
 
 

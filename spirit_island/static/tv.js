@@ -153,7 +153,8 @@ function focusRows(h) {
   });
   if (h.kind === "build") return h.rows.map((r) => el("div", { class: "focus" }, el("b", {}, r.land), `builds a ${r.adds === "cities" ? "city" : "town"}`));
   if (h.kind === "reveal") return h.rows.map((r) => el("div", { class: "focus" }, el("b", {}, r.land),
-    r.explore === "yes" ? "gets an explorer" : "explorer if a neighbour has a town/city or is ocean"));
+    r.explore === "yes" ? "gets an explorer" : r.explore === "no" ? "no explorer (no ocean, town or city next to it)"
+      : "explorer if a neighbour has a town/city or is ocean"));
   return [];
 }
 

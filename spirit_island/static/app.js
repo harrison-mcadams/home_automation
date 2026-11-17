@@ -317,7 +317,7 @@ const HELPERS = {
       if (!h.rows.length) box.append(el("p", {}, "No tagged land matches this card."));
       for (const r of h.rows) {
         box.append(landRow(r.land, r.explore === "yes" ? el("span", { class: "badge bad" }, "gets explorer")
-          : el("span", { class: "badge" }, "check neighbours"),
+          : el("span", { class: "badge" }, r.explore === "no" ? "no explorer" : "check neighbours"),
           el("button", { onclick: () => act({ type: "apply_explore", land: r.land }) }, "+1 explorer")));
       }
     }

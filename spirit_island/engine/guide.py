@@ -412,7 +412,7 @@ def _first_explore(s):
               "or is next to a land with a town or city."] + _unknown_note(unknown) + [
               f"Then slide the {rules.card_label(slot)} card one space left, from Explore to Build. "
               "Those lands will build in round 1. Tap Next and the app moves it too."]
-        helper["rows"] = [{"land": lid, "explore": g.explore_preview(s["lands"][lid])} for lid in hit]
+        helper["rows"] = [{"land": lid, "explore": g.explore_preview(s["lands"][lid], s, lid)} for lid in hit]
     return {
         "title": "First explore",
         "do": do,
@@ -740,7 +740,7 @@ def _explore(s):
             "helper": helper,
         }
     hit, unknown = _lands_for(s, slot)
-    rows = [{"land": lid, "explore": g.explore_preview(s["lands"][lid])} for lid in hit]
+    rows = [{"land": lid, "explore": g.explore_preview(s["lands"][lid], s, lid)} for lid in hit]
     helper.update({"rows": rows})
     return {
         "title": "Explore",
