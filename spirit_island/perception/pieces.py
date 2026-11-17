@@ -187,6 +187,10 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
         # dome next to dark shade.
         n = 2 if f.size >= 0.095 else 1
         out = {"type": "dahan", "count": n, "why": f"tan wood with shadow (value {f.value}, texture {f.texture})"}
+    elif f.size >= 0.1 and f.saturation <= 85 and f.value >= 140 and f.thickness >= 0.035:
+        # A big, solid, fairly pale piece in warm dim light: the city (dahan are smaller
+        # and far more saturated).
+        out = {"type": "city", "why": f"large pale piece (size {f.size}, sat {f.saturation})"}
     elif warm and f.value < rules["dahan_min_value"]:
         # Darker than any cream or tan piece, brownish: the wooden table, uncovered at the
         # rim when the board slides.

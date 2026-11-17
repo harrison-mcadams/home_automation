@@ -174,6 +174,13 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     # not take pieces with them.
     current = find_board(image)
     if current is not None:
+        # With other boards in view (invader board, spirit panel) the outline finder can
+        # take in far more than the island: then its outline is no use for trimming.
+        test = cv2.warpPerspective(current.mask, reg.homography, (W_full, H_full), flags=cv2.INTER_NEAREST)
+        ratio = float((test > 0).sum()) / max(1, int((board_mask > 0).sum()))
+        if not 0.7 < ratio < 1.4:
+            current = None
+    if current is not None:
         now_mask = shrink(cv2.warpPerspective(current.mask, reg.homography, (W_full, H_full), flags=cv2.INTER_NEAREST))
         size = np.sqrt(max(1, int((now_mask > 0).sum())))
         close = int(0.08 * size) | 1
