@@ -142,7 +142,12 @@ function renderGuide() {
   $("g-phase").textContent = g.phase;
   $("g-title").textContent = g.title;
   const sub = g.sub || 0;
-  $("g-do").replaceChildren(...g.do.map((t, i) => el("li", { class: g.single || i === sub ? "now" : i < sub ? "done" : "" }, t)));
+  $("g-do").replaceChildren(...g.do.map((t, i) => {
+    // An item can be {text, colour}: a colour-coded choice (matching the board).
+    const li = el("li", { class: (g.single || i === sub ? "now" : i < sub ? "done" : "") + (t.colour ? " opt" : "") }, t.text || t);
+    if (t.colour) li.style.setProperty("--opt", t.colour);
+    return li;
+  }));
   $("g-why").textContent = g.why || "";
   $("g-tips").replaceChildren(...(g.tips || []).map((t) => el("li", {}, t)));
   $("g-pics").replaceChildren(...pictures((g.pictures || []).filter((p) => !p.items || p.items.includes(sub))));

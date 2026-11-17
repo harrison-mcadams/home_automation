@@ -398,6 +398,8 @@ class Game:
                 if bonus:
                     self._spirit(int(i))["energy"] += bonus
             s["growth_choice"] = {}
+        if step == "time_passes":
+            s["resolved"] = {}
         if step == "time_passes" or step == "setup.first_explore":
             # Entering Growth next: note the presence on the island, to tell the option later.
             s["presence_at_growth"] = sum(l["presence"] for l in s["lands"].values())
@@ -504,6 +506,16 @@ class Game:
         sp = self._spirit(int(action.get("player", 0)))
         sp["energy"] = max(0, sp["energy"] + int(action.get("delta", 0)))
         return f"Energy {'+' if int(action.get('delta', 0)) >= 0 else ''}{int(action.get('delta', 0))} (now {sp['energy']})"
+
+    def _do_card_resolved(self, action):
+        """A played power card was carried out (by a number key, or seen by the camera)."""
+        s = self.state
+        card = action.get("card")
+        s.setdefault("resolved", {})[card] = action.get("land")
+        fear = int(action.get("fear", 0))
+        if fear:
+            self._do_fear({"amount": fear})
+        return f"{card} resolved" + (f" on {action.get('land')}" if action.get("land") else "") + (f", {fear} fear" if fear else "")
 
     def _do_growth_base(self, action):
         """How many presence were on the island when Growth began (to count new discs)."""

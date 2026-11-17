@@ -133,9 +133,11 @@ class Store:
         if getattr(self, "power_watch", None) is not None:
             out["power_watch"] = pw = self.power_watch.public()
             # Where the cards in view could be used, for the drawn board.
-            if self.game.state["step"] in ("spirit.powers", "fast", "slow"):
-                from .engine.targets import targets
-                out["targets"] = {c["name"]: targets(self.game.state, c["name"]) for c in pw.get("cards", [])}
+            focus = self.card_focus()
+            if focus:
+                out["card_focus"] = focus
+                out["targets"] = {c["name"]: {o["land"]: o["text"] for o in c["options"]} for c in focus}
+                out["guide"] = card_guide(self.game.state, focus, out["guide"])
         return out
 
     def vision_changed(self):
@@ -163,7 +165,60 @@ class Store:
                 except ActionError as e:
                     print(f"camera sync failed: {e}")
         self.growth_from_presence()
+        try:
+            self.resolve_cards_from_camera()
+        except ActionError as e:
+            print(f"card resolve failed: {e}")
         self.broadcast(self.snapshot())
+
+    def card_focus(self):
+        """The power cards in view during Play powers / Fast / Slow, with their choices."""
+        s = self.game.state
+        pw = self.power_watch.public() if getattr(self, "power_watch", None) else {}
+        if s["step"] not in ("spirit.powers", "fast", "slow") or not pw.get("cards"):
+            return []
+        from .engine.targets import options
+        from .engine import rules as R
+        out = []
+        for c in pw["cards"]:
+            art = R.SPIRIT_ART.get(s["players"][0]["spirit"]) if s["players"] else None
+            folder = art[0] if art and c["name"] in art[1] else None
+            src = f"spirits/{folder}/{R.picture_slug(c['name'])}.jpg" if folder else f"powers/{R.picture_slug(c['name'])}.jpg"
+            out.append({**c, "src": src, "options": options(s, c["name"]),
+                        "spirit": bool(R.POWER_TARGETS.get(c["name"], {}).get("spirit")),
+                        "resolved": c["name"] in s.get("resolved", {}),
+                        "now": s["step"] == c["speed"]})
+        return out
+
+    def resolve_cards_from_camera(self):
+        """In Fast / Slow, a card whose choice the camera sees carried out is marked done;
+        once every card for this step is done, the game moves on."""
+        s = self.game.state
+        if s["step"] not in ("fast", "slow") or self.vision is None:
+            return
+        from .engine.targets import done
+        focus = [c for c in self.card_focus() if c["now"]]
+        if not focus:
+            return
+        diffs = {d["land"]: d for d in self.vision.public(s)["diffs"] if d["confirmed"]}
+        for c in focus:
+            if c["resolved"]:
+                continue
+            for o in c["options"]:
+                d = diffs.get(o["land"])
+                if d and done(o, d["delta"]):
+                    self.dispatch({"type": "observe", "lands": {o["land"]: d["camera"]}}, "camera")
+                    self.dispatch({"type": "card_resolved", "card": c["name"], "land": o["land"], "fear": o["fear"]}, "camera")
+                    break
+        self.advance_if_cards_done()
+
+    def advance_if_cards_done(self):
+        s = self.game.state
+        if s["step"] not in ("fast", "slow"):
+            return
+        now = [c for c in self.card_focus() if c["now"]]
+        if now and all(c["name"] in s.get("resolved", {}) for c in now):
+            self.dispatch({"type": "next"}, "camera")
 
     def growth_from_presence(self):
         """During Growth, suggest the option from what's new on the table: new presence
@@ -205,6 +260,33 @@ class Store:
 
 # Changes each time the server starts, so open pages reload to pick up new code.
 BOOT_ID = str(os.getpid()) + "-" + str(int(__import__("time").time()))
+
+
+def card_guide(state, focus, base):
+    """The step's guide replaced by what the cards in view can do, choices colour-coded."""
+    step = state["step"]
+    do, pics = [], []
+    for c in focus:
+        when = {"fast": "before the invaders (Fast powers)", "slow": "after the invaders (Slow powers)"}[c["speed"]]
+        head = f"{c['name']}: {c['cost']} energy, {c['speed']}, resolves {when}."
+        if c["resolved"]:
+            do.append(head + " Done ✓")
+        elif c["spirit"]:
+            do.append(head + " It targets a spirit (you), not a land.")
+        elif not c["options"]:
+            do.append(head + " Nothing useful in range right now.")
+        else:
+            do.append(head + (" Choose:" if c["now"] else " Your choices, as things stand:"))
+            for o in c["options"]:
+                do.append({"text": f"{o['key']}. Land {o['land'][1:]}: {o['text']}", "colour": o["colour"]})
+        # (The card picture sits under the list; the side keeps the drawn board, with the
+        # choices lit in the same colours.)
+    if step == "spirit.powers":
+        do.append("Press → to pay and move on.")
+    elif any(c["now"] and not c["resolved"] for c in focus):
+        do.append("Do it at the table. The camera spots the change and moves on, or press the option's number.")
+    return {**base, "title": " + ".join(c["name"] for c in focus), "do": do, "pictures": pics, "single": True,
+            "helper": {"kind": "card_options", "cards": focus}, "why": "", "tips": []}
 
 
 def snapshot(game):

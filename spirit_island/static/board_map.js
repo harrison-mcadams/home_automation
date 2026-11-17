@@ -94,6 +94,7 @@ const BoardMap = (() => {
       const i = info[name] || {};
       poly.style.fill = TERRAIN[i.terrain] || "#6d6a5c";
       poly.classList.toggle("hit", !!i.hit);
+      poly.style.stroke = i.hit && i.colour ? i.colour : "";
     }
   }
 
@@ -136,11 +137,13 @@ const BoardMap = (() => {
   function setTags(v, tags) {
     v.tags.replaceChildren();
     for (const l of (v.map && v.map.lands) || []) {
-      const t = tags[l.name];
+      let t = tags[l.name];
       if (!t) continue;
+      const colour = t.colour || "#ffd968";
+      t = t.text || t;
       const w = Math.max(120, t.length * 17);
       const inner = svg("g", { transform: `rotate(${-v.rot})` },
-        svg("rect", { x: -w / 2, y: -48, width: w, height: 40, rx: 12, class: "tagbg" }),
+        svg("rect", { x: -w / 2, y: -48, width: w, height: 40, rx: 12, class: "tagbg", style: `stroke:${colour}` }),
         svg("text", { x: 0, y: -21, class: "tagtx" }, document.createTextNode(t)));
       v.tags.append(svg("g", { transform: `translate(${l.centre[0]} ${l.centre[1]})` }, inner));
     }

@@ -169,3 +169,5 @@ svg.scene { display: block; width: 100%; height: auto; }
 .scan p.ok { color: #86dc93; font-weight: 700; font-size: 18px; }
 
 .readslots { font-size: 18px; padding: 0 8px; cursor: pointer; }
+
+#g-do li.opt { list-style: none; margin-left: -22px; border-left: 6px solid var(--opt); padding-left: 8px; color: var(--opt); font-weight: 700; }

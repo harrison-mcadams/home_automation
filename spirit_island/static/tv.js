@@ -158,7 +158,7 @@ function focusRows(h) {
 
 function words(g) {
   if (!REF) return [];
-  const text = [g.title, ...(g.do || []), g.why || ""].join(" ").toLowerCase();
+  const text = [g.title, ...(g.do || []).map((t) => t.text || t), g.why || ""].join(" ").toLowerCase();
   return REF.glossary.filter(([k]) => text.includes(k.toLowerCase().split(/[ (]/)[0])).slice(0, 3)
     .map(([k, v]) => el("div", {}, el("b", {}, k + ": "), v));
 }
@@ -283,7 +283,12 @@ function renderNow() {
   // Next walks the numbered items one at a time: the current one is lit, and only its
   // pictures are shown.
   const sub = g.sub || 0;
-  $("n-do").replaceChildren(...g.do.map((t, i) => el("li", { class: g.single || i === sub ? "now" : i < sub ? "done" : "" }, t)));
+  $("n-do").replaceChildren(...g.do.map((t, i) => {
+    // An item can be {text, colour}: a colour-coded choice (matching the board).
+    const li = el("li", { class: (g.single || i === sub ? "now" : i < sub ? "done" : "") + (t.colour ? " opt" : "") }, t.text || t);
+    if (t.colour) li.style.setProperty("--opt", t.colour);
+    return li;
+  }));
   const focus = focusRows(g.helper);
   const c = g.helper && g.helper.kind === "verify" ? pieceCheck() : null;
   if (c) {
@@ -402,14 +407,15 @@ function drawMap(v) {
     info[l.name] = { terrain: land && land.terrain, hit: hits.has(lid) };
   }
   // A power card in view: light up the lands it can target, with what it would do there.
-  const tg = S.targets || {}, tags = {};
-  for (const [card, lands] of Object.entries(tg)) {
-    for (const [lid, what] of Object.entries(lands)) {
-      if (lid === "spirit" || /^(nothing|no invaders)/.test(what)) continue;  // only lands where it does something
-      const name = lid.slice((v.board || "").length);
+  const focus = S.card_focus || [], tags = {};
+  for (const c of focus) {
+    if (c.resolved) continue;
+    for (const o of c.options) {
+      const name = o.land.slice((v.board || "").length);
       info[name] = info[name] || {};
       info[name].hit = true;
-      tags[name] = (Object.keys(tg).length > 1 ? card.split(" ")[0] + ": " : "") + what;
+      info[name].colour = o.colour;
+      tags[name] = { text: `${o.key}. ` + (focus.length > 1 ? c.name.split(" ")[0] + ": " : "") + o.text, colour: o.colour };
     }
   }
   BoardMap.setLands(mapView, info);
@@ -466,6 +472,11 @@ document.addEventListener("keydown", (e) => {
   if (!S) return;
   const k = e.key;
   if ((k === "e" || k === "E") && S.state.status === "playing") { e.preventDefault(); act({ type: "take_presence", track: "energy" }, "Disc from the energy track"); return; }
+  if (/^[1-9]$/.test(k) && (S.state.step === "fast" || S.state.step === "slow") && (S.card_focus || []).length) {
+    const c = S.card_focus.find((x) => x.now && !x.resolved);
+    const o = c && c.options.find((x) => x.key === +k);
+    if (o) { e.preventDefault(); act({ type: "card_resolved", card: c.name, land: o.land, fear: o.fear }, `${c.name}: land ${o.land.slice(1)}`); return; }
+  }
   if (/^[1-3]$/.test(k) && S.state.step === "spirit.growth") { e.preventDefault(); act({ type: "growth_choice", option: +k }, "Growth option " + k); return; }
   const st0 = (S.derived.spirits || [])[0];
   if ((k === "c" || k === "C") && st0 && st0.unassigned) { e.preventDefault(); act({ type: "take_presence", track: "cards" }, "Disc from the card plays track"); return; }
