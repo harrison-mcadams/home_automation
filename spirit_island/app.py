@@ -100,6 +100,10 @@ class Store:
             return {}
 
     def dispatch(self, action, source):
+        # Paused (e.g. while pieces are moved about to teach the camera): nothing the camera
+        # sees touches the game.
+        if getattr(self, "paused", False) and source == "camera":
+            return self.snapshot()
         # With a card in view, Next leaves the step in one go (the card screen is one step).
         if action.get("type") == "next" and self.game.state["step"] in ("spirit.powers", "fast", "slow")                 and self.card_focus():
             action = {**action, "screen": True}
@@ -132,6 +136,7 @@ class Store:
             out["vision"] = self.vision.public(self.game.state)
         if self.cards is not None:
             out["card_scan"] = self.cards.public()
+        out["paused"] = bool(getattr(self, "paused", False))
         if getattr(self, "slot_watch", None) is not None:
             out["slot_watch"] = self.slot_watch.public()
         if getattr(self, "change_watch", None) is not None:
@@ -531,6 +536,14 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
         if not body:
             return Response("no picture yet", status=503)
         return Response(body, mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/pause_camera")
+    def pause_camera():
+        """{"on": true} stops the camera changing the game (training, tidying the table)."""
+        store.paused = bool((request.get_json(silent=True) or {}).get("on", True))
+        out = store.snapshot()
+        store.broadcast(out)
+        return jsonify(out)
 
     @app.post("/api/card_scan")
     def card_scan():

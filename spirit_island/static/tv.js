@@ -95,6 +95,7 @@ function renderReads() {
   const sw = S.slot_watch || {}, pw = S.power_watch || {}, v = S.vision || {};
   const slotTxt = (k) => { const c = (sw.slots || {})[k]; return !c ? "?" : c === "empty" ? "empty" : c === "back" ? "deck (face down)" : label(c); };
   const rows = [];
+  if (S.paused) rows.push(el("div", { class: "read warn" }, el("b", {}, "Game paused"), "The camera is not changing the game (teaching it your pieces)."));
   const ch = S.changes || {};
   rows.push(el("div", { class: "read" + (ch.status && ch.status !== "watching" ? " warn" : "") }, el("b", {}, "Island camera"),
     ch.status || "off", ...(ch.recent || []).slice(0, 3).map((e) => el("div", { class: "ev" }, "Saw: " + (e.did || "a change")))));
