@@ -682,16 +682,34 @@ def _build(s):
     hit, unknown = _lands_for(s, card)
     rows = [{"land": lid, "adds": g.build_preview(s["lands"][lid])}
             for lid in hit if g.build_preview(s["lands"][lid])]
+    # Land by land: what to add, and why (colour-coded to match the drawn board).
+    items, marks = [f"Build card: {rules.card_label(card)}. In each {rules.card_label(card)} land:"], {}
+    colours = {"towns": "#f2c14e", "cities": "#ff8f6b", None: "#8a948c"}
+    for lid in hit:
+        land = s["lands"][lid]
+        adds = g.build_preview(land)
+        t, c, e = land.get("towns", 0), land.get("cities", 0), land.get("explorers", 0)
+        have = ", ".join(x for x in (f"{e} explorer{'s' if e != 1 else ''}" if e else "",
+                                     f"{t} town{'s' if t != 1 else ''}" if t else "",
+                                     f"{c} cit{'ies' if c != 1 else 'y'}" if c else "") if x) or "no invaders"
+        if adds == "cities":
+            what, why = "add a city", f"has {have}: more towns than cities"
+        elif adds == "towns":
+            what, why = "add a town", f"has {have}: not more towns than cities"
+        else:
+            what, why = "nothing", "no invaders, so it doesn't build"
+        items.append({"text": f"Land {lid[len(lid.rstrip('0123456789')):]}: {what} ({why})", "colour": colours[adds]})
+        marks[lid] = {"text": what, "colour": colours[adds]}
+    items.append("Place them, then press →.")
     return {
-        "title": "Build",
-        "do": [
-            f"Build card: {rules.card_label(card)}. In every land of that terrain that has any invaders:",
-            "If the land has more towns than cities, add a city. Otherwise add a town.",
-            "Lands with no invaders do not build.",
-        ] + _unknown_note(unknown),
-        "why": "Towns and cities hit hard when they ravage later, so builds matter.",
+        "title": f"Build: {rules.card_label(card)}",
+        "single": True,
+        "do": items + _unknown_note(unknown),
+        "why": "Rule: a land with invaders adds a city if it has more towns than cities, otherwise a town. "
+               "Dahan don't stop a build.",
         "tips": [],
         "helper": {"kind": "build", "rows": rows},
+        "marks": marks,
     }
 
 

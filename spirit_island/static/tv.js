@@ -408,6 +408,12 @@ function drawMap(v) {
   }
   // A power card in view: light up the lands it can target, with what it would do there.
   const focus = S.card_focus || [], tags = {};
+  // Steps that mark lands (e.g. Build: what each land adds), in the step's colours.
+  for (const [lid, m] of Object.entries(S.guide.marks || {})) {
+    const name = lid.slice((v.board || "").length);
+    info[name] = { ...(info[name] || {}), hit: m.text !== "nothing", colour: m.colour };
+    tags[name] = { text: m.text, colour: m.colour };
+  }
   for (const c of focus) {
     if (c.resolved) continue;
     for (const o of c.options) {
