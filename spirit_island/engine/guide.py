@@ -339,7 +339,7 @@ def _pieces(s):
         "do": [
             "The small black icons by each land number are its starting pieces.",
         ] + rows + [
-            "Dahan: cream wooden discs. Town: small white house. City: tall white tower. "
+            "Dahan: round wooden pieces. Town: small white house. City: tall white tower. "
             "Blight: grey-blue bumpy piece (from the box, not the blight card).",
             "Ignore the paw and spiral icons; they're for an expansion.",
             "The TV marks each land live as the camera spots its pieces. When every land shows a tick "
