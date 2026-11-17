@@ -446,6 +446,12 @@ class Store:
             return
         if s.get("growth_suggest", {}).get("0") != option:
             self.dispatch({"type": "growth_suggest", "option": option}, "camera")
+        # Everything the option does is on the table (all its presence, and its card if it
+        # gives one): take it as chosen and move on.
+        gains_card = option in GROWTH_GAINS_CARD.get(spirit, set())
+        if added > 0 and (new_card or not gains_card):
+            self.dispatch({"type": "growth_choice", "option": option}, "camera")
+            self.dispatch({"type": "next", "screen": True}, "camera")
 
     def broadcast(self, payload):
         data = json.dumps(payload)
