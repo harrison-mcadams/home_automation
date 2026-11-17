@@ -426,6 +426,18 @@ class Game:
         inv["slots"]["explore"] = card
         return f"Revealed invader card: {rules.card_label(card)}"
 
+    def _do_toggle_camera_view(self, action):
+        """Show or hide the camera's view of the invader board on the TV."""
+        s = self.state
+        s["hide_slot_camera"] = not s.get("hide_slot_camera", False)
+        return QUIET
+
+    def _do_turn_board(self, action):
+        """Turn the drawn board on the screens a quarter turn (to match where you sit)."""
+        s = self.state
+        s["board_rotation"] = (int(s.get("board_rotation", 0)) + int(action.get("by", 90))) % 360
+        return QUIET
+
     def _do_reset_slots(self, action):
         """Clear the Ravage, Build and Explore spaces (e.g. to redo the first explore)."""
         if self.state["status"] != "setup":

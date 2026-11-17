@@ -156,7 +156,7 @@ function addDiscs(fig, img, p) {
 }
 function figure(p, cls) {
   if (p.scan) {
-    return el("figure", { class: "wide scanfig" }, el("img", { src: "/api/card_scan.jpg?t=" + (p.stamp || 0), alt: "card camera" }),
+    return el("figure", { class: "wide scanfig" }, el("img", { src: (p.src || "/api/card_scan.jpg") + "?t=" + (p.stamp || 0), alt: "card camera" }),
       el("figcaption", { class: p.card ? "ok" : "" }, p.caption));
   }
   if (p.anim) return el("figure", { class: (cls || "") + " anim" }, animScene(p), el("figcaption", {}, p.caption.split(":")[0]));
@@ -230,6 +230,12 @@ function markCheck(c, h) {
   fig.append(layer);
 }
 
+function finishNow(g) {
+  $("n-why").textContent = g.why || "";
+  $("n-why").classList.toggle("hidden", !g.why);
+  $("n-words").replaceChildren(...words(g));
+}
+
 function renderNow() {
   const g = S.guide, s = S.state;
   document.body.classList.toggle("over", s.status === "won" || s.status === "lost");
@@ -263,6 +269,19 @@ function renderNow() {
   // While a card is being read, the TV shows what the camera sees, outlined when found.
   const scan = S.card_scan || {};
   const scanning = scan.active && !s.invaders.slots.explore && g.helper && g.helper.kind === "reveal";
+  // On the explore steps the camera watches the invader board by itself; its view shows
+  // here (C on the remote hides or shows it).
+  const sw = S.slot_watch || {};
+  const watching = !scanning && sw.active && sw.found && !s.hide_slot_camera;
+  document.body.classList.toggle("watch", watching);
+  if (watching) {
+    document.body.classList.remove("bare");
+    const ex = s.invaders.slots.explore;
+    renderGallery([{ scan: true, wide: true, src: "/api/slot_watch.jpg", stamp: sw.stamp, card: ex,
+      caption: ex ? `Explore: ${label(ex)}` : sw.explore_seen ? `Reading Explore: ${label(sw.explore_seen)}...` :
+        "Turn over the top invader card on the Explore space" }], s.status === "setup");
+    return finishNow(g);
+  }
   renderGallery(scanning ? [{ scan: true, wide: true, stamp: scan.stamp, card: scan.card,
     caption: scan.card ? `I see: ${label(scan.card)}. Confirm on the phone.` :
       scan.seen ? "Hold still..." : "Hold the invader card face up under the camera" }] : forItem(g.pictures, sub),
@@ -271,9 +290,7 @@ function renderNow() {
   // Build the screen up as the game goes: setup shows only the step itself; the invader
   // cards, lands and camera join at the first explore, the status bar once play starts.
   document.body.classList.toggle("bare", s.status === "setup" && s.step !== "setup.first_explore");
-  $("n-why").textContent = g.why || "";
-  $("n-why").classList.toggle("hidden", !g.why);
-  $("n-words").replaceChildren(...words(g));
+  finishNow(g);
 }
 
 function renderInvaders() {
@@ -329,6 +346,7 @@ async function loadMap(letter) {
 
 function drawMap(v) {
   if (!mapView) return;
+  if (mapView.rot !== (S.state.board_rotation || 0)) BoardMap.setRotation(mapView, S.state.board_rotation || 0);
   const hits = hitLands(), info = {};
   for (const l of mapView.map.lands) {
     const lid = (v.board || "") + l.name, land = S.state.lands[lid];
@@ -386,6 +404,8 @@ async function act(action, msg) {
 document.addEventListener("keydown", (e) => {
   if (!S) return;
   const k = e.key;
+  if (k === "c" || k === "C") { e.preventDefault(); act({ type: "toggle_camera_view" }); return; }
+  if (k === "r" || k === "R") { e.preventDefault(); act({ type: "turn_board" }, "Board turned"); return; }
   if (k === "ArrowRight" || k === "Enter" || k === " " || k === "MediaTrackNext") { e.preventDefault(); act({ type: "next" }, "Next step"); }
   else if (k === "ArrowLeft" || k === "Backspace" || k === "MediaTrackPrevious") { e.preventDefault(); if (S.state.status === "setup") act({ type: "back" }, "Back"); else if (S.can_undo) act({ type: "undo" }, "Undone"); }
   else if (k === "f" || k === "F") { if (S.state.status === "playing") act({ type: "fear", amount: 1 }, "+1 fear"); }

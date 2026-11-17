@@ -44,15 +44,32 @@ const BoardMap = (() => {
       <radialGradient id="bm-sea" cx="50%" cy="50%" r="75%"><stop offset="0" stop-color="#1f5d86"/><stop offset="1" stop-color="#0b2236"/></radialGradient>
       <filter id="bm-shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity=".55"/></filter>`;
     const sea = svg("g"), lands = svg("g"), labels = svg("g", { class: "labels" }), pieces = svg("g");
-    root.append(defs, sea, lands, labels, pieces);
+    // Everything sits in one group, so the board can be turned to face the player.
+    const world = svg("g", {}, sea, lands, labels, pieces);
+    root.append(defs, world);
     container.replaceChildren(root);
-    return { root, sea, lands, labels, pieces, map: null, els: [] };
+    return { root, world, sea, lands, labels, pieces, map: null, els: [], rot: 0 };
+  }
+
+  // Turn the drawn board by 0, 90, 180 or 270 degrees (clockwise); pieces stay upright.
+  function setRotation(v, deg) {
+    v.rot = ((deg % 360) + 360) % 360;
+    if (v.map) frame(v);
+    for (const o of v.els) o.g.querySelector(".upright").setAttribute("transform", `rotate(${-v.rot})`);
+  }
+
+  function frame(v) {
+    const pad = 40, W = v.map.width + 2 * pad, H = v.map.height + 2 * pad;
+    const cx = v.map.width / 2, cy = v.map.height / 2, side = v.rot % 180 !== 0;
+    const w = side ? H : W, h = side ? W : H;
+    v.root.setAttribute("viewBox", `${cx - w / 2} ${cy - h / 2} ${w} ${h}`);
+    v.world.setAttribute("transform", `rotate(${v.rot} ${cx} ${cy})`);
   }
 
   function setMap(v, map) {
     v.map = map;
     const pad = 40;
-    v.root.setAttribute("viewBox", `${-pad} ${-pad} ${map.width + 2 * pad} ${map.height + 2 * pad}`);
+    frame(v);
     v.sea.replaceChildren(
       svg("rect", { x: -pad, y: -pad, width: map.width + 2 * pad, height: map.height + 2 * pad, fill: "url(#bm-sea)" }),
       svg("rect", { x: -pad, y: -pad, width: map.width + 2 * pad, height: map.height + 2 * pad, fill: "url(#bm-waves)" }));
@@ -97,7 +114,7 @@ const BoardMap = (() => {
         best.g.style.transform = `translate(${p.x}px, ${p.y}px)`;
         next.push(best);
       } else {
-        const inner = svg("g", { class: "bob" }, shape(p));
+        const inner = svg("g", { class: "bob" }, svg("g", { class: "upright", transform: `rotate(${-v.rot})` }, shape(p)));
         const g = svg("g", { class: "piece enter " + p.type, filter: "url(#bm-shadow)" }, inner);
         inner.style.animationDelay = (-Math.random() * 4).toFixed(2) + "s";
         g.style.transform = `translate(${p.x}px, ${p.y}px)`;
@@ -115,5 +132,5 @@ const BoardMap = (() => {
     v.els = next;
   }
 
-  return { create, setMap, setLands, setPieces };
+  return { create, setMap, setLands, setPieces, setRotation };
 })();

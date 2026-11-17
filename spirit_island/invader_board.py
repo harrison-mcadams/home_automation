@@ -87,7 +87,7 @@ class InvaderBoardReader:
         if H is None:
             return {"found": False}
         aw, ah = self.art_size
-        out = {"found": True, "slots": {}, "outlines": {}}
+        out = {"found": True, "slots": {}, "outlines": {}, "H": H, "art_size": (aw, ah)}
         # The room light tints everything (warm evening light): measure the tint on the
         # board's own printed art, away from the card spaces, and take it out of the cards.
         seen = cv2.warpPerspective(frame, np.linalg.inv(H), (aw, ah))

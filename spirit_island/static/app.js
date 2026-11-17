@@ -250,7 +250,17 @@ const HELPERS = {
     const box = el("div", { class: "helper" });
     const cur = S.state.invaders.slots.explore;
     const scan = S.card_scan || {};
-    if (!cur && S.card_scan) {
+    const sw = S.slot_watch || {};
+    if (sw.active) {
+      box.append(el("div", { class: "scan" },
+        sw.found ? el("img", { src: "/api/slot_watch.jpg?t=" + (sw.stamp || 0), alt: "the camera's view of the invader board" }) : null,
+        el("p", { class: cur ? "ok" : "" }, !sw.found ? (sw.why || "Looking for the invader board...") :
+          cur ? `Explore: ${cardLabel(cur)}` : sw.explore_seen ? `Reading ${cardLabel(sw.explore_seen)}...` :
+          "Watching the Explore space: turn the top card over and it fills in by itself."),
+        el("button", { class: "ghost", onclick: () => act({ type: "toggle_camera_view" }) },
+          S.state.hide_slot_camera ? "Show the camera view on the TV" : "Hide the camera view on the TV")));
+    }
+    if (!cur && S.card_scan && !sw.found) {
       // Read the card with the camera: hold it face up under the camera, then confirm.
       if (!scan.active) {
         box.append(el("button", { class: "primary", onclick: () => postScan(true) }, "📷 Read the card with the camera"));
@@ -428,6 +438,9 @@ function renderCamera() {
     el("div", { class: "seg" },
       el("button", { class: board ? "" : "primary", onclick: () => vision({ view: "photo" }) }, "Photo"),
       el("button", { class: board ? "primary" : "", onclick: () => vision({ view: "board" }) }, "Drawn board"))));
+  if (v.has_map) box.append(el("div", { class: "rowline" },
+    el("div", { class: "what" }, "Turn the drawn board to match where you sit"),
+    el("button", { onclick: () => act({ type: "turn_board" }) }, "↻ Turn 90°")));
   if (board) {
     loadPhoneMap();
     box.append(phoneMap.box);
@@ -457,6 +470,7 @@ async function loadPhoneMap() {
 function drawPhoneMap(v) {
   const m = phoneMap.view;
   if (!m) return;
+  if (m.rot !== (S.state.board_rotation || 0)) BoardMap.setRotation(m, S.state.board_rotation || 0);
   const hits = hitLands(), info = {};
   for (const l of m.map.lands) {
     const lid = (v.board || "") + l.name, land = S.state.lands[lid];

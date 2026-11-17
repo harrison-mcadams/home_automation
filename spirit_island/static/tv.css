@@ -247,3 +247,7 @@ body.gallery #n-do li:not(.now) { font-size: 1.9vh; }
 #gallery figure.scanfig img { flex: 1 1 auto; min-height: 0; object-fit: contain; width: 100%; border-radius: 1.2vh; }
 #gallery figure.scanfig figcaption { font-size: 3.2vh; color: var(--text); white-space: normal; }
 #gallery figure.scanfig figcaption.ok { color: var(--accent); font-weight: 800; }
+
+/* explore steps: the camera's view of the invader board between the steps and the side panel */
+body.watch main { grid-template-columns: .8fr 1.2fr 1fr; }
+body.gallery.watch #side { display: grid; }

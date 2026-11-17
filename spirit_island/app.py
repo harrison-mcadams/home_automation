@@ -119,6 +119,8 @@ class Store:
             out["vision"] = self.vision.public(self.game.state)
         if self.cards is not None:
             out["card_scan"] = self.cards.public()
+        if getattr(self, "slot_watch", None) is not None:
+            out["slot_watch"] = self.slot_watch.public()
         return out
 
     def vision_changed(self):
@@ -248,6 +250,18 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
     if cfg.get("camera_snapshot_url"):
         from .card_reader import CardScanner
         store.cards = CardScanner(cfg["camera_snapshot_url"], on_change=lambda: store.broadcast(store.snapshot()))
+
+        from .slot_watch import SlotWatch
+        store.slot_watch = SlotWatch(store, cfg["camera_snapshot_url"])
+        if start_vision and url:
+            store.slot_watch.start()
+
+    @app.get("/api/slot_watch.jpg")
+    def slot_watch_photo():
+        body = store.slot_watch.jpeg if getattr(store, "slot_watch", None) else b""
+        if not body:
+            return Response("no picture yet", status=503)
+        return Response(body, mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
 
     @app.post("/api/card_scan")
     def card_scan():
