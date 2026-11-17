@@ -206,6 +206,12 @@ class Store:
             if land is None:
                 continue
             step, did = s["step"], None
+            # The cards' choices as they stood before this change (a choice to destroy the last
+            # explorer in a land is gone from the list once it's done).
+            try:
+                focus_before = [c for c in self.card_focus() if c["now"] and not c["resolved"]]
+            except ActionError:
+                focus_before = []
             try:
                 push = self._card_push(lid) if piece in WHITE and delta < 0 and step in ("fast", "slow") else None
                 if push:
@@ -252,7 +258,8 @@ class Store:
             out.append({**e, "did": did})
             # A played card whose choice this carries out is done.
             try:
-                for c in [c for c in self.card_focus() if c["now"] and not c["resolved"]]:
+                done_now = set(self.game.state.get("resolved", {}))
+                for c in [c for c in focus_before if c["name"] not in done_now]:
                     for o in c["options"]:
                         if o["land"] == lid and option_done(o, {e["piece"]: delta}):
                             self.dispatch({"type": "card_resolved", "card": c["name"], "land": lid,
