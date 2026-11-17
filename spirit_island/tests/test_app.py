@@ -22,12 +22,12 @@ def test_state_and_actions_round_trip(client, tmp_path):
     assert '"A4": "S"' in (tmp_path / "board_terrains.json").read_text()
 
 
-def test_terrain_tags_carry_into_next_game(client):
+def test_printed_terrains_win_over_old_hand_tags(client):
     client.post("/api/action", json={"type": "configure", "players": [{}]})
     client.post("/api/action", json={"type": "land_info", "land": "A7", "terrain": "W"})
     client.post("/api/action", json={"type": "new_game"})
     r = client.post("/api/action", json={"type": "configure", "players": [{}]})
-    assert r.json["state"]["lands"]["A7"]["terrain"] == "W"
+    assert r.json["state"]["lands"]["A7"]["terrain"] == "S"  # as printed on board A
 
 
 def test_errors_are_400(client):

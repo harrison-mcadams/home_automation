@@ -102,7 +102,11 @@ class Store:
     def dispatch(self, action, source):
         with self.lock:
             if action.get("type") == "configure":
-                action = {**action, "terrains": {**self.saved_terrains(), **(action.get("terrains") or {})}}
+                # Hand-tagged terrains only fill gaps: the printed boards' own terrains win
+                # (old hand tags from before they were known can be wrong).
+                printed = rules.default_terrains(rules.BOARDS)
+                saved = {k: v for k, v in self.saved_terrains().items() if k not in printed}
+                action = {**action, "terrains": {**saved, **(action.get("terrains") or {})}}
             self.game.dispatch(action, source=source)
             self._save()
             payload = self._snapshot()
