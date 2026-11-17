@@ -575,7 +575,9 @@ def create_app(data_dir=None, vision_url=None, start_vision=True):
         from .step_watch import StepWatch
         if cfg.get("board_reference"):
             from .change_watch import ChangeWatch
-            store.change_watch = ChangeWatch(store, cfg["camera_snapshot_url"], cfg["board_reference"])
+            store.change_watch = ChangeWatch(store, cfg["camera_snapshot_url"].replace("/photo.jpg", "/frame.jpg"),
+                                             cfg["board_reference"], every=0.5,
+                                             fallback=cfg["camera_snapshot_url"])
             if start_vision and url:
                 store.change_watch.start()
         from .power_cards import PowerWatch

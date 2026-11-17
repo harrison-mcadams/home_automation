@@ -192,6 +192,10 @@ class ChangeTracker:
             self.status = "something large is on the board"
             return []
         events = []
+        if not patches:
+            self.baseline, self.base_corners = now, corners
+            self.status = "watching"
+            return []
         stuff_old, stuff_new = self._stuff(b, self.baseline), self._stuff(b, now)
         named = {}  # pixel names per photo, worked out only when needed
         for mask, _, changed in patches:

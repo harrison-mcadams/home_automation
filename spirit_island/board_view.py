@@ -233,6 +233,18 @@ class BoardView:
             old.unlink(missing_ok=True)
             old.with_suffix(".json").unlink(missing_ok=True)
 
+    def run_fast(self, grab_frame, every: float) -> None:
+        """Keep the newest video frame: far cheaper for the phone than a full photo, so it
+        can come often, for following pieces as they move."""
+        while not self.stopping.is_set():
+            started = time.time()
+            try:
+                self.frame = grab_frame()
+                self.frame_time = time.time()
+            except Exception:  # camera hiccup: the stale check below says so
+                pass
+            self.stopping.wait(max(0.1, every - (time.time() - started)))
+
     def run(self) -> None:
         while not self.stopping.is_set():
             started = time.time()
@@ -294,6 +306,13 @@ class BoardView:
                         return
                     ok, buf = cv2.imencode(".jpg", raw, [cv2.IMWRITE_JPEG_QUALITY, 92])
                     self._send(buf.tobytes(), "image/jpeg")
+                elif path == "/frame.jpg":
+                    frame = getattr(view, "frame", None)
+                    if frame is None or time.time() - getattr(view, "frame_time", 0) > 10:
+                        self.send_error(503, "no recent video frame")
+                        return
+                    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
+                    self._send(buf.tobytes(), "image/jpeg")
                 elif path == "/state.json":
                     with view.lock:
                         body = json.dumps(view.state).encode()
@@ -317,6 +336,8 @@ def main(argv=None) -> int:
     p.add_argument("--confirm", type=int, default=3,
                    help="how many of the last 2N-1 photos must agree before the shown state changes")
     p.add_argument("--save", help="folder to keep the raw photo whenever the reading changes")
+    p.add_argument("--fast-every", type=float, default=0,
+                   help="also keep the phone's video frame this often (seconds), at /frame.jpg")
     args = p.parse_args(argv)
 
     if args.image:
@@ -329,12 +350,16 @@ def main(argv=None) -> int:
         from vision import phone
         from vision.capture import fetch_still
 
-        url = phone.urls(phone.connect(args.phone, args.phone_host))["photo"]
+        urls = phone.urls(phone.connect(args.phone, args.phone_host))
+        url, shot = urls["photo"], urls["shot"]
         grab = lambda: fetch_still(url, timeout=20)  # noqa: E731
 
     view = BoardView(Path(args.reference), grab, every=args.every, confirm=args.confirm,
                      save_dir=Path(args.save) if args.save else None)
     threading.Thread(target=view.run, daemon=True).start()
+    if args.fast_every and not args.image:
+        threading.Thread(target=view.run_fast, args=(lambda: fetch_still(shot, timeout=5), args.fast_every),
+                         daemon=True).start()
     server = ThreadingHTTPServer((args.host, args.port), view.handler())
     print(f"Board page on http://localhost:{args.port} (Ctrl+C to stop)")
     try:

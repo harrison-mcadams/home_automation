@@ -13,9 +13,10 @@ from .change_tracker import ChangeTracker
 
 
 class ChangeWatch:
-    def __init__(self, store, photo_url: str, boards_dir: str, every: float = 1.0):
+    def __init__(self, store, photo_url: str, boards_dir: str, every: float = 1.0, fallback: str | None = None):
         self.store = store
         self.url = photo_url
+        self.fallback = fallback  # full photos, when there are no video frames
         self.every = every
         self.tracker = ChangeTracker(boards_dir)
         self.recent: list = []     # the last few events, newest first, for the screens
@@ -47,8 +48,14 @@ class ChangeWatch:
         letter = v.camera_board(s) if v else None
         if not letter or not s.get("lands"):
             return
-        with urllib.request.urlopen(self.url, timeout=8) as r:
-            image = cv2.imdecode(np.frombuffer(r.read(), np.uint8), cv2.IMREAD_COLOR)
+        try:
+            with urllib.request.urlopen(self.url, timeout=8) as r:
+                image = cv2.imdecode(np.frombuffer(r.read(), np.uint8), cv2.IMREAD_COLOR)
+        except Exception:
+            if not self.fallback:
+                raise
+            with urllib.request.urlopen(self.fallback, timeout=8) as r:
+                image = cv2.imdecode(np.frombuffer(r.read(), np.uint8), cv2.IMREAD_COLOR)
         before = self.tracker.status
         events = self.tracker.update(image, letter)
         for e in events:
