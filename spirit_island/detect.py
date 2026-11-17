@@ -187,6 +187,8 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     region = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * rim + 1, 2 * rim + 1)))
     board_area = max(1, int((region > 0).sum()))
     kwargs.setdefault("min_split_thickness", 1.2 * min_thickness * np.sqrt(board_area))
+    if lands and lands[0] is not None:
+        kwargs.setdefault("zones", lands[0])
     blobs, change_mask, labels, scale = find_changes(reference, aligned, region, return_labels=True, **kwargs)
     work = cv2.resize(aligned, (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_AREA)
     full_board_area = float((board_mask > 0).sum()) * scale * scale  # in working pixels
@@ -229,8 +231,17 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
             closed = cv2.morphologyEx(piece_mask.astype(np.uint8), cv2.MORPH_CLOSE,
                                       cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
             closed_thickness = cv2.distanceTransform(closed, cv2.DIST_L2, 5).max() / scale
-            if closed_thickness < min_thickness * np.sqrt(board_area):
+            # A pale plastic town or explorer seen from above can be thin too (a roof edge, a
+            # hollow middle the land shows through), but it is compact, not a long line.
+            compact_white = (entry["type"] in ("town", "explorer", "city")
+                             and closed_thickness >= 0.5 * min_thickness * np.sqrt(board_area)
+                             and max(w, h) <= 0.12 * np.sqrt(board_area))
+            if closed_thickness < min_thickness * np.sqrt(board_area) and not compact_white:
                 continue  # a thin line of change along a printed edge, not a piece
+            if compact_white and closed_thickness < min_thickness * np.sqrt(board_area):
+                # Only part of a white building shows against a pale land (a roof edge);
+                # a real explorer reads thicker than this, so call it a town.
+                entry.update({"type": "town", "why": entry["why"] + "; thin pale outline: part of a building"})
             entry["thickness_px"] = round(float(closed_thickness), 1)
         pieces.append(entry)
     # Safety net: a blob much bigger than a typical piece may be several pieces touching.
@@ -257,7 +268,7 @@ def board_state(pieces: list) -> dict:
         land = p.get("land") or "?"
         kind = p.get("type", "unknown") + (f" ({p['colour']})" if p.get("colour") else "")
         state.setdefault(land, {})
-        state[land][kind] = state[land].get(kind, 0) + 1
+        state[land][kind] = state[land].get(kind, 0) + int(p.get("count", 1))
     return dict(sorted(state.items()))
 
 

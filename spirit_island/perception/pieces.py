@@ -37,7 +37,14 @@ RULES = {
     "disc_min_fill": 0.72,  # dahan 0.78-0.84; an explorer with sand in its gaps 0.64
     "dahan_min_value": 130,  # dahan V 202-219; leaves room for shade
     "energy_min_texture": 20,  # printed card: texture 25-32; dahan 7-25 (dim light), presence 4-17
-    "energy_min_size": 0.085,  # energy marker 0.093-0.096; dahan 0.065-0.072, presence up to 0.082
+    "energy_min_size": 0.09,  # a dahan on busy jungle art can read 0.085 and textured
+    # Evening light (2026-11-16): the wooden dahan (domed, tan) read saturated tan, H 14-22,
+    # S 99-178, V 173-224, size 0.055-0.085: as saturated as a painted disc, so a warm,
+    # tan, roundish piece is a dahan before it is presence.
+    "tan_hue": (8, 24),
+    "tan_min_saturation": 80,
+    "tan_max_elongation": 1.9,  # a dahan's shadow can stretch it
+    "pale_dahan_max_size": 0.08,  # a pale warm piece this small is a dahan; bigger is a city/town  # energy marker 0.093-0.096; dahan 0.065-0.072, presence up to 0.082
     # White plastic invaders. Sizes are sqrt(piece area) / sqrt(board area).
     "explorer_max_thickness": 0.030,  # spindly: 0.025-0.0265; town and city 0.035-0.040
     "city_min_size": 0.075,  # city 0.080-0.083; explorer 0.065-0.070
@@ -123,16 +130,27 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
         # Before presence: in warm sunlight the tan card can get as saturated as a yellow disc,
         # but it stays textured (printed) and larger.
         out = {"type": "energy", "why": f"tan, printed (texture {f.texture}, size {f.size})"}
+    elif (rules["tan_hue"][0] <= f.hue <= rules["tan_hue"][1] and f.saturation >= rules["tan_min_saturation"]
+          and f.value >= rules["dahan_min_value"] and f.elongation <= rules["tan_max_elongation"]
+          and f.fill >= 0.6):
+        out = {"type": "dahan", "why": f"tan wood (hue {f.hue}, sat {f.saturation})"}
+    elif (rules["tan_hue"][0] <= f.hue <= rules["tan_hue"][1] and f.saturation >= rules["tan_min_saturation"]
+          and f.value >= rules["dahan_min_value"] and f.size <= 0.13):
+        # Long or ragged and tan: two dahan touching that couldn't be cut apart. Count them
+        # by area against one dahan's.
+        n = 2 if f.size >= 0.095 else 1  # one dahan plus its shadow reads up to ~0.09
+        out = {"type": "dahan", "count": n, "why": f"tan wood, {n} touching (size {f.size}, elongation {f.elongation})"}
     elif f.saturation >= rules["vivid_min_saturation"] and f.value >= rules["presence_min_value"]:
         out = {"type": "presence", "colour": hue_name(f.hue), "why": f"vivid {hue_name(f.hue)} (sat {f.saturation})"}
     elif blue_grey and f.value <= rules["blight_max_value"]:
         out = {"type": "blight", "why": f"blue-grey (hue {f.hue}, sat {f.saturation}, value {f.value})"}
-    elif warm and f.value >= rules["dahan_min_value"] and disc:
+    elif warm and f.value >= rules["dahan_min_value"] and disc and not (
+            f.saturation <= rules["pale_max_saturation"] and f.size > rules["pale_dahan_max_size"]):
         out = {"type": "dahan", "why": f"plain cream (hue {f.hue}, texture {f.texture})"}
     elif f.saturation <= rules["pale_max_saturation"] and f.value >= rules["pale_min_value"]:
         if f.thickness <= rules["explorer_max_thickness"]:
             kind = "explorer"
-        elif f.size >= rules["city_min_size"] and f.elongation <= rules["city_max_elongation"]:
+        elif f.size >= rules["city_min_size"] and (f.elongation <= rules["city_max_elongation"] or f.size >= 0.1):
             kind = "city"
         else:
             kind = "town"
