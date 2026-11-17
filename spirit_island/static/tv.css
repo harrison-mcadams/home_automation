@@ -28,6 +28,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 #s-fear .meter i { background: var(--fear); }
 #s-blight .meter i { background: var(--blight); }
 .stat.wide > span { font-size: 3vh; }
+#s-spirit > span { font-size: 3.4vh; white-space: nowrap; }
 .stat .note { font-size: 2vh; color: var(--warn); font-weight: 700; margin-left: .6vw; }
 .stat.alarm { border-color: var(--bad); box-shadow: 0 0 2vh rgba(255, 122, 107, .35) inset; }
 

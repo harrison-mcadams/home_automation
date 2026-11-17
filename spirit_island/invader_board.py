@@ -63,6 +63,7 @@ class InvaderBoardReader:
         # which the colour comparison can't tell from a face.
         back = cv2.imread(str(BACKS / "stage1_back.jpg"))
         self.back_kp, self.back_des = self.sift.detectAndCompute(cv2.cvtColor(back, cv2.COLOR_BGR2GRAY), None)
+        self.back_size = back.shape[:2]
         self.empty = {}
         aw, ah = self.art_size
         for slot, (x, y, w, h) in SLOTS.items():
@@ -99,7 +100,14 @@ class InvaderBoardReader:
             return False
         H, inl = cv2.findHomography(np.float32([self.back_kp[g.queryIdx].pt for g in good]),
                                     np.float32([kp[g.trainIdx].pt for g in good]), cv2.RANSAC, 6)
-        return H is not None and inl.sum() >= 25  # the deck gives ~80; card faces and the board under 15
+        if H is None or inl.sum() < 20:  # the deck gives 60-80
+            return False
+        # A real deck fills the space: the back picture must map onto most of the crop, as a
+        # sensible card shape (chance matches on the board's painted art don't).
+        bh, bw = self.back_size
+        q = cv2.perspectiveTransform(np.float32([[0, 0], [bw, 0], [bw, bh], [0, bh]]).reshape(-1, 1, 2), H).reshape(-1, 2)
+        area = cv2.contourArea(q)
+        return bool(cv2.isContourConvex(q) and 0.5 * 400 * 600 < area < 1.6 * 400 * 600)
 
     def read(self, frame: np.ndarray) -> dict:
         H = self.locate(frame)
