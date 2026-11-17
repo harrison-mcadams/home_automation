@@ -164,7 +164,8 @@ class BoardView:
             self.misses = 0
         elif len(self.boards) > 1:
             self.misses += 1
-            if self.misses >= 2:
+            # Right after starting (nothing read yet), look for the right board at once.
+            if self.misses >= 2 or self.stable is None:
                 other = self._other_board(raw)
                 if other:
                     self.use(other[0])
