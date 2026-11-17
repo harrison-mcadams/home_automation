@@ -755,7 +755,7 @@ def _advance(s):
         "do": [
             "Slide the invader cards one space left: Ravage card to the discard pile, Build card to "
             "Ravage, Explore card to Build.",
-            "Tap Next and the app moves them too.",
+            "The camera moves on by itself once it sees the cards shifted (or tap Next).",
         ],
         "why": "So each card explores, then builds the next round, then ravages the round after: "
                "you always see two rounds of trouble coming.",

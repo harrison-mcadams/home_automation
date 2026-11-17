@@ -83,6 +83,21 @@ class SlotWatch:
                           "slots": {k: (v.get("card") if v.get("kind") == "face" else v.get("kind")) for k, v in slots.items()},
                           "explore_seen": seen}
         game = self.store.game.state
+        # Advance step: once the cards are seen one space left (twice running), move on.
+        if game.get("step") == "invader.advance":
+            have = game["invaders"]["slots"]
+            read = self.state["slots"]
+            moved = (read.get("ravage") == have.get("build") and read.get("build") == have.get("explore")
+                     and (have.get("build") or have.get("explore")))
+            self.advanced = (getattr(self, "advanced", 0) + 1) if moved else 0
+            if self.advanced >= 2:
+                self.advanced = 0
+                try:
+                    self.store.dispatch({"type": "next", "screen": True}, "camera")
+                    return
+                except Exception as e:
+                    with self.lock:
+                        self.state["why"] = str(e)
         if seen and len(self.recent) == 2 and self.recent[0] == seen and game["invaders"]["slots"]["explore"] is None                 and game.get("step") in WATCH_STEPS:
             try:
                 self.store.dispatch({"type": "reveal_invader", "card": seen}, "camera")
