@@ -142,6 +142,15 @@ function landRow(lid, what, button) {
 }
 
 const HELPERS = {
+  gain_power(h) {
+    const box = el("div", { class: "helper" });
+    for (const p of h.players || []) {
+      box.append(landRow(p.name, el("span", {}, "gained a power card?"),
+        el("span", {}, el("button", { onclick: () => act({ type: "gain_power", player: p.i, delta: -1 }) }, "-"), " ",
+          el("button", { onclick: () => act({ type: "gain_power", player: p.i }) }, "Took the next one"))));
+    }
+    return box;
+  },
   verify(h) {
     const box = el("div", { class: "helper" });
     box.append(el("button", { class: "primary", onclick: () => act({ type: "place_start" }) },
@@ -206,10 +215,13 @@ const HELPERS = {
       addBtn.classList.toggle("hidden", rows.length >= 4);
     }
     drawPlayers();
+    const prog = el("input", { type: "checkbox", onchange: () => autosave(0) });
+    prog.checked = s.progression !== false;
     const adv = el("select", { onchange: () => autosave(0) }, REF.adversaries.map((a) => el("option", { value: a, selected: a === s.adversary.name }, a)));
     const lvl = el("input", { type: "number", min: 0, max: 6, value: s.adversary.level, style: "width:5em" });
     const diff = el("input", { type: "number", min: 0, max: 20, value: s.adversary.difficulty, style: "width:5em" });
     box.append(el("h3", {}, "Players"), playersBox, addBtn, dealBtn,
+      el("label", { class: "check-line" }, prog, " Use the recommended power progression (best for learning)"),
       el("label", {}, "Adversary (optional; leave None for now)"), adv,
       el("label", {}, "Adversary level and difficulty (from its panel; used for the score)"),
       el("div", { class: "btngrid" }, lvl, diff),
@@ -220,6 +232,7 @@ const HELPERS = {
         players: inputs.map((x) => ({ name: x.name.value.trim(), spirit: x.sp.value })),
         boards: inputs.map((x) => x.bd.value),
         adversary: { name: adv.value, level: +lvl.value, difficulty: +diff.value },
+        progression: prog.checked,
       });
     }
     if (!s.players.length) setTimeout(() => autosave(0));

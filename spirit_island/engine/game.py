@@ -286,6 +286,14 @@ class Game:
         s["start_placed"] = True
         return "Starting pieces placed"
 
+    def _do_gain_power(self, action):
+        """With power progression: a player takes the next card on their list."""
+        s = self.state
+        i = int(action.get("player", 0))
+        nxt = s.setdefault("progression_next", {})
+        nxt[str(i)] = max(0, nxt.get(str(i), 0) + int(action.get("delta", 1)))
+        return f"{s['players'][i]['name']} gained a power card"
+
     def _do_back(self, action):
         """Go back one item, or to the last item of the previous setup screen, keeping
         everything already chosen."""
@@ -317,6 +325,8 @@ class Game:
                          "spirit": p.get("spirit") or ""} for i, p in enumerate(players)]
         s["boards"] = list(boards)
         adv = action.get("adversary") or {}
+        # Learning games default to each spirit's recommended power progression.
+        s["progression"] = bool(action.get("progression", s.get("progression", True)))
         s["adversary"] = {"name": adv.get("name", "None"),
                           "level": int(adv.get("level", 0)),
                           "difficulty": int(adv.get("difficulty", 0))}

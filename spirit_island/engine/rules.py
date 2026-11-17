@@ -97,6 +97,20 @@ START_PRESENCE = {
     "Vital Strength of the Earth": [("M", 2), ("J", 1)],
 }
 
+# Recommended power progressions (from each spirit's Power Progression card): when you gain
+# a power card, take the next one instead of drawing. A Major means forgetting a power.
+PROGRESSION = {
+    "River Surges in Sunlight": [("Uncanny Melting", "Minor"), ("Nature's Resilience", "Minor"),
+        ("Pull Beneath the Hungry Earth", "Minor"), ("Accelerated Rot", "Major"), ("Song of Sanctity", "Minor"),
+        ("Tsunami", "Major"), ("Encompassing Ward", "Minor")],
+    "Lightning's Swift Strike": [("Delusions of Danger", "Minor"), ("Call to Bloodshed", "Minor"),
+        ("Powerstorm", "Major"), ("Purifying Flame", "Minor"), ("Pillar of Living Flame", "Major"),
+        ("Entrancing Apparitions", "Minor"), ("Call to Isolation", "Minor")],
+    "Vital Strength of the Earth": [("Rouse the Trees and Stones", "Minor"), ("Call to Migrate", "Minor"),
+        ("Poisoned Land", "Major"), ("Devouring Ants", "Minor"), ("Vigor of the Breaking Dawn", "Major"),
+        ("Voracious Growth", "Minor"), ("Savage Mawbeasts", "Minor")],
+}
+
 # Starting pieces printed on each balanced board (expansion icons left out).
 START_PIECES = {
     "A": {2: {"cities": 1, "dahan": 1}, 3: {"dahan": 2}, 4: {"blight": 1}, 6: {"dahan": 1}, 7: {"dahan": 2}, 8: {"towns": 1}},

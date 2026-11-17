@@ -347,7 +347,27 @@ def _pieces(s):
     }
 
 
+def _progression_list(cards):
+    return ", ".join(f"{i}. {c}{' (Major)' if kind == 'Major' else ''}" for i, (c, kind) in enumerate(cards, 1))
+
+
 def _cards(s):
+    prog = s.get("progression") and any(p["spirit"] in rules.PROGRESSION for p in s["players"])
+    if prog:
+        do = [f"{p['name']}: pull these cards out of the Minor and Major decks (as on {p['spirit']}'s "
+              f"Power Progression card) and stack them face down in this order: "
+              f"{_progression_list(rules.PROGRESSION[p['spirit']])}."
+              for p in s["players"] if p["spirit"] in rules.PROGRESSION]
+        do += ["Whenever growth says gain a power card, take the next card from your stack instead of "
+               "drawing. After taking a Major, forget (remove) one power card of your choice.",
+               "Shuffle the rest of the Minor and Major decks and set them nearby; some powers draw from them."]
+        pics = [{"src": f"spirits/{rules.SPIRIT_ART[p['spirit']][0]}/progression.jpg",
+                 "caption": f"{p['name']}'s power progression"}
+                for p in s["players"] if p["spirit"] in rules.PROGRESSION]
+        return {"title": "Power cards: your progression", "single": True, "do": do,
+                "why": "A fixed, good order of new powers, so a first game is about learning, not choosing.",
+                "tips": ["Turn the progression off on the Players step to draw powers normally."],
+                "pictures": pics}
     return {
         "title": "Power card decks",
         "do": [
@@ -391,18 +411,37 @@ def _first_explore(s):
 
 # --- round --------------------------------------------------------------------
 
+def _next_powers(s):
+    if not s.get("progression"):
+        return []
+    out = []
+    for i, p in enumerate(s["players"]):
+        lst = rules.PROGRESSION.get(p["spirit"])
+        k = s.get("progression_next", {}).get(str(i), 0)
+        if lst and k < len(lst):
+            c, kind = lst[k]
+            out.append(f"{p['name']}'s next power card, if you gain one: {c}"
+                       + (" (a Major: then forget a power)." if kind == "Major" else "."))
+    return out
+
+
 def _growth(s):
     return {
         "title": "Growth",
         "do": [
             "Each spirit picks ONE growth option on the top of their panel and does everything in it.",
             "Common pieces of growth: reclaim (take your discarded power cards back into hand), "
-            "gain a power card (draw 4 minor or major, keep 1), add presence (move a disc from a "
-            "track onto a land within the range shown), gain energy.",
+            + ("gain a power card (take the next card from your progression stack), " if s.get("progression")
+             else "gain a power card (draw 4 minor or major, keep 1), ")
+            + "add presence (move a disc from a track onto a land within the range shown), gain energy.",
+        ] + _next_powers(s) + [
             "Moving presence off a track uncovers a bigger number or a new symbol. That is how a "
             "spirit gets stronger.",
         ],
         "why": "Everyone does this at the same time; it does not matter who goes first.",
+        "helper": ({"kind": "gain_power", "players": [{"i": i, "name": p["name"]} for i, p in enumerate(s["players"])
+                                                       if p["spirit"] in rules.PROGRESSION]}
+                   if s.get("progression") else None),
         "tips": ["Running low on cards in hand? A reclaim option is usually the right choice.",
                  "Taking a Major power means forgetting (permanently removing) one card you own."],
     }
