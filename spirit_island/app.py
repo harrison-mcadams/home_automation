@@ -416,6 +416,12 @@ class Store:
         new_card = any(c["name"] in prog for c in pw.get("cards", []))
         if option is None or (new_card and option not in GROWTH_GAINS_CARD.get(spirit, set())):
             return
+        # No new presence is also what the table looks like before anything is done: an
+        # option that adds none is only suggested once something else of it shows (a card).
+        if added == 0 and not new_card:
+            if s.get("growth_suggest", {}).get("0"):
+                self.dispatch({"type": "growth_suggest", "option": 0}, "camera")
+            return
         if s.get("growth_suggest", {}).get("0") != option:
             self.dispatch({"type": "growth_suggest", "option": option}, "camera")
 
