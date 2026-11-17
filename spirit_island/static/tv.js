@@ -401,7 +401,19 @@ function drawMap(v) {
     const lid = (v.board || "") + l.name, land = S.state.lands[lid];
     info[l.name] = { terrain: land && land.terrain, hit: hits.has(lid) };
   }
+  // A power card in view: light up the lands it can target, with what it would do there.
+  const tg = S.targets || {}, tags = {};
+  for (const [card, lands] of Object.entries(tg)) {
+    for (const [lid, what] of Object.entries(lands)) {
+      if (lid === "spirit") continue;
+      const name = lid.slice((v.board || "").length);
+      info[name] = info[name] || {};
+      info[name].hit = true;
+      tags[name] = (Object.keys(tg).length > 1 ? card.split(" ")[0] + ": " : "") + what;
+    }
+  }
   BoardMap.setLands(mapView, info);
+  BoardMap.setTags(mapView, tags);
   BoardMap.setPieces(mapView, v.pieces || []);
 }
 

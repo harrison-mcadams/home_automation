@@ -43,12 +43,12 @@ const BoardMap = (() => {
       </pattern>
       <radialGradient id="bm-sea" cx="50%" cy="50%" r="75%"><stop offset="0" stop-color="#1f5d86"/><stop offset="1" stop-color="#0b2236"/></radialGradient>
       <filter id="bm-shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity=".55"/></filter>`;
-    const sea = svg("g"), lands = svg("g"), labels = svg("g", { class: "labels" }), pieces = svg("g");
+    const sea = svg("g"), lands = svg("g"), labels = svg("g", { class: "labels" }), pieces = svg("g"), tags = svg("g");
     // Everything sits in one group, so the board can be turned to face the player.
-    const world = svg("g", {}, sea, lands, labels, pieces);
+    const world = svg("g", {}, sea, lands, labels, pieces, tags);
     root.append(defs, world);
     container.replaceChildren(root);
-    return { root, world, sea, lands, labels, pieces, map: null, els: [], rot: 0 };
+    return { root, world, sea, lands, labels, pieces, tags, map: null, els: [], rot: 0 };
   }
 
   // Turn the drawn board by 0, 90, 180 or 270 degrees (clockwise); pieces stay upright.
@@ -132,5 +132,19 @@ const BoardMap = (() => {
     v.els = next;
   }
 
-  return { create, setMap, setLands, setPieces, setRotation };
+  // Short notes on lands (what a power card would do there), kept upright.
+  function setTags(v, tags) {
+    v.tags.replaceChildren();
+    for (const l of (v.map && v.map.lands) || []) {
+      const t = tags[l.name];
+      if (!t) continue;
+      const w = Math.max(120, t.length * 17);
+      const inner = svg("g", { transform: `rotate(${-v.rot})` },
+        svg("rect", { x: -w / 2, y: -48, width: w, height: 40, rx: 12, class: "tagbg" }),
+        svg("text", { x: 0, y: -21, class: "tagtx" }, document.createTextNode(t)));
+      v.tags.append(svg("g", { transform: `translate(${l.centre[0]} ${l.centre[1]})` }, inner));
+    }
+  }
+
+  return { create, setMap, setLands, setPieces, setRotation, setTags };
 })();

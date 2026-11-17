@@ -127,6 +127,22 @@ POWER_INFO = {
     "Encompassing Ward": (1, "fast"),
 }
 
+# What each recognised power card can target: range from your presence, which lands
+# ("any", terrain letters, or "coastal"), or a spirit instead of a land.
+POWER_TARGETS = {
+    "Boon of Vigor": {"spirit": True},
+    "Encompassing Ward": {"spirit": True},
+    "Flash Floods": {"range": 1, "land": "any"},
+    "River's Bounty": {"range": 0, "land": "any"},
+    "Wash Away": {"range": 1, "land": "any"},
+    "Uncanny Melting": {"range": 1, "land": "any"},
+    "Nature's Resilience": {"range": 1, "land": "any"},
+    "Pull Beneath the Hungry Earth": {"range": 1, "land": "any"},
+    "Accelerated Rot": {"range": 2, "land": "JW"},
+    "Song of Sanctity": {"range": 1, "land": "MJ"},
+    "Tsunami": {"range": 2, "land": "coastal"},
+}
+
 # Starting pieces printed on each balanced board (expansion icons left out).
 START_PIECES = {
     "A": {2: {"cities": 1, "dahan": 1}, 3: {"dahan": 2}, 4: {"blight": 1}, 6: {"dahan": 1}, 7: {"dahan": 2}, 8: {"towns": 1}},

@@ -20,7 +20,7 @@ from .engine import rules
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 MIN_INLIERS = 60      # a card in view gives 150+; the background gives up to ~40
-WATCH_STEPS = ("spirit.growth", "spirit.energy", "spirit.powers")
+WATCH_STEPS = ("spirit.growth", "spirit.energy", "spirit.powers", "fast", "slow")
 
 
 def card_paths(spirit: str) -> dict:

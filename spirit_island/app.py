@@ -131,7 +131,11 @@ class Store:
         if getattr(self, "slot_watch", None) is not None:
             out["slot_watch"] = self.slot_watch.public()
         if getattr(self, "power_watch", None) is not None:
-            out["power_watch"] = self.power_watch.public()
+            out["power_watch"] = pw = self.power_watch.public()
+            # Where the cards in view could be used, for the drawn board.
+            if self.game.state["step"] in ("spirit.powers", "fast", "slow"):
+                from .engine.targets import targets
+                out["targets"] = {c["name"]: targets(self.game.state, c["name"]) for c in pw.get("cards", [])}
         return out
 
     def vision_changed(self):

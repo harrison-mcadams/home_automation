@@ -27,3 +27,6 @@
 .boardmap.art .land { fill: transparent !important; stroke: transparent; filter: none; }
 .boardmap.art .land.hit { stroke: #ffd968; fill: rgba(255, 217, 104, .18) !important; }
 .boardmap.art .lnum { display: none; }
+
+.boardmap .tagbg { fill: rgba(10, 18, 14, .85); stroke: #ffd968; stroke-width: 3; }
+.boardmap .tagtx { font: 700 26px system-ui, sans-serif; fill: #fff3c4; text-anchor: middle; }
