@@ -28,7 +28,7 @@ const BoardMap = (() => {
       case "dahan": return svg("circle", { r: s * .48, class: "dahan" });
       case "blight": return svg("path", { d: `M0 ${-s * .6} L${s * .2} ${-s * .2} L${s * .6} ${-s * .25} L${s * .3} ${s * .1} L${s * .5} ${s * .55} L0 ${s * .3} L${-s * .5} ${s * .55} L${-s * .3} ${s * .1} L${-s * .6} ${-s * .25} L${-s * .2} ${-s * .2} Z`, class: "blight" });
       case "presence": return svg("circle", { r: s * .42, class: "presence", fill: PRESENCE[p.colour] || "#b993f5" });
-      case "energy": return null;
+      case "energy": case "faint": return null;
       default: return svg("circle", { r: s * .3, class: "unknown" });
     }
   }
@@ -100,7 +100,7 @@ const BoardMap = (() => {
   function setPieces(v, list) {
     const old = v.els.slice(), next = [];
     for (const p of list) {
-      if (p.type === "energy") continue;
+      if (p.type === "energy" || p.type === "faint") continue;
       const key = p.type + "|" + (p.colour || "");
       // The nearest unclaimed piece of the same kind is the "same" piece, if it's close.
       let best = null, bd = 140;

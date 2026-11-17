@@ -73,7 +73,8 @@ def reconcile(seen: dict, board_state: dict | None, board: str, lands: dict) -> 
         counts = dict(counts)
         tracked = lands.get(lid, {})
         land = lid[len(board):]
-        unknown = int(((board_state or {}).get(land) or {}).get("unknown", 0))
+        here = (board_state or {}).get(land) or {}
+        unknown = int(here.get("unknown", 0)) + int(here.get("faint", 0))
         have = sum(counts[p] for p in INVADERS)
         want = sum(tracked.get(p, 0) for p in INVADERS)
         if want and have < want and unknown:

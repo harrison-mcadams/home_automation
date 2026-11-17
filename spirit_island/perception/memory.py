@@ -122,7 +122,7 @@ class PieceMemory:
         pieces = result["pieces"]
         free = list(range(len(self.tracks)))
         for p in pieces:
-            if p.get("type") in (None, "unknown", "table") or not p.get("reference_bbox"):
+            if p.get("type") in (None, "unknown", "table", "faint") or not p.get("reference_bbox"):
                 continue
             x, y, w, h = p["reference_bbox"]
             cx, cy = x + w / 2, y + h / 2

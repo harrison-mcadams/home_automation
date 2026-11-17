@@ -280,7 +280,14 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
                              and closed_thickness >= 0.5 * min_thickness * np.sqrt(board_area)
                              and max(w, h) <= 0.12 * np.sqrt(board_area))
             if closed_thickness < min_thickness * np.sqrt(board_area) and not compact_white:
-                continue  # a thin line of change along a printed edge, not a piece
+                # Usually a thin line along a printed edge. A small, compact, pale scrap may be
+                # an explorer in shade: kept as "faint", which only ever stands in for a
+                # piece the tracker already expects in that land.
+                if (max(w, h) <= 0.08 * np.sqrt(board_area) and feats.saturation < 90
+                        and feats.size >= 0.02 and feats.elongation <= 3):
+                    entry.update({"type": "faint", "why": "small pale scrap (an explorer in shade?)"})
+                    pieces.append(entry)
+                continue
             if compact_white and closed_thickness < min_thickness * np.sqrt(board_area):
                 # Only part of a white building shows against a pale land (a roof edge);
                 # a real explorer reads thicker than this, so call it a town.
