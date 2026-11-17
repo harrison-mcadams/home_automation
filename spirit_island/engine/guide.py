@@ -316,6 +316,17 @@ def start_presence(s):
     return out
 
 
+def _expected_start(s):
+    out = {}
+    for b in s["boards"]:
+        for n in range(1, 9):
+            out[f"{b}{n}"] = dict(rules.START_PIECES.get(b, {}).get(n, {}))
+    for lid, n in start_presence(s).items():
+        if lid in out:
+            out[lid]["presence"] = out[lid].get("presence", 0) + n
+    return out
+
+
 def _pieces(s):
     rows = []
     for b in s["boards"]:
@@ -331,11 +342,12 @@ def _pieces(s):
             "Dahan: cream wooden discs. Town: small white house. City: tall white tower. "
             "Blight: grey-blue bumpy piece (from the box, not the blight card).",
             "Ignore the paw and spiral icons; they're for an expansion.",
-            "Done? Tap Verify on the phone: the camera checks every land against what should be there.",
+            "The TV marks each land live as the camera spots its pieces. When every land shows a tick "
+            "you're done; tap Verify on the phone to record them.",
         ],
         "why": "This is the island as the invaders first find it.",
         "tips": [],
-        "helper": {"kind": "verify", "placed": bool(s.get("start_placed")),
+        "helper": {"kind": "verify", "placed": bool(s.get("start_placed")), "expected": _expected_start(s),
                    # where each land sits on the single-board picture, for marking the check on it
                    "points": ({f"{s['boards'][0]}{n}": _land_point(f"{s['boards'][0]}{n}", s["boards"][0])
                                for n in range(1, 9)} if len(s["boards"]) == 1 else {})},

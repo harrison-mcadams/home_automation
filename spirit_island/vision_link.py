@@ -243,6 +243,8 @@ class VisionLink:
             "view": self.view,
             "pieces": list(self.pieces),
             "seen": seen,
+            # the newest photo's reading, before it settles: for live feedback while placing
+            "latest": to_game_counts(raw.get("seen"), board) if board and raw.get("status") == "ok" else None,
             "blind": is_blind,
             "diffs": diffs,
         }

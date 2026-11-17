@@ -15,8 +15,9 @@ const ROUND_STEPS = ["spirit.growth", "spirit.energy", "spirit.powers", "fast", 
 
 // Starting-piece check: each land the camera covers, what should be there vs what it sees.
 function pieceCheck() {
-  const v = S.vision || {}, seen = v.seen, lands = S.state.lands;
-  if (!S.state.start_placed) return null;
+  const v = S.vision || {}, h = S.guide.helper || {};
+  // Live: the newest photo against the printed starting pieces, from the moment the step opens.
+  const seen = v.latest || v.seen, lands = h.expected || S.state.lands;
   if (!seen) return { ok: null, rows: [], note: v.connected ? "The camera can't line up the board yet." : "The camera isn't connected." };
   const P = ["explorers", "towns", "cities", "dahan", "blight", "presence"];
   const word = { explorers: "explorer", towns: "town", cities: "city", dahan: "Dahan", blight: "blight", presence: "presence" };

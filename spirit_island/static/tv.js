@@ -21,8 +21,9 @@ const TERRAIN_VAR = { J: "var(--J)", W: "var(--W)", S: "var(--S)", M: "var(--M)"
 
 // Starting-piece check: each land the camera covers, what should be there vs what it sees.
 function pieceCheck() {
-  const v = S.vision || {}, seen = v.seen, lands = S.state.lands;
-  if (!S.state.start_placed) return null;
+  const v = S.vision || {}, h = S.guide.helper || {};
+  // Live: the newest photo against the printed starting pieces, from the moment the step opens.
+  const seen = v.latest || v.seen, lands = h.expected || S.state.lands;
   if (!seen) return { ok: null, rows: [], note: v.connected ? "The camera can't line up the board yet." : "The camera isn't connected." };
   const P = ["explorers", "towns", "cities", "dahan", "blight", "presence"];
   const word = { explorers: "explorer", towns: "town", cities: "city", dahan: "Dahan", blight: "blight", presence: "presence" };
@@ -215,7 +216,7 @@ function markCheck(c, h) {
     const pt = h.points[r.lid];
     if (!pt) continue;
     const tag = el("div", { class: "check-tag " + (r.ok ? "ok" : "bad") },
-      r.ok ? "✓" : el("span", {}, el("b", {}, "should be "), r.want, el("br"), el("b", {}, "sees "), r.got));
+      r.ok ? "✓" : el("span", {}, el("b", {}, "needs "), r.want, el("br"), el("b", {}, "sees "), r.got));
     tag.style.left = pt[0] * 100 + "%"; tag.style.top = pt[1] * 100 + "%";
     layer.append(tag);
   }
