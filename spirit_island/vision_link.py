@@ -113,7 +113,7 @@ def judge(state: dict, diff: dict) -> tuple[str, str]:
 class VisionLink:
     """Polls the board page and keeps the latest settled reading."""
 
-    def __init__(self, url: str = "http://localhost:8091", every: float = 3.0, on_change=None, board_map=None):
+    def __init__(self, url: str = "http://localhost:8091", every: float = 1.0, on_change=None, board_map=None):
         self.url = url.rstrip("/")
         # BoardMap(s) for the drawn board view: one, or {letter: BoardMap} when the camera
         # knows several boards and says which one it sees.

@@ -152,13 +152,20 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     covered = valid_mask(image.shape, reg, reference.shape)
     # Stay clear of the picture's edges, in both photos: where the board runs off the
     # frame, a few pixels of misalignment look like change.
-    edge = max(8, int(0.006 * max(reference.shape[:2])))
+    # The mask work below (big closes and erosions) runs on a quarter-size copy: at full
+    # camera resolution it took seconds per photo, and masks don't need the detail.
+    H_full, W_full = reference.shape[:2]
+    q = 4
+    small = (max(1, W_full // q), max(1, H_full // q))
+    shrink = lambda m: cv2.resize(m, small, interpolation=cv2.INTER_NEAREST)  # noqa: E731
+    covered = shrink(covered)
+    edge = max(2, int(0.006 * max(reference.shape[:2]) / q))
     covered = cv2.erode(covered, np.ones((2 * edge + 1, 2 * edge + 1), np.uint8))
     covered[:edge, :] = 0
     covered[-edge:, :] = 0
     covered[:, :edge] = 0
     covered[:, -edge:] = 0
-    region = cv2.bitwise_and(board_mask, covered)
+    region = cv2.bitwise_and(shrink(board_mask), covered)
     # Only the board itself counts, never the table around it: the board slides, so the
     # wood next to it changes. Outline the board in *this* photo too and keep the overlap,
     # pulled in a little from the rim.
@@ -167,8 +174,7 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     # not take pieces with them.
     current = find_board(image)
     if current is not None:
-        now_mask = cv2.warpPerspective(current.mask, reg.homography, (reference.shape[1], reference.shape[0]),
-                                       flags=cv2.INTER_NEAREST)
+        now_mask = shrink(cv2.warpPerspective(current.mask, reg.homography, (W_full, H_full), flags=cv2.INTER_NEAREST))
         size = np.sqrt(max(1, int((now_mask > 0).sum())))
         close = int(0.08 * size) | 1
         now_mask = cv2.morphologyEx(now_mask, cv2.MORPH_CLOSE,
@@ -178,13 +184,12 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         cv2.drawContours(now_mask, contours, -1, 255, thickness=cv2.FILLED)
         grow = int(0.02 * size) | 1
         now_mask = cv2.dilate(now_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (grow, grow)))
-        # Trust it only near the board's rim, where table can creep in when the board
-        # slides; the interior of the board always stays in.
         band = int(0.04 * size) | 1
         interior = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * band + 1, 2 * band + 1)))
         region = cv2.bitwise_or(interior, cv2.bitwise_and(region, now_mask))
-    rim = max(5, int(0.012 * np.sqrt(max(1, int((region > 0).sum())))))
+    rim = max(2, int(0.012 * np.sqrt(max(1, int((region > 0).sum())))))
     region = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * rim + 1, 2 * rim + 1)))
+    region = cv2.resize(region, (W_full, H_full), interpolation=cv2.INTER_NEAREST)
     board_area = max(1, int((region > 0).sum()))
     kwargs.setdefault("min_split_thickness", 1.2 * min_thickness * np.sqrt(board_area))
     if lands and lands[0] is not None:
@@ -244,6 +249,16 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
                 entry.update({"type": "town", "why": entry["why"] + "; thin pale outline: part of a building"})
             entry["thickness_px"] = round(float(closed_thickness), 1)
         pieces.append(entry)
+    # A long blob counted as two touching pieces, while one of the two was cut out as its
+    # own piece too (the long blob is then the other piece plus shadow): count it once.
+    for p in pieces:
+        if p.get("count", 1) > 1:
+            x, y, w, h = p["reference_bbox"]
+            inside = [o for o in pieces if o is not p and o["type"] == p["type"]
+                      and x <= o["reference_bbox"][0] + o["reference_bbox"][2] / 2 <= x + w
+                      and y <= o["reference_bbox"][1] + o["reference_bbox"][3] / 2 <= y + h]
+            if inside:
+                p["count"] = max(1, p["count"] - len(inside))
     # Safety net: a blob much bigger than a typical piece may be several pieces touching.
     if len(pieces) >= 3:
         median_area = float(np.median([p["area_px"] for p in pieces]))

@@ -122,7 +122,9 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
     blue_grey = blo <= f.hue <= bhi and f.saturation >= rules["blight_min_saturation"]
     # The energy marker is both printed and clearly larger than a disc; a dim dahan can get
     # as textured (up to 25), so size must agree.
-    printed = f.texture >= rules["energy_min_texture"] and f.size >= rules["energy_min_size"]
+    # The marker is a round disc; two touching dahan make a long, textured tan blob instead.
+    printed = (f.texture >= rules["energy_min_texture"] and f.size >= rules["energy_min_size"]
+               and f.elongation <= 1.4)
     if f.value <= rules["dark_max_value"] and (f.saturation < rules["blight_min_saturation"] or blue_grey):
         # Dark and grey or blue-grey. Dark *brown* is table wood showing at a moved board's rim.
         out = {"type": "blight", "why": f"dark (value {f.value})"}
