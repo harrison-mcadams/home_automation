@@ -161,7 +161,7 @@ def classify(f: PieceFeatures, rules: dict = RULES) -> dict:
         # by area against one dahan's.
         n = 2 if f.size >= 0.095 else 1  # one dahan plus its shadow reads up to ~0.09
         out = {"type": "dahan", "count": n, "why": f"tan wood, {n} touching (size {f.size}, elongation {f.elongation})"}
-    elif blo <= f.hue <= bhi and f.saturation >= rules["blight_min_saturation"] and f.size > 0.08:
+    elif blo <= f.hue <= bhi + 10 and f.saturation >= rules["blight_min_saturation"] and f.size > 0.08:
         out = {"type": "presence", "colour": hue_name(f.hue), "why": f"blue disc beside another piece (size {f.size})"}
     elif f.saturation >= rules["vivid_min_saturation"] and f.value >= rules["presence_min_value"]:
         out = {"type": "presence", "colour": hue_name(f.hue), "why": f"vivid {hue_name(f.hue)} (sat {f.saturation})"}
