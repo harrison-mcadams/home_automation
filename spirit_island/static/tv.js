@@ -205,6 +205,7 @@ function figure(p, cls) {
 // (a spirit panel or board) big on top, the cards in a row underneath.
 function renderGallery(pics, setup) {
   const on = pics.length > 0;
+  document.body.classList.toggle("withmap", !!(S.state && S.state.step === "spirit.growth"));
   document.body.classList.toggle("setup", setup);
   document.body.classList.toggle("gallery", on);
   const gal = $("gallery");

@@ -175,6 +175,10 @@ class ChangeTracker:
             self.baseline, self.base_corners, self.prev = now, corners, now
             self.status = "watching"
             return []
+        if self.prev is None:  # the board was out of view (a hand over it): start the stillness check again
+            self.prev = now
+            self.status = "watching"
+            return []
         # Still? (compared with the photo just before)
         moving, big = self._patches(b, self.prev, now)
         self.prev = now

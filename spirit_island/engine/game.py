@@ -417,6 +417,7 @@ class Game:
         if step == "time_passes" or step == "setup.first_explore":
             # Entering Growth next: note the presence on the island, to tell the option later.
             s["presence_at_growth"] = sum(l["presence"] for l in s["lands"].values())
+            s["presence_lands_at_growth"] = {lid: l["presence"] for lid, l in s["lands"].items()}
         if step == "setup.players" and not s["players"]:
             raise ActionError("choose players and spirits first")
         if step == "setup.first_explore":
@@ -559,6 +560,8 @@ class Game:
     def _do_growth_base(self, action):
         """How many presence were on the island when Growth began (to count new discs)."""
         self.state["presence_at_growth"] = int(action["value"])
+        if action.get("lands") is not None:
+            self.state["presence_lands_at_growth"] = dict(action["lands"])
         return QUIET
 
     def _do_growth_suggest(self, action):

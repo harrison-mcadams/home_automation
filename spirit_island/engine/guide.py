@@ -461,6 +461,17 @@ GROWTH_BY_PRESENCE = {"River Surges in Sunlight": {0: 1, 1: 3, 2: 2}}
 
 
 def _growth(s):
+    g = _growth_base(s)
+    before = s.get("presence_lands_at_growth") or {}
+    marks = {}
+    for lid, land in s["lands"].items():
+        n = land.get("presence", 0) - before.get(lid, land.get("presence", 0))
+        if n > 0:
+            marks[lid] = {"text": f"+{n} presence (new)", "colour": "#5fd0e8"}
+    return {**g, "marks": marks} if marks else g
+
+
+def _growth_base(s):
     pics, items = [], []
     chosen = s.get("growth_choice", {}).get("0")
     suggested = s.get("growth_suggest", {}).get("0")
