@@ -194,11 +194,11 @@ function renderGallery(pics, setup) {
       const r = el("div", { class: "g-rest" }, ...rest.map((p) => figure(p)));
       // Under a hero (one player), one row whose column widths follow each picture's shape
       // (panels ~1.5:1, cards ~0.7:1) so everything shares one height.
-      if (hero && !multi) {
+      if (hero && !multi && rest.length >= 3) {
         r.classList.add("row");
         r.style.gridTemplateColumns = rest.map((p) => (p.wide ? "2.1fr" : "1fr")).join(" ");
       }
-      r.style.setProperty("--h", (multi ? 15.5 : rest.length <= 3 ? 50 : rest.length === 4 ? 38 : rest.length === 5 ? 31 : 34) + "vh");
+      r.style.setProperty("--h", (hero && rest.length < 3 ? 38 : multi ? 15.5 : rest.length <= 3 ? 50 : rest.length === 4 ? 38 : rest.length === 5 ? 31 : 34) + "vh");
       sec.append(r);
     }
     return sec;
