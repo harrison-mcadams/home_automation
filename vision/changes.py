@@ -65,7 +65,11 @@ def change_map(
         # otherwise differs only in brightness, which counts half.
         lighter = new_lab[..., 0] - ref_lab[..., 0]
         chroma = np.hypot(new_lab[..., 1] - 128, new_lab[..., 2] - 128)
-        out[(lighter > 22) & (chroma < 14) & sel] += white_boost
+        bright = ((lighter > 22) & (chroma < 14) & sel).astype(np.uint8)
+        # A white building shows as a few bright faces with its shading between them: join
+        # them (close small gaps) so it comes out as one piece, not fragments.
+        bright = cv2.morphologyEx(bright, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
+        out[(bright > 0) & sel] += white_boost
     return out
 
 
