@@ -312,16 +312,19 @@ function renderLands() {
   }
 }
 
-let mapView = null, mapLoaded = false;
-async function loadMap() {
-  if (mapLoaded) return; mapLoaded = true;
+// The drawn board is fetched again whenever the camera reports a different board
+// (it can start on another one right after a restart).
+let mapView = null, mapLoaded = null;
+async function loadMap(letter) {
+  if (mapLoaded === (letter || "?")) return; mapLoaded = letter || "?";
   try {
     const r = await fetch("/api/vision/map");
     if (!r.ok) return;
+    $("cam-map").replaceChildren();
     mapView = BoardMap.create($("cam-map"));
     BoardMap.setMap(mapView, await r.json());
     if (S) renderCamera();
-  } catch (e) { mapLoaded = false; }
+  } catch (e) { mapLoaded = null; }
 }
 
 function drawMap(v) {
@@ -340,7 +343,7 @@ function renderCamera() {
   if (!v) { $("camera").classList.add("hidden"); return; }
   $("camera").classList.remove("hidden");
   const board = v.view === "board" && v.has_map;
-  if (v.has_map) loadMap();
+  if (v.has_map) loadMap(v.detected_board);
   $("cam-map").classList.toggle("hidden", !board);
   $("cam-view").replaceChildren(...(v.has_map ? [el("span", { class: board ? "" : "on" }, "Photo"), el("span", { class: board ? "on" : "" }, "Drawn board")] : []));
   if (board) drawMap(v);

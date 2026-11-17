@@ -426,7 +426,7 @@ function renderCamera() {
       el("button", { class: board ? "" : "primary", onclick: () => vision({ view: "photo" }) }, "Photo"),
       el("button", { class: board ? "primary" : "", onclick: () => vision({ view: "board" }) }, "Drawn board"))));
   if (board) {
-    if (!phoneMap.view) loadPhoneMap();
+    loadPhoneMap();
     box.append(phoneMap.box);
     drawPhoneMap(v);
   } else {
@@ -436,13 +436,16 @@ function renderCamera() {
 }
 
 // The drawn board keeps one SVG alive between renders so its pieces can animate.
-const phoneMap = { box: null, view: null, loading: false };
+const phoneMap = { box: null, view: null, loading: false, letter: null };
 phoneMap.box = el("div", { class: "phonemap" });
 async function loadPhoneMap() {
-  if (phoneMap.loading) return; phoneMap.loading = true;
+  const letter = (S && S.vision && S.vision.detected_board) || "?";
+  if (phoneMap.loading || (phoneMap.view && phoneMap.letter === letter)) return; phoneMap.loading = true;
   try {
     const r = await fetch("/api/vision/map");
     if (!r.ok) return;
+    phoneMap.letter = letter;
+    phoneMap.box.replaceChildren();
     phoneMap.view = BoardMap.create(phoneMap.box);
     BoardMap.setMap(phoneMap.view, await r.json());
     if (S && S.vision) drawPhoneMap(S.vision);
