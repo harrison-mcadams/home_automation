@@ -164,8 +164,8 @@ class Store:
             return
         added = sum(l["presence"] for l in s["lands"].values()) - base
         option = table.get(added)
-        if option and s.get("growth_choice", {}).get("0") != option:
-            self.dispatch({"type": "growth_choice", "option": option}, "camera")
+        if option and not s.get("growth_choice", {}).get("0") and s.get("growth_suggest", {}).get("0") != option:
+            self.dispatch({"type": "growth_suggest", "option": option}, "camera")
 
     def broadcast(self, payload):
         data = json.dumps(payload)

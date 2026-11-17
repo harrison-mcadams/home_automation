@@ -367,6 +367,11 @@ class Game:
         s["sub"] = 0
         step = s["step"]
         if step == "spirit.growth":
+            # Next confirms the camera's suggestion when nothing was picked by hand.
+            for i, n in list(s.get("growth_suggest", {}).items()):
+                if not s.get("growth_choice", {}).get(i):
+                    self._do_growth_choice({"player": int(i), "option": n})
+            s["growth_suggest"] = {}
             s["growth_done"] = dict(s.get("growth_choice", {}))
             s["growth_choice"] = {}
         if step == "time_passes" or step == "setup.first_explore":
@@ -449,8 +454,21 @@ class Game:
             nxt[str(i)] = max(0, nxt.get(str(i), 0) - 1)
         if n in gains:
             nxt[str(i)] = nxt.get(str(i), 0) + 1
-        choices[str(i)] = n
-        return f"{s['players'][i]['name']} chose growth option {n}"
+        if n:
+            choices[str(i)] = n
+        else:
+            choices.pop(str(i), None)
+        s.setdefault("growth_suggest", {}).pop(str(i), None)
+        return f"{s['players'][i]['name']} chose growth option {n}" if n else "Growth choice cleared"
+
+    def _do_growth_suggest(self, action):
+        """The camera's guess at a growth option; the player confirms it (Next, or 1/2/3)."""
+        s = self.state
+        i, n = str(int(action.get("player", 0))), int(action.get("option", 0))
+        if s.get("growth_choice", {}).get(i):
+            return QUIET
+        s.setdefault("growth_suggest", {})[i] = n
+        return QUIET
 
     def _do_toggle_camera_view(self, action):
         """Show or hide the camera's view of the invader board on the TV."""

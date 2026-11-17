@@ -463,6 +463,7 @@ GROWTH_BY_PRESENCE = {"River Surges in Sunlight": {0: 1, 1: 3, 2: 2}}
 def _growth(s):
     pics, items = [], []
     chosen = s.get("growth_choice", {}).get("0")
+    suggested = s.get("growth_suggest", {}).get("0")
     single = len(s["players"]) == 1
     p = s["players"][0] if s["players"] else None
     if single and p and p["spirit"] in GROWTH:
@@ -487,16 +488,20 @@ def _growth(s):
             if card and n in GROWTH_GAINS_CARD.get(p["spirit"], set()):
                 pics.append({"src": f"powers/{rules.picture_slug(card[0])}.jpg", "items": [n],
                              "caption": f"You'd take: {card[0]}"})
-        if chosen:
-            # Chosen (by the camera or a key): show just that option, big, and let → move on.
-            title, text = GROWTH[p["spirit"]][chosen - 1]
+        if chosen or suggested:
+            # Picked with a key, or suggested by the camera: show just that option, big.
+            # A suggestion is only taken when you press → (or a number key).
+            n = chosen or suggested
+            title, text = GROWTH[p["spirit"]][n - 1]
             return {
-                "title": f"Growth: option {chosen} ✓",
+                "title": f"Growth: option {n} ✓" if chosen else f"Growth: option {n}?",
                 "single": True,
-                "do": [f"Chosen: option {chosen}, {title}. " + text.format(nextcard=nxt),
-                       "Wrong? Press 1, 2 or 3 to change it. Otherwise press → for Gain energy."],
-                "pictures": [dict(pp, items=[0]) for pp in pics if pp.get("items") == [chosen]],
-                "why": "The camera worked it out from your new presence discs.",
+                "do": ([f"Chosen: option {n}, {title}. " + text.format(nextcard=nxt),
+                        "Press 1, 2 or 3 to change it, or → for Gain energy."] if chosen else
+                       [f"The camera thinks you took option {n}, {title}: " + text.format(nextcard=nxt),
+                        f"Right? Press → to confirm it and go on to Gain energy. Otherwise press 1, 2 or 3."]),
+                "pictures": [dict(pp, items=[0]) for pp in pics if pp.get("items") == [n]],
+                "why": "Worked out from your new presence discs." if not chosen else "",
                 "helper": {"kind": "growth", "options": len(GROWTH[p["spirit"]]), "chosen": chosen},
                 "tips": [],
             }
