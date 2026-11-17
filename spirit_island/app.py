@@ -110,7 +110,14 @@ class Store:
         # Leaving Play powers: pay for the cards the camera sees played (only when really
         # leaving the step, not when Next walks through its numbered items).
         if action.get("type") == "next" and self.game.state["step"] == "spirit.powers"                 and (action.get("screen") or self.game.state.get("sub", 0) >= self.game._items() - 1)                 and getattr(self, "power_watch", None) is not None:
-            cost = self.power_watch.public().get("cost") or 0
+            pw_now = self.power_watch.public()
+            cost = pw_now.get("cost") or 0
+            # Remember what was played, so Fast and Slow still show those cards once
+            # they've been moved out of the camera's view.
+            with self.lock:
+                for c in pw_now.get("cards", []):
+                    self.game.dispatch({"type": "note", "key": "played", "add": {k: c.get(k) for k in ("name", "cost", "speed")}},
+                                       source="camera")
             if cost and not self.game.state.get("energy_from_camera"):
                 try:
                     with self.lock:
@@ -303,12 +310,16 @@ class Store:
         """The power cards in view during Play powers / Fast / Slow, with their choices."""
         s = self.game.state
         pw = self.power_watch.public() if getattr(self, "power_watch", None) else {}
-        if s["step"] not in ("spirit.powers", "fast", "slow") or not pw.get("cards"):
+        cards = list(pw.get("cards") or [])
+        if s["step"] in ("fast", "slow"):
+            seen = {c["name"] for c in cards}
+            cards += [c for c in s.get("played", []) if c["name"] not in seen]
+        if s["step"] not in ("spirit.powers", "fast", "slow") or not cards:
             return []
         from .engine.targets import options
         from .engine import rules as R
         out = []
-        for c in pw["cards"]:
+        for c in cards:
             art = R.SPIRIT_ART.get(s["players"][0]["spirit"]) if s["players"] else None
             folder = art[0] if art and c["name"] in art[1] else None
             src = f"spirits/{folder}/{R.picture_slug(c['name'])}.jpg" if folder else f"powers/{R.picture_slug(c['name'])}.jpg"

@@ -400,6 +400,7 @@ class Game:
             s["growth_choice"] = {}
         if step == "time_passes":
             s["resolved"] = {}
+            s["played"] = []
         if step == "time_passes" or step == "setup.first_explore":
             # Entering Growth next: note the presence on the island, to tell the option later.
             s["presence_at_growth"] = sum(l["presence"] for l in s["lands"].values())
