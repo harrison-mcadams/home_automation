@@ -135,13 +135,33 @@ class Store:
             # and fitting the step. Unusual ones wait for a tap on the phone.
             diffs = [d for d in v.public(self.game.state)["diffs"]
                      if d["confirmed"] and d["verdict"] in ("expected", "plausible")]
-            if diffs:
+            # Only presence is copied in by itself for now: it's colour-checked and reliable.
+            # Other differences wait for a tap (shaded white figures still flicker).
+            lands = {d["land"]: {"presence": d["camera"]["presence"]} for d in diffs if "presence" in d["delta"]}
+            if lands:
                 try:
-                    self.dispatch({"type": "observe", "lands": {d["land"]: d["camera"] for d in diffs}}, "camera")
+                    self.dispatch({"type": "observe", "lands": lands}, "camera")
+                    self.growth_from_presence()
                     return
                 except ActionError as e:
                     print(f"camera sync failed: {e}")
         self.broadcast(self.snapshot())
+
+    def growth_from_presence(self):
+        """During Growth, the number of new presence discs tells the option for spirits
+        whose options each add a different number (River: 0 -> 1, 1 -> 3, 2 -> 2)."""
+        from .engine.guide import GROWTH_BY_PRESENCE
+        s = self.game.state
+        if s["step"] != "spirit.growth" or len(s["players"]) != 1:
+            return
+        table = GROWTH_BY_PRESENCE.get(s["players"][0]["spirit"])
+        base = s.get("presence_at_growth")
+        if not table or base is None:
+            return
+        added = sum(l["presence"] for l in s["lands"].values()) - base
+        option = table.get(added)
+        if option and s.get("growth_choice", {}).get("0") != option:
+            self.dispatch({"type": "growth_choice", "option": option}, "camera")
 
     def broadcast(self, payload):
         data = json.dumps(payload)

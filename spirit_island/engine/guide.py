@@ -456,6 +456,8 @@ GROWTH = {
 
 
 GROWTH_GAINS_CARD = {"River Surges in Sunlight": {1, 3}}
+# New presence discs -> growth option, where that tells them apart.
+GROWTH_BY_PRESENCE = {"River Surges in Sunlight": {0: 1, 1: 3, 2: 2}}
 
 
 def _growth(s):
@@ -465,12 +467,15 @@ def _growth(s):
     p = s["players"][0] if s["players"] else None
     if single and p and p["spirit"] in GROWTH:
         folder = rules.SPIRIT_ART[p["spirit"]][0]
-        nxt = ""
+        nxt, card = "", None
         if s.get("progression") and p["spirit"] in rules.PROGRESSION:
             k = s.get("progression_next", {}).get("0", 0)
+            if chosen in GROWTH_GAINS_CARD.get(p["spirit"], set()):
+                k -= 1  # the choice already counted its card
             lst = rules.PROGRESSION[p["spirit"]]
-            if k < len(lst):
-                nxt = f" (the next on your progression: {lst[k][0]})"
+            if 0 <= k < len(lst):
+                card = lst[k]
+                nxt = f" (the next on your progression: {card[0]}" + (", a Major: then forget a power)" if card[1] == "Major" else ")")
         items = ["Pick ONE of the three growth options at the top of your panel and do everything in it. "
                  "Here they are, one at a time:"]
         pics.append({"src": f"spirits/{folder}/growth.jpg", "wide": True, "items": [0],
@@ -479,6 +484,9 @@ def _growth(s):
             items.append(f"Option {n}, {title}: " + text.format(nextcard=nxt))
             pics.append({"src": f"spirits/{folder}/growth_{n}.jpg", "wide": True, "items": [n],
                          "caption": f"Option {n}: {title}"})
+            if card and n in GROWTH_GAINS_CARD.get(p["spirit"], set()):
+                pics.append({"src": f"powers/{rules.picture_slug(card[0])}.jpg", "items": [n],
+                             "caption": f"You'd take: {card[0]}"})
         items.append((f"You chose option {chosen}. " if chosen else
                       "Choose with the number keys 1, 2, 3 on the remote/keyboard (or on the phone). ")
                      + "Do it at the table: the camera adds new presence discs by itself. Then Next.")

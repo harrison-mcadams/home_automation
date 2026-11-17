@@ -369,6 +369,9 @@ class Game:
         if step == "spirit.growth":
             s["growth_done"] = dict(s.get("growth_choice", {}))
             s["growth_choice"] = {}
+        if step == "time_passes" or step == "setup.first_explore":
+            # Entering Growth next: note the presence on the island, to tell the option later.
+            s["presence_at_growth"] = sum(l["presence"] for l in s["lands"].values())
         if step == "setup.players" and not s["players"]:
             raise ActionError("choose players and spirits first")
         if step == "setup.first_explore":
