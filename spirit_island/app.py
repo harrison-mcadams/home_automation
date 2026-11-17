@@ -341,6 +341,10 @@ class Store:
         now = panel["tokens"]
         if start is None:
             return
+        # More tokens than when the step began: one was out of view then. Count from the most seen.
+        if s["step"] == "spirit.powers" and now > start:
+            self.dispatch({"type": "mark_energy_start", "value": now}, "camera")
+            start = now
         st = G.spirit_stats(s, 0)
         if s["step"] == "spirit.energy" and st and now == start + st["energy_per_turn"]:
             self.dispatch({"type": "next", "screen": True}, "camera")
