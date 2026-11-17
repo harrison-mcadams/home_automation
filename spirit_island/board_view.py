@@ -159,6 +159,7 @@ class BoardView:
         started = time.time()
         raw = self.grab()
         self.raw = raw  # the latest full-resolution photo, for reading cards held under the camera
+        self.raw_time = time.time()
         image = detect.rotate(raw, self.rotate)
         result = detect.detect_pieces(self.reference, self.board_mask, image, lands=self.lands)
         if result["registered"]:
@@ -286,6 +287,10 @@ class BoardView:
                     raw = getattr(view, "raw", None)
                     if raw is None:
                         self.send_error(503, "no photo yet")
+                        return
+                    # Never pass off an old photo as the table now (the phone camera stopped).
+                    if time.time() - getattr(view, "raw_time", 0) > 30:
+                        self.send_error(503, "the camera has stopped sending photos")
                         return
                     ok, buf = cv2.imencode(".jpg", raw, [cv2.IMWRITE_JPEG_QUALITY, 92])
                     self._send(buf.tobytes(), "image/jpeg")
