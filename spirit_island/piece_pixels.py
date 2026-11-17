@@ -21,6 +21,7 @@ two touch.
 
 from __future__ import annotations
 
+import json
 import pickle
 import sys
 from pathlib import Path
@@ -31,6 +32,7 @@ import numpy as np
 from .piece_model import DEV, KINDS, TRAIN, Board
 
 MODEL = DEV / "piece_pixels.pkl"
+MIXED = DEV / "train_mixed"   # layouts of mixed pieces, each with truth.json (land -> counts)
 COLOURS = ["board", "white", "dahan", "blight", "presence"]
 OF_KIND = {"explorers": 1, "towns": 1, "cities": 1, "dahan": 2, "blight": 3, "presence": 4}
 WHITE = ["explorers", "towns", "cities"]
@@ -54,10 +56,30 @@ def lab_pair(b: Board, now: np.ndarray):
 
 
 def pixel_features(ref, new, sel):
+    """Each pixel's colour, the empty board's colour there, and the same over its
+    surroundings (a disc-sized neighbourhood), so a pixel is named in context: the lit top
+    of a Dahan on sand is pale like white plastic, but sits in a smooth tan patch."""
+    key = (id(ref), id(new))
+    if _CTX.get("key") != key:
+        d = new - ref
+        L = new[..., 0]
+        m = cv2.GaussianBlur(L, (0, 0), 2)
+        _CTX.update(key=key,
+                    near=cv2.GaussianBlur(new, (0, 0), 6),
+                    dnear=cv2.GaussianBlur(d, (0, 0), 6),
+                    dfar=cv2.GaussianBlur(d, (0, 0), 12),
+                    smooth=np.sqrt(cv2.GaussianBlur((L - m) ** 2, (0, 0), 3)),
+                    smooth_ref=np.sqrt(cv2.GaussianBlur((ref[..., 0] - cv2.GaussianBlur(ref[..., 0], (0, 0), 2)) ** 2, (0, 0), 3)))
+    c = _CTX
     r, n = ref[sel], new[sel]
     d = n - r
     chroma = np.hypot(n[:, 1] - 128, n[:, 2] - 128)[:, None]
-    return np.hstack([n, r, d, chroma, np.linalg.norm(d, axis=1, keepdims=True)]).astype(np.float32)
+    return np.hstack([n, r, d, chroma, np.linalg.norm(d, axis=1, keepdims=True),
+                      c["near"][sel], c["dnear"][sel], c["dfar"][sel],
+                      c["smooth"][sel][:, None], c["smooth_ref"][sel][:, None]]).astype(np.float32)
+
+
+_CTX: dict = {}
 
 
 def changed(ref, new, region):
@@ -71,7 +93,7 @@ def is_shadow(ref, new):
     """Darker than the empty board but the same colour: a shadow, not a piece."""
     d = new - ref
     # (Blight is dark too, but much darker than any shadow.)
-    return (d[..., 0] < -5) & (d[..., 0] > -30) & (np.abs(d[..., 1]) < 5) & (np.abs(d[..., 2]) < 5)
+    return (d[..., 0] < -5) & (d[..., 0] > -30) & (np.abs(d[..., 1]) < 4.5) & (np.abs(d[..., 2]) < 4.5)
 
 
 def white_features(b: Board, white: np.ndarray, gray: np.ndarray, bbox) -> np.ndarray:
@@ -160,12 +182,47 @@ def train():
             pick[rng.choice(idx, min(n, len(idx)), replace=False)] = True
             X.append(pixel_features(ref, new, pick.reshape(sel.shape)))
             y.append(np.full(int(pick.sum()), label))
+    first = HistGradientBoostingClassifier(max_iter=200, learning_rate=0.1).fit(np.vstack(X), np.concatenate(y))
+
+    # Mixed layouts: in a land holding white pieces and one other colour, the pixels the
+    # first model doesn't call white are that colour (this is where Dahan on sand come from).
+    mixed = []
+    for folder in sorted(MIXED.glob("*/truth.json")):
+        lands = json.loads(folder.read_text())["lands"]
+        for f in sorted(folder.parent.glob("*.jpg")):
+            now = b.align(cv2.imread(str(f)))
+            if now is None:
+                continue
+            mixed.append((f, lands, now))
+            ref, new = lab_pair(b, now)
+            fg = changed(ref, new, inner(b)) & ~is_shadow(ref, new)
+            guess = np.zeros(fg.shape, np.uint8)
+            if fg.any():
+                guess[fg] = first.predict(pixel_features(ref, new, fg))
+            for n, counts in lands.items():
+                colours = {OF_KIND[k] for k, v in counts.items() if v}
+                other = colours - {1}
+                if len(other) > 1:
+                    continue
+                here = fg & (b.labels == b.names.index(n) + 1)
+                parts = [(here & (guess == 1), 1)] if 1 in colours else []
+                if other:
+                    parts.append((here & (guess != 1), other.pop()))
+                for sel, label in parts:
+                    idx = np.flatnonzero(sel)
+                    if len(idx) < 20:
+                        continue
+                    pick = np.zeros(sel.size, bool)
+                    pick[rng.choice(idx, min(1500, len(idx)), replace=False)] = True
+                    X.append(pixel_features(ref, new, pick.reshape(sel.shape)))
+                    y.append(np.full(int(pick.sum()), label))
     X, y = np.vstack(X), np.concatenate(y)
     print("pixels:", {c: int((y == i).sum()) for i, c in enumerate(COLOURS)})
-    pix = HistGradientBoostingClassifier(max_iter=200, learning_rate=0.1).fit(X, y)
+    pix = HistGradientBoostingClassifier(max_iter=250, learning_rate=0.1).fit(X, y)
 
     # Second model: explorer / town / city, from white blobs in the white-piece photos.
     WX, Wy, sizes = [], [], {k: [] for k in KINDS}
+    CX, Cy = [], []  # how many of each a white blob holds (bunched pieces make one blob)
     for f, (kind, now) in aligned.items():
         if kind == "empty":
             continue
@@ -177,6 +234,10 @@ def train():
                 continue
             one = float(np.median([m.sum() for m, _ in found]))
             for m, bbox in found:
+                c = [0, 0, 0]
+                c[WHITE.index(kind)] = max(1, int(round(m.sum() / one)))
+                CX.append(white_features(b, m, gray, bbox))
+                Cy.append(c)
                 if 0.6 * one < m.sum() < 1.5 * one:
                     WX.append(white_features(b, m, gray, bbox))
                     Wy.append(WHITE.index(kind))
@@ -189,6 +250,23 @@ def train():
                 one = float(np.median(areas))
                 sizes[kind] += [a / b.area for a in areas if 0.6 * one < a < 1.5 * one]
     sizes = {k: float(np.median(v)) for k, v in sizes.items()}
+    # Mixed layouts: a land with a single white blob shows what a bunch looks like.
+    model = PixelPieces.__new__(PixelPieces)
+    model.pix, model.sizes, model.boards = pix, sizes, {}
+    for f, lands, now in mixed:
+        names = name_pixels(pix, b, now)
+        gray = cv2.cvtColor(now, cv2.COLOR_BGR2GRAY)
+        by_land = {}
+        for m, bbox in model.white_pieces(b, names):
+            by_land.setdefault(model.land_of(b, m), []).append((m, bbox))
+        for n, counts in lands.items():
+            blobs = by_land.get(n, [])
+            want = [counts.get(k, 0) for k in WHITE]
+            if len(blobs) == 1 and sum(want):
+                m, bbox = blobs[0]
+                for _ in range(3):  # count these real bunches more
+                    CX.append(white_features(b, m, gray, bbox))
+                    Cy.append(want)
     WX, Wy = np.array(WX), np.array(Wy)
     print("white examples:", {k: int((Wy == i).sum()) for i, k in enumerate(WHITE)},
           "sizes", {k: round(v * 1000, 2) for k, v in sizes.items()})
@@ -196,7 +274,11 @@ def train():
     cv = cross_val_score(wclf, WX, Wy, cv=StratifiedKFold(5, shuffle=True, random_state=0))
     print("white shape cross-validated:", round(float(cv.mean()), 3))
     wclf.fit(WX, Wy)
-    MODEL.write_bytes(pickle.dumps({"pix": pix, "white": wclf, "sizes": sizes}))
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    CX, Cy = np.array(CX), np.array(Cy, float)
+    print("white bunches:", len(CX))
+    count = [HistGradientBoostingRegressor(max_iter=200, learning_rate=0.08).fit(CX, Cy[:, i]) for i in range(3)]
+    MODEL.write_bytes(pickle.dumps({"pix": pix, "white": wclf, "count": count, "sizes": sizes}))
     print("saved", MODEL)
 
 
@@ -204,6 +286,9 @@ class PixelPieces:
     def __init__(self, path: Path = MODEL):
         d = pickle.loads(Path(path).read_bytes())
         self.pix, self.white, self.sizes = d["pix"], d["white"], d["sizes"]
+        # The bunch counter (d["count"]) fitted its own training layouts but did worse on
+        # unseen ones (layout B), so pieces are read one per white blob.
+        self.count = None
         self.boards = {}
 
     def land_of(self, b, mask):
@@ -213,6 +298,24 @@ class PixelPieces:
             return None
         name = b.names[int(np.bincount(vals).argmax()) - 1]
         return None if name == "ocean" else name
+
+    def white_pieces(self, b, names):
+        """White blobs that are plastic pieces (not a disc's shine, not the board's edge)."""
+        # The shine on top of a wooden disc can look like white plastic: white right on a
+        # disc belongs to the disc.
+        wood = np.isin(names, (OF_KIND["dahan"], OF_KIND["presence"])).astype(np.uint8)
+        r = int(np.sqrt(self.sizes["dahan"] * b.area / np.pi))
+        wood = cv2.dilate(wood, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(1.4 * r) | 1,) * 2)) > 0
+        out = []
+        for m, bbox in white_blobs(b, names == 1):
+            if (m & wood).sum() > 0.3 * m.sum():
+                continue
+            pts = cv2.findNonZero(m.astype(np.uint8))
+            (_, _), (w, h), _ = cv2.minAreaRect(pts)
+            if max(w, h) > 3.2 * max(1.0, min(w, h)):
+                continue  # a thin sliver: the board's edge, not a piece
+            out.append((m, bbox))
+        return out
 
     def read_aligned(self, b, now, letter="C"):
         names = name_pixels(self.pix, b, now)
@@ -232,29 +335,33 @@ class PixelPieces:
                     out[f"{letter}{land}"][kind] += c
                     found.append((kind, c, tuple(int(v) for v in st[i][:4])))
         gray = cv2.cvtColor(now, cv2.COLOR_BGR2GRAY)
-        # The shine on top of a wooden disc can look like white plastic: white right on a
-        # disc belongs to the disc.
-        wood = np.isin(names, (OF_KIND["dahan"], OF_KIND["presence"])).astype(np.uint8)
-        r = int(np.sqrt(self.sizes["dahan"] * b.area / np.pi))
-        wood = cv2.dilate(wood, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(1.4 * r) | 1,) * 2)) > 0
-        white = names == 1
-        for m, bbox in white_blobs(b, white):
-            if (m & wood).sum() > 0.3 * m.sum():
-                continue
+        for m, bbox in self.white_pieces(b, names):
             land = self.land_of(b, m)
             if not land:
                 continue
-            pts = cv2.findNonZero(m.astype(np.uint8))
-            (_, _), (w, h), _ = cv2.minAreaRect(pts)
-            if max(w, h) > 3.2 * max(1.0, min(w, h)):
-                continue  # a thin sliver: the board's edge, not a piece
-            kind = WHITE[int(self.white.predict([white_features(b, m, gray, bbox)])[0])]
-            k = m.sum() / b.area / self.sizes[kind]
-            if k < 0.22:
-                continue
-            c = max(1, min(3, int(round(k))))
-            out[f"{letter}{land}"][kind] += c
-            found.append((kind, c, bbox))
+            f = white_features(b, m, gray, bbox)
+            c = None
+            if self.count is not None:
+                c = [max(0, int(round(float(r.predict([f])[0])))) for r in self.count]
+                if sum(c) < 2:
+                    c = None  # one piece: the one-piece model names it better
+            if c is not None:
+                # Several pieces bunched together into one blob.
+                if not sum(c):
+                    if m.sum() / b.area < 0.3 * self.sizes["explorers"]:
+                        continue
+                    c[int(self.white.predict([f])[0])] = 1
+            else:
+                kind = WHITE[int(self.white.predict([f])[0])]
+                k = m.sum() / b.area / self.sizes[kind]
+                if k < 0.22:
+                    continue
+                c = [0, 0, 0]
+                c[WHITE.index(kind)] = max(1, min(3, int(round(k))))
+            for kind, n in zip(WHITE, c):
+                if n:
+                    out[f"{letter}{land}"][kind] += n
+                    found.append((kind, n, bbox))
         return out, names, found
 
     def read(self, image, letter="C"):
