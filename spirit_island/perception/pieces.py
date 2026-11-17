@@ -25,7 +25,7 @@ RULES = {
     # Measured on Harrison's set under the Pixel 6 (r7-r9 layouts, 2026-11-16). Colour is
     # OpenCV HSV (hue 0-180, saturation and value 0-255), the median of the piece's core.
     "vivid_min_saturation": 105,  # presence discs: S 115-165; nothing else above ~90
-    "dark_max_value": 100,
+    "dark_max_value": 115,  # blight dims to ~100 in evening light; white plastic stays above 140
     "presence_min_value": 130,  # painted discs are bright (V 204-230); dark saturated brown is wood  # anything this dark is blight, whatever its hue
     "blight_hue": (85, 125),  # blight is blue-grey: H 100-103, S 79-91, V 116-129
     "blight_min_saturation": 60,

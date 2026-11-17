@@ -194,6 +194,7 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     kwargs.setdefault("min_split_thickness", 1.2 * min_thickness * np.sqrt(board_area))
     if lands and lands[0] is not None:
         kwargs.setdefault("zones", lands[0])
+    kwargs.setdefault("white_boost", 30.0)
     blobs, change_mask, labels, scale = find_changes(reference, aligned, region, return_labels=True, **kwargs)
     work = cv2.resize(aligned, (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_AREA)
     full_board_area = float((board_mask > 0).sum()) * scale * scale  # in working pixels
@@ -238,7 +239,8 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
             closed_thickness = cv2.distanceTransform(closed, cv2.DIST_L2, 5).max() / scale
             # A pale plastic town or explorer seen from above can be thin too (a roof edge, a
             # hollow middle the land shows through), but it is compact, not a long line.
-            compact_white = (entry["type"] in ("town", "explorer", "city")
+            compact_white = (entry["type"] in ("town", "explorer", "city") and feats.size >= 0.022
+                             and feats.value >= 180
                              and closed_thickness >= 0.5 * min_thickness * np.sqrt(board_area)
                              and max(w, h) <= 0.12 * np.sqrt(board_area))
             if closed_thickness < min_thickness * np.sqrt(board_area) and not compact_white:
@@ -249,6 +251,16 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
                 entry.update({"type": "town", "why": entry["why"] + "; thin pale outline: part of a building"})
             entry["thickness_px"] = round(float(closed_thickness), 1)
         pieces.append(entry)
+    # A ragged, washed-out part cut off right next to another piece is that piece's shadow
+    # (domed dahan cast one), not a piece of its own.
+    def _centre_in(a, b):
+        ax, ay, aw, ah = a
+        bx, by, bw, bh = b
+        return bx <= ax + aw / 2 <= bx + bw and by <= ay + ah / 2 <= by + bh or             ax <= bx + bw / 2 <= ax + aw and ay <= by + bh / 2 <= ay + ah
+    pieces = [p for p in pieces if not (
+        p["type"] in ("explorer", "unknown", "town") and p.get("features", {}).get("fill", 1) < 0.55
+        and any(o is not p and o.get("features", {}).get("fill", 0) >= 0.7
+                and _centre_in(p["reference_bbox"], o["reference_bbox"]) for o in pieces))]
     # A long blob counted as two touching pieces, while one of the two was cut out as its
     # own piece too (the long blob is then the other piece plus shadow): count it once.
     for p in pieces:

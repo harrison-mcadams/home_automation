@@ -32,6 +32,7 @@ def change_map(
     region: Optional[np.ndarray] = None,
     blur: int = 7,
     zones: Optional[np.ndarray] = None,
+    white_boost: float = 0.0,
 ) -> np.ndarray:
     """Per-pixel colour difference (float32, roughly CIE delta-E) after evening out
     a global lighting change inside `region`, or one per zone (e.g. per printed land)
@@ -56,7 +57,16 @@ def change_map(
                 new_lab[..., c][m] -= float(np.median(new_lab[..., c][m] - ref_lab[..., c][m]))
     diff = new_lab - ref_lab
     diff[..., 0] *= 0.5  # brightness changes (shadows) count half as much as colour changes
-    return np.sqrt((diff**2).sum(axis=2))
+    out = np.sqrt((diff**2).sum(axis=2))
+    if white_boost:
+        # White plastic invaders are the only near-white things on a board: where the photo
+        # (after the light is evened out) is clearly brighter than the empty board and
+        # neutral in colour, count it as a strong change. A white town on a pale mountain
+        # otherwise differs only in brightness, which counts half.
+        lighter = new_lab[..., 0] - ref_lab[..., 0]
+        chroma = np.hypot(new_lab[..., 1] - 128, new_lab[..., 2] - 128)
+        out[(lighter > 22) & (chroma < 14) & sel] += white_boost
+    return out
 
 
 def _part_ok(part: np.ndarray, blob_area: int, min_frac: float, min_thickness: float) -> bool:
@@ -173,6 +183,7 @@ def find_changes(
     return_labels: bool = False,
     zones: Optional[np.ndarray] = None,
     grow: float = 1.0,
+    white_boost: float = 0.0,
 ):
     """Blobs where `aligned` differs from `reference`, inside `region` (255 = look).
 
@@ -193,7 +204,7 @@ def find_changes(
     reg = cv2.erode(reg, np.ones((9, 9), np.uint8))
 
     z = cv2.resize(zones, size, interpolation=cv2.INTER_NEAREST) if zones is not None else None
-    diff = change_map(ref, new, reg, zones=z)
+    diff = change_map(ref, new, reg, zones=z, white_boost=white_boost)
     inside = diff[reg > 0]
     if inside.size == 0:
         return [], np.zeros((full_h, full_w), np.uint8)

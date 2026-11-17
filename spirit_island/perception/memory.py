@@ -63,6 +63,18 @@ class Track:
         return x + w / 2, y + h / 2
 
 
+def _covers(a, b) -> bool:
+    """True if box a and box b overlap enough to be the same piece."""
+    if not a or not b:
+        return False
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    ix = max(0, min(ax + aw, bx + bw) - max(ax, bx))
+    iy = max(0, min(ay + ah, by + bh) - max(ay, by))
+    inter = ix * iy
+    return inter > 0.3 * min(aw * ah, bw * bh)
+
+
 class PieceMemory:
     def __init__(self, reference: np.ndarray, lands: Optional[tuple] = None,
                  keep_for: int = 12, min_score: float = 0.35, margin: float = 0.08, confirm: int = 2):
@@ -142,6 +154,11 @@ class PieceMemory:
                 t.misses += 1  # not seen this time; it gets a few more photos before it's let go
                 continue
             score, bbox, board_like = found
+            # Already covered by a piece seen in this photo (its blob just came out a
+            # different shape, e.g. with its shadow): don't count it twice.
+            if any(_covers(p.get("reference_bbox"), bbox) for p in pieces if not p.get("remembered")):
+                t.misses = 0
+                continue
             t.bbox, t.misses = bbox, 0
             cx, cy = t.centre
             t.land = self._land(cx, cy, t.land)
