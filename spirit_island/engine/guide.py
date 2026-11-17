@@ -409,7 +409,9 @@ def _first_explore(s):
         hit, unknown = _lands_for(s, slot)
         do = [f"Revealed: {rules.card_label(slot)}.",
               "Add 1 explorer to each land of that terrain that is coastal, has a town or city, "
-              "or is next to a land with a town or city."] + _unknown_note(unknown)
+              "or is next to a land with a town or city."] + _unknown_note(unknown) + [
+              f"Then slide the {rules.card_label(slot)} card one space left, from Explore to Build. "
+              "Those lands will build in round 1. Tap Next and the app moves it too."]
         helper["rows"] = [{"land": lid, "explore": g.explore_preview(s["lands"][lid])} for lid in hit]
     return {
         "title": "First explore",
