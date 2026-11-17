@@ -220,6 +220,41 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         feats = measure(work, piece_mask, full_board_area)
         entry.update(classify(feats))
         entry["features"] = describe(feats)
+        # A painted presence disc touching another piece: if a good part of a non-presence
+        # blob is vividly coloured (no other piece is), split that part off as presence.
+        if entry["type"] != "presence":
+            hsv = cv2.cvtColor(work, cv2.COLOR_BGR2HSV)
+            vivid = piece_mask & (hsv[..., 1] > 120) & (hsv[..., 2] > 70)
+            vivid = cv2.morphologyEx(vivid.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0
+            disc_px = (0.045 * np.sqrt(full_board_area)) ** 2  # a disc is ~0.065 across
+            if vivid.sum() >= 0.4 * disc_px and vivid.sum() <= 0.85 * piece_mask.sum():
+                vf = measure(work, vivid, full_board_area)
+                vc = classify(vf)
+                if vc["type"] == "presence":
+                    ys, xs = np.nonzero(vivid)
+                    disc = dict(entry)
+                    disc.update(vc)
+                    disc["features"] = describe(vf)
+                    disc["why"] = vc["why"] + "; split off a piece it touches"
+                    vx, vy = xs.mean() / scale, ys.mean() / scale
+                    vcx, vcy = cv2.perspectiveTransform(np.float32([[[vx, vy]]]), H_inv).reshape(2)
+                    disc["centroid"] = [round(float(vcx)), round(float(vcy))]
+                    x0, y0 = xs.min() / scale, ys.min() / scale
+                    disc["reference_bbox"] = [int(x0), int(y0), int((xs.max() - xs.min()) / scale), int((ys.max() - ys.min()) / scale)]
+                    if land_labels is not None:
+                        pts = np.stack([(xs / scale).astype(int).clip(0, land_labels.shape[1] - 1),
+                                        (ys / scale).astype(int).clip(0, land_labels.shape[0] - 1)], axis=1)
+                        disc["land"] = piece_land(land_labels, land_names, pts)
+                    pieces.append(disc)
+                    rest = piece_mask & ~cv2.dilate(vivid.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
+                    if rest.sum() >= 0.3 * disc_px:
+                        piece_mask = rest
+                        feats = measure(work, piece_mask, full_board_area)
+                        entry.update(classify(feats))
+                        entry["features"] = describe(feats)
+                        entry["split_rest"] = True  # what's left once a disc was cut off: a real piece
+                    else:
+                        continue
         if land_labels is not None:
             ys, xs = np.nonzero(piece_mask)
             pts = np.stack([(xs / scale).astype(int).clip(0, land_labels.shape[1] - 1),
@@ -258,7 +293,7 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         ax, ay, aw, ah = a
         bx, by, bw, bh = b
         return bx <= ax + aw / 2 <= bx + bw and by <= ay + ah / 2 <= by + bh or             ax <= bx + bw / 2 <= ax + aw and ay <= by + bh / 2 <= ay + ah
-    pieces = [p for p in pieces if not (
+    pieces = [p for p in pieces if p.get("split_rest") or not (
         p["type"] in ("explorer", "unknown", "town")
         and (p.get("features", {}).get("fill", 1) < 0.55
              or (p["type"] == "unknown" and p.get("features", {}).get("value", 255) < 120))
