@@ -573,3 +573,18 @@ keepAwake();
   }
   poll();
 })();
+
+// Keep the TV awake while the game is up (the PC otherwise blanks the screen when the
+// mouse sits still). Chrome allows this on localhost or https only, so open the TV page
+// as http://localhost:5055/tv on the PC itself.
+(function keepAwake() {
+  if (!("wakeLock" in navigator)) return;
+  let lock = null;
+  const get = async () => {
+    try { if (!lock && document.visibilityState === "visible") { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; }); } }
+    catch (e) { /* not allowed here (plain http on another host) */ }
+  };
+  document.addEventListener("visibilitychange", get);
+  document.addEventListener("click", get);
+  get();
+})();
