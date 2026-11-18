@@ -26,7 +26,7 @@ from flask import Flask, Response, jsonify, request
 from vision.capture import Camera
 
 from . import mat as matmod
-from .gestures import GestureReader, palm_size
+from .gestures import GestureReader, fingers_up, palm_size
 from .hands import HandFinder, draw_hand
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -54,12 +54,13 @@ PROMPTS = [
     ("Point at a different land and hold", {"kind": "hold", "count": 1, "tip": True}),
     ("Rest: move a few pieces around normally for 15 seconds. No double taps should fire.", {"kind": "rest", "seconds": 15}),
 ]
-TIMEOUT_S = 10.0
+TIMEOUT_S = 12.0
 
 
 class Session:
-    def __init__(self, back_is="left"):
+    def __init__(self, back_is="left", only=None):
         self.lock = threading.Lock()
+        self.prompts = [p for p in PROMPTS if not only or p[1]["kind"] in only]
         self.back_is = back_is  # image direction of a back swipe, set by --back
         self.restart()
 
@@ -70,12 +71,26 @@ class Session:
             self.prompt_t = time.time()
             self.results = []
             self.extra = []   # events that matched nothing, outside rest
+            self.frames = []  # per-frame hand readings during tap prompts, for tuning
             self.rest_hits = []
             self.last_event = None
             self.stamp = time.strftime("%Y%m%d-%H%M%S")
 
     def current(self):
-        return PROMPTS[self.i] if self.i < len(PROMPTS) else None
+        return self.prompts[self.i] if self.i < len(self.prompts) else None
+
+    def log_frame(self, t, hands):
+        """Keep what the tracker saw while a tap is asked for: enough to tune taps from."""
+        cur = self.current()
+        if not cur or cur[1]["kind"] != "double_tap":
+            return
+        row = {"t": round(t, 3), "prompt": self.i}
+        if hands:
+            m = max(hands, key=palm_size)
+            row.update({"fingers": [int(x) for x in fingers_up(m)], "hands": len(hands),
+                        "pts": [[round(x, 1), round(y, 1)] for (x, y) in m]})
+        with self.lock:
+            self.frames.append(row)
 
     def _matches(self, want, ev):
         if want["kind"] != ev["kind"]:
@@ -90,7 +105,7 @@ class Session:
         return True
 
     def _advance(self, outcome, ev=None):
-        text, want = PROMPTS[self.i]
+        text, want = self.prompts[self.i]
         self.results.append({"prompt": text, "outcome": outcome,
                              "latency_s": round(time.time() - self.prompt_t, 2), "event": _plain(ev)})
         self.i += 1
@@ -135,7 +150,7 @@ class Session:
             r = [x for x in self.results if x["outcome"] != "rest"]
             passed = [x for x in r if x["outcome"].startswith("pass")]
             by_kind = {}
-            for x, (_, want) in zip(self.results, PROMPTS):
+            for x, (_, want) in zip(self.results, self.prompts):
                 if want["kind"] == "rest":
                     continue
                 k = {"hold": "fingers" if not want.get("tip") else "point", "swipe": "swipe",
@@ -146,7 +161,7 @@ class Session:
                     d["pass"] += 1
                     d["latency"].append(x["latency_s"])
             cur = self.current()
-            return {"prompt": cur[0] if cur else None, "index": self.i, "total": len(PROMPTS),
+            return {"prompt": cur[0] if cur else None, "index": self.i, "total": len(self.prompts),
                     "seconds_left": round(max(0.0, (cur[1].get("seconds", TIMEOUT_S) if cur else 0)
                                               - (time.time() - self.prompt_t)), 1),
                     "passed": len(passed), "tried": len(r), "by_kind": by_kind,
@@ -157,6 +172,7 @@ class Session:
         os.makedirs(OUT_DIR, exist_ok=True)
         with open(os.path.join(OUT_DIR, f"{self.stamp}.json"), "w", encoding="utf-8") as f:
             json.dump({"started": self.started, "results": self.results, "extra": self.extra,
+                       "frames": self.frames,
                        "rest_hits": self.rest_hits, "back_is": self.back_is}, f, indent=1)
 
 
@@ -207,6 +223,7 @@ class Runner:
                 found = matmod.find_mat(img, hands)
                 mat = found or mat if hands else found  # keep the last mat while a hand covers it
                 last_mat_t = time.time()
+            self.session.log_frame(t, hands)
             events = self.reader.update(t, hands, mat)
             if mat:
                 events += self.cards.update(t, matmod.find_cards(img, mat, hands))
@@ -345,10 +362,11 @@ def main(argv=None):
     ap.add_argument("--back", default="left", choices=["left", "right"],
                     help="which way a back swipe moves in the camera picture")
     ap.add_argument("--record", help="also save the raw video to this file (mp4)")
+    ap.add_argument("--only", help="only these prompt kinds, e.g. double_tap or hold,double_tap")
     ap.add_argument("--mat", action="store_true", help="look for the dark input mat (and cards on it)")
     ap.add_argument("--work-width", type=int, default=480, help="frame width used for hand finding")
     args = ap.parse_args(argv)
-    session = Session(back_is=args.back)
+    session = Session(back_is=args.back, only=args.only.split(",") if args.only else None)
     runner = Runner(args.camera, session, record=args.record, work_width=args.work_width,
                     use_mat=args.mat).start()
     app = create_app(runner, session)
