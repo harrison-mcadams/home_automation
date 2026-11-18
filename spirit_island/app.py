@@ -197,10 +197,12 @@ class Store:
 
     # -- camera gestures -----------------------------------------------------------------
     def choices_open(self):
-        """How many numbered options the game is asking you to pick from right now."""
+        """How many numbered options the game is asking you to pick from right now (0 once
+        one is picked: then gestures only go Next or Back)."""
         from .engine.guide import GROWTH
         s = self.game.state
-        if s["status"] == "playing" and s["step"] == "spirit.growth" and s["players"]:
+        if s["status"] == "playing" and s["step"] == "spirit.growth" and s["players"] \
+                and not s.get("growth_choice", {}).get("0"):
             return len(GROWTH.get(s["players"][0]["spirit"], []))
         return 0
 

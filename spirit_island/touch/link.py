@@ -4,11 +4,11 @@ it sees into game actions.
 - First, hold an open hand still for 2 seconds where you want your gesture spot.
   Gestures count only with your palm inside that spot (not over the map).
 - Double tap with one finger: Next. With two fingers: Undo (Back during setup).
-- Hold up N fingers for half a second: pick option N of the choice the game is asking
-  for (only while it asks, e.g. a growth option).
+- Hold up N fingers for half a second: pick option N when the game asks for a number
+  (e.g. a growth option).
 
-A one-finger hold waits a moment longer before it counts, because a finger resting on
-the table before a double tap looks just like holding up 1; a double tap cancels it.
+One thing at a time: while the game is asking for a number, only a number counts (taps
+are ignored); once it has one, only Next and Back count. Back takes the number back.
 
 `GestureLink.process(t, hands)` is the whole pipeline after hand finding, so tests can
 feed it hand points without a camera.
@@ -21,7 +21,6 @@ import time
 
 from .gestures import GestureReader, GestureZone
 
-ONE_FINGER_WAIT_S = 1.0  # extra wait before a 1-finger hold counts (a double tap may follow)
 
 
 class GestureLink:
@@ -34,7 +33,6 @@ class GestureLink:
         self.work_width = work_width
         self.reader = GestureReader()
         self.zone = GestureZone()  # gestures only count in the spot you set with an open hand
-        self._pending_one = None   # time a 1-finger hold was seen, waiting to count
         self._stop = threading.Event()
         self.status = {"camera": "off", "fps": 0.0, "hands": 0}
         self.last = None           # last thing done, for the TV: {"what", "t"}
@@ -44,27 +42,18 @@ class GestureLink:
         seen = len(hands)
         hands = self.zone.update(t, hands)
         events = self.reader.update(t, hands)
+        # One thing at a time (Harrison, 2026-11-18): while the game wants a number, only
+        # a number counts; once it has one, only Next and Back do (Back also takes the
+        # number back, so you can pick again).
+        wants_number = self.choices() > 0
         for ev in events:
-            if ev["kind"] == "double_tap":
-                self._pending_one = None
-                if ev["fingers"] == 1:
-                    self._act({"type": "next"}, "Next")
-                else:
-                    self._act({"type": "undo"}, "Back")
-            elif ev["kind"] == "hold":
-                n = ev["count"]
-                if not 1 <= n <= self.choices():
-                    continue
-                if n == 1:
-                    self._pending_one = t
-                else:
-                    self._pending_one = None
-                    self._choose(n)
-        if self._pending_one is not None and t - self._pending_one >= ONE_FINGER_WAIT_S:
-            self._pending_one = None
-            if self.choices() >= 1:
-                self._choose(1)
+            if ev["kind"] == "double_tap" and not wants_number:
+                self._act({"type": "next"} if ev["fingers"] == 1 else {"type": "undo"},
+                          "Next" if ev["fingers"] == 1 else "Back")
+            elif ev["kind"] == "hold" and wants_number and 1 <= ev["count"] <= self.choices():
+                self._choose(ev["count"])
         self.status["hands"] = seen
+        self.status["wants_number"] = wants_number
         self.status["in_spot"] = len(hands)
         prog = self.reader.progress()
         if self.zone.setting:

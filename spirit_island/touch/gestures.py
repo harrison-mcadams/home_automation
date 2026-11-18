@@ -35,6 +35,7 @@ TAP_LEVELS_S = 1.0    # the two levels are read from this much recent history
 TAP_MAX_S = 0.4       # each tap, and the touch between the two, lasts at most this long
 TAP_REST_S = 0.1      # the finger rests at least this long before a double tap (short, so
                       # back-to-back double taps both count)
+TAP_MIN_GAP_S = 0.5   # two double taps fire at least this far apart (faster is jitter)
 TAP_STILL = 0.25      # during taps the palm stays within this many palm lengths
 TAP_SIZE = 0.25       # ... and its size changes by less than this fraction (two-finger
                       # taps tilt the hand: palm 165 -> 145 px on the 2026-11-18 run)
@@ -101,6 +102,7 @@ class _Tap:
         self.since = 0.0
         self.runs = deque(maxlen=6)  # finished (state, start, end), oldest first
         self.first_down = 0.0  # when the double tap's first tap started
+        self.fired = -1e9
 
     def update(self, t, length):
         self.history.append((t, length))
@@ -132,6 +134,9 @@ class _Tap:
             return None
         if any(r[2] - r[1] > TAP_MAX_S for r in (p1, r1, p2)):
             return None
+        if p2[2] - self.fired < TAP_MIN_GAP_S:
+            return None
+        self.fired = p2[2]
         self.first_down = p1[1]
         self.runs.clear()
         self.runs.append((self.state, self.since - 1.0, self.since))  # fresh rest

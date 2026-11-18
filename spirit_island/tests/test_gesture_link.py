@@ -52,15 +52,18 @@ def test_numbers_only_count_while_a_choice_is_open():
     assert len(got) == 1  # 5 is not one of the 3 options
 
 
-def test_one_finger_choice_waits_and_a_double_tap_cancels_it():
+def test_one_thing_at_a_time_number_then_taps():
+    """While the game wants a number only numbers count; once it has one, only taps."""
     got = []
-    link = with_spot(GestureLink(on_action=got.append, choices=lambda: 3))
-    feed(link, [[hand(("index",))]] * 50)  # held 2.5 s: counts as option 1
-    assert got == [{"type": "choose", "option": 1}]
-    got.clear()
-    feed(link, [[]] * 10, t0=10)
-    feed(link, double_tap(1), t0=20)       # finger rests ~0.4 s, then taps: Next only
-    assert [a["type"] for a in got] == ["next"]
+    wants = [3]
+    link = with_spot(GestureLink(on_action=lambda a: (got.append(a), wants.__setitem__(0, 0))))
+    link.choices = lambda: wants[0]
+    feed(link, [[hand(("index", "middle"))]] * 15, t0=5)
+    assert got == [{"type": "choose", "option": 2}]   # number taken; no longer wants one
+    feed(link, [[]] * 10, t0=7)
+    feed(link, double_tap(1), t0=10)
+    feed(link, [[hand(("index", "middle", "ring"))]] * 15, t0=13)  # a number now: ignored
+    assert [a["type"] for a in got] == ["choose", "next"]
 
 
 def _to_growth(store):
@@ -102,7 +105,7 @@ def test_gesture_status_endpoint(tmp_path):
 
 def test_nothing_counts_until_the_spot_is_set_and_only_inside_it():
     got = []
-    link = GestureLink(on_action=got.append, choices=lambda: 3)
+    link = GestureLink(on_action=got.append)
     feed(link, double_tap(1))
     assert got == [] and link.public()["spot"]["setting"]
     with_spot(link)                                        # spot around (300, 300)

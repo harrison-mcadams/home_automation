@@ -561,6 +561,8 @@ keepAwake();
         if (g.camera === "ok" && g.spot && g.spot.setting)
           words = "Hold an open hand still for 2 seconds where you'll tap";
         else if (g.camera === "ok" && g.hands && !g.in_spot) words = "hand outside your tap spot";
+        else if (g.camera === "ok" && g.wants_number) words = "Hold up fingers for your option";
+        else if (g.camera === "ok") words = "Double tap: next · two fingers: back";
         if (ring && g.spot && g.spot.setting) box.querySelector("b").textContent = "✋";
         if (lastT === null) lastT = g.last ? g.last.t : 0;  // don't replay an old one
         else if (g.last && g.last.t > lastT) { toast(g.last.what); lastT = g.last.t; }
