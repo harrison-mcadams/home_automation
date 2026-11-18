@@ -71,51 +71,59 @@ def plausible(H_cam_to_ref, ref_shape, frame_size):
     return 0.05 * fw * fh <= area <= 1.5 * fw * fh
 
 
+def scan_source(scan_path, seeds):
+    """A board's clean printed scan (assets/boards/<letter>.png), its lands found from seeds."""
+    from spirit_island.perception.lands import segment_lands
+    scan = cv2.imread(str(scan_path), cv2.IMREAD_UNCHANGED)
+    if scan is None:
+        raise FileNotFoundError(scan_path)
+    bgr = scan[..., :3]
+    mask = (scan[..., 3] > 128).astype(np.uint8) * 255 if scan.shape[2] == 4 else \
+        np.full(scan.shape[:2], 255, np.uint8)
+    labels, names = segment_lands(bgr, mask, {k: tuple(v) for k, v in seeds.items()})
+    return {"name": f"scan {Path(scan_path).stem}", "reference": bgr, "mask": mask,
+            "labels": labels, "names": names, "rotate": 0}
+
+
+def reference_sources(ref_dir):
+    """Every board reference folder the old board camera saved (reference.jpg, board_mask.png,
+    lands.png + lands.json), under `ref_dir` or `ref_dir` itself."""
+    from spirit_island.perception.lands import load
+    ref_dir = Path(ref_dir)
+    folders = [ref_dir] if (ref_dir / "reference.jpg").exists() else \
+        [d for d in sorted(ref_dir.iterdir()) if (d / "reference.jpg").exists()]
+    out = []
+    for d in folders:
+        labels, names = load(d)
+        ref = cv2.imread(str(d / "reference.jpg"))
+        if labels is None or ref is None:
+            continue
+        meta = json.loads((d / "reference.json").read_text()) if (d / "reference.json").exists() else {}
+        out.append({"name": f"reference {d.name}", "reference": ref,
+                    "mask": cv2.imread(str(d / "board_mask.png"), cv2.IMREAD_GRAYSCALE),
+                    "labels": labels, "names": names, "rotate": meta.get("rotate", 0)})
+    return out
+
+
 class BoardPointer(LandLookup):
-    """Keeps the camera lined up with a board, in the background.
+    """Keeps the camera lined up with the board, in the background.
 
-    Prefers the clean printed scan of the board (assets/boards/<letter>.png, its lands
-    found from board_seeds.json), which has no old lighting baked in; falls back to the
-    old camera reference folder."""
+    Tries each known picture of the board (the clean scans and the old camera's reference
+    photos; their folder letters aren't trusted, since on 2026-11-18 Harrison's board C
+    matched the folder named A) and keeps whichever lines up with a believable outline.
+    Land ids always use the game's own board letter."""
 
-    @classmethod
-    def from_scan(cls, scan_path, letter, seeds):
-        from spirit_island.perception.lands import segment_lands
-        scan = cv2.imread(str(scan_path), cv2.IMREAD_UNCHANGED)
-        if scan is None:
-            raise FileNotFoundError(scan_path)
-        bgr = scan[..., :3]
-        mask = (scan[..., 3] > 128).astype(np.uint8) * 255 if scan.shape[2] == 4 else \
-            np.full(scan.shape[:2], 255, np.uint8)
-        labels, names = segment_lands(bgr, mask, {k: tuple(v) for k, v in seeds.items()})
-        self = cls.__new__(cls)
-        LandLookup.__init__(self, labels, names, letter, 0)
-        self.reference, self.mask = bgr, mask
-        self._init_thread()
-        return self
-
-    def _init_thread(self):
+    def __init__(self, sources, letter):
+        if not sources:
+            raise FileNotFoundError("no pictures of the board to line up with")
+        self.sources = sources
+        self.active = 0
+        s0 = sources[0]
+        super().__init__(s0["labels"], s0["names"], letter, s0["rotate"])
         self.status = "not lined up yet"
+        self.source_name = None
         self._frame = None
         self._stop = threading.Event()
-
-    def __init__(self, ref_dir, letter_hint=None):
-        ref_dir = Path(ref_dir)
-        if not (ref_dir / "reference.jpg").exists():
-            folders = [d for d in sorted(ref_dir.iterdir()) if (d / "reference.jpg").exists()]
-            pick = [d for d in folders if d.name == letter_hint] or folders
-            if not pick:
-                raise FileNotFoundError(f"no board reference in {ref_dir}")
-            ref_dir = pick[0]
-        from spirit_island.perception.lands import load
-        labels, names = load(ref_dir)
-        if labels is None:
-            raise FileNotFoundError(f"no land map in {ref_dir}")
-        meta = json.loads((ref_dir / "reference.json").read_text()) if (ref_dir / "reference.json").exists() else {}
-        super().__init__(labels, names, meta.get("letter") or ref_dir.name, meta.get("rotate", 0))
-        self.reference = cv2.imread(str(ref_dir / "reference.jpg"))
-        self.mask = cv2.imread(str(ref_dir / "board_mask.png"), cv2.IMREAD_GRAYSCALE)
-        self._init_thread()
 
     def give_frame(self, frame):
         self._frame = frame
@@ -124,23 +132,38 @@ class BoardPointer(LandLookup):
         threading.Thread(target=self._run, daemon=True).start()
         return self
 
-    def _run(self):
+    def _try(self, src, frame):
         from vision.register import register
+        img = frame
+        if src["rotate"] in (90, 180, 270):
+            img = cv2.rotate(frame, {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180,
+                                     270: cv2.ROTATE_90_COUNTERCLOCKWISE}[src["rotate"]])
+        try:
+            reg = register(src["reference"], img, reference_mask=src["mask"])
+        except Exception:
+            return None
+        if reg is not None and reg.ok and plausible(reg.homography, src["reference"].shape, img.shape[1::-1]):
+            return reg.homography
+        return None
+
+    def locate_once(self, frame):
+        """Line up one frame: the board that worked last time first, then the others."""
+        order = [self.active] + [i for i in range(len(self.sources)) if i != self.active]
+        for i in order:
+            H = self._try(self.sources[i], frame)
+            if H is not None:
+                src = self.sources[i]
+                self.active, self.source_name = i, src["name"]
+                self.labels, self.names, self.rotate = src["labels"], src["names"], src["rotate"]
+                self.homography, self.frame_size = H, (frame.shape[1], frame.shape[0])
+                self.located_at, self.status = time.time(), "lined up"
+                return True
+        if time.time() - self.located_at > 30:
+            self.status = "can't find the board"
+        return False
+
+    def _run(self):
         while not self._stop.is_set():
-            frame = self._frame
-            if frame is not None:
-                h, w = frame.shape[:2]
-                img = frame
-                if self.rotate in (90, 180, 270):
-                    img = cv2.rotate(frame, {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180,
-                                             270: cv2.ROTATE_90_COUNTERCLOCKWISE}[self.rotate])
-                try:
-                    reg = register(self.reference, img, reference_mask=self.mask)
-                except Exception as e:  # never stop the gesture camera over this
-                    reg, self.status = None, f"error: {e}"
-                if reg is not None and reg.ok and plausible(reg.homography, self.reference.shape, img.shape[1::-1]):
-                    self.homography, self.frame_size = reg.homography, (w, h)
-                    self.located_at, self.status = time.time(), "lined up"
-                elif time.time() - self.located_at > 30:
-                    self.status = "can't find the board"
+            if self._frame is not None:
+                self.locate_once(self._frame)
             self._stop.wait(LOCATE_EVERY_S)

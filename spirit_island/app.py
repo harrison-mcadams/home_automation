@@ -619,15 +619,16 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
         from .touch.link import GestureLink
         board = None
         letter = (store.game.state.get("boards") or ["C"])[0]
-        scan = os.path.join(BASE_DIR, cfg["board_art_dir"], f"{letter}.png")
         try:
-            from .touch.board_point import BoardPointer
+            from .touch import board_point as bp
+            sources = []
+            scan = os.path.join(BASE_DIR, cfg["board_art_dir"], f"{letter}.png")
             if os.path.exists(scan):
                 with open(os.path.join(BASE_DIR, "board_seeds.json"), encoding="utf-8") as f:
-                    seeds = json.load(f)["boards"][letter]
-                board = BoardPointer.from_scan(scan, letter, seeds).start()
-            elif cfg.get("board_reference"):
-                board = BoardPointer(cfg["board_reference"], letter_hint=letter).start()
+                    sources.append(bp.scan_source(scan, json.load(f)["boards"][letter]))
+            if cfg.get("board_reference") and os.path.isdir(cfg["board_reference"]):
+                sources += bp.reference_sources(cfg["board_reference"])
+            board = bp.BoardPointer(sources, letter).start() if sources else None
         except Exception as e:  # pointing is optional: numbers still work
             print(f"Pointing at lands is off: {e}")
         store.gestures = GestureLink(cfg["touch_camera_url"], on_action=store.gesture_action,

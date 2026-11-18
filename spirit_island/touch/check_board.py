@@ -14,7 +14,7 @@ import os
 import cv2
 import numpy as np
 
-from .board_point import BoardPointer, plausible
+from . import board_point as bp_mod
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -24,6 +24,7 @@ def main(argv=None):
     ap.add_argument("--camera", required=True)
     ap.add_argument("--letter", default="C")
     ap.add_argument("--out", default="board_check.jpg")
+    ap.add_argument("--reference", help="folder of the old board camera's references (config board_reference)")
     a = ap.parse_args(argv)
     if os.path.exists(a.camera):
         frame = cv2.imread(a.camera)
@@ -32,15 +33,18 @@ def main(argv=None):
         ok, frame = cap.read()
         if not ok:
             raise SystemExit("no frame from the camera")
-    seeds = json.load(open(os.path.join(BASE, "board_seeds.json"), encoding="utf-8"))["boards"][a.letter]
-    bp = BoardPointer.from_scan(os.path.join(BASE, "assets", "boards", f"{a.letter}.png"), a.letter, seeds)
-    from vision.register import register
-    reg = register(bp.reference, frame, reference_mask=bp.mask)
-    if reg is None:
-        raise SystemExit("no alignment at all")
-    ok = reg.ok and plausible(reg.homography, bp.reference.shape, frame.shape[1::-1])
-    print(f"inliers {reg.inliers} of {reg.matches} matches; plausible: {ok}")
-    inv = np.linalg.inv(reg.homography)
+    sources = []
+    scan = os.path.join(BASE, "assets", "boards", f"{a.letter}.png")
+    if os.path.exists(scan):
+        seeds = json.load(open(os.path.join(BASE, "board_seeds.json"), encoding="utf-8"))["boards"][a.letter]
+        sources.append(bp_mod.scan_source(scan, seeds))
+    if a.reference:
+        sources += bp_mod.reference_sources(a.reference)
+    bp = bp_mod.BoardPointer(sources, a.letter)
+    if not bp.locate_once(frame):
+        raise SystemExit("could not line up with any picture of the board: " + ", ".join(s["name"] for s in sources))
+    print("lined up with", bp.source_name)
+    inv = np.linalg.inv(bp.homography)
     out = frame.copy()
     for i, name in enumerate(bp.names, 1):
         m = (bp.labels == i).astype(np.uint8)
