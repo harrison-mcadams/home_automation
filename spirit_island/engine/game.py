@@ -240,6 +240,8 @@ class Game:
         self.history = history or []
 
     # -- public -----------------------------------------------------------
+    camera_energy = False   # the panel camera counts energy tokens (old camera-tracking mode)
+
     def dispatch(self, action, source="manual"):
         kind = action.get("type")
         handler = getattr(self, f"_do_{kind}", None)
@@ -394,7 +396,7 @@ class Game:
             return QUIET
         s["sub"] = 0
         step = s["step"]
-        if step == "spirit.energy" and not s.get("energy_from_camera"):
+        if step == "spirit.energy" and not (s.get("energy_from_camera") and self.camera_energy):
             for i, p in enumerate(s["players"]):
                 st = spirit_stats(s, i)
                 if st:
@@ -620,6 +622,29 @@ class Game:
         sp = self._spirit(int(action.get("player", 0)))
         sp["energy"] = max(0, sp["energy"] + int(action.get("delta", 0)))
         return f"Energy {'+' if int(action.get('delta', 0)) >= 0 else ''}{int(action.get('delta', 0))} (now {sp['energy']})"
+
+    def _do_play_card(self, action):
+        """Play a power card on Choose and pay for powers: pay its cost now and use a card
+        play (Harrison, 2026-11-18: lay it down, point at it, it's played). Undo takes it back."""
+        s = self.state
+        if s["step"] != "spirit.powers":
+            raise ActionError("cards are played on Choose and pay for powers")
+        name = action.get("card")
+        cost, speed = rules.POWER_INFO.get(name, (action.get("cost"), action.get("speed")))
+        if cost is None:
+            raise ActionError(f"{name}: cost not known")
+        played = s.setdefault("played", [])
+        if any(c["name"] == name for c in played):
+            raise ActionError(f"{name} is already played")
+        st = spirit_stats(s, 0)
+        sp = self._spirit(0)
+        if st and len(played) >= st["card_plays"]:
+            raise ActionError(f"no card plays left ({st['card_plays']} this round)")
+        if sp["energy"] < cost:
+            raise ActionError(f"{name} needs {cost} energy, you have {sp['energy']}")
+        sp["energy"] -= cost
+        played.append({"name": name, "cost": cost, "speed": speed})
+        return f"Played {name}: -{cost} energy (now {sp['energy']})"
 
     def _do_card_resolved(self, action):
         """A played power card was carried out (by a number key, or seen by the camera)."""

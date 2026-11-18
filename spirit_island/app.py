@@ -130,7 +130,8 @@ class Store:
             action = {**action, "screen": True}
         # Leaving Play powers: pay for the cards the camera sees played (only when really
         # leaving the step, not when Next walks through its numbered items).
-        if action.get("type") == "next" and self.game.state["step"] == "spirit.powers"                 and (action.get("screen") or self.game.state.get("sub", 0) >= self.game._items() - 1)                 and getattr(self, "power_watch", None) is not None:
+        # (With the gesture camera's CardWatch, cards are paid as they are played instead.)
+        if action.get("type") == "next" and self.game.state["step"] == "spirit.powers"                 and (action.get("screen") or self.game.state.get("sub", 0) >= self.game._items() - 1)                 and getattr(self, "power_watch", None) is not None                 and not hasattr(self.power_watch, "target_at"):
             pw_now = self.power_watch.public()
             cost = pw_now.get("cost") or 0
             # Remember what was played, so Fast and Slow still show those cards once
@@ -216,6 +217,12 @@ class Store:
     def point_targets(self):
         """The question's options as things to point at, in option order: "land:C4" on the
         map, "growth:2" or "track:energy" on the spirit panel ([] when nothing is asked)."""
+        s = self.game.state
+        if s["status"] == "playing" and s["step"] == "spirit.powers" and hasattr(getattr(self, "power_watch", None), "target_at"):
+            # Every card in view not yet played: pointing at one plays it. Double taps still
+            # go Next / Back here, since you may play none, one or several.
+            played = {c["name"] for c in s.get("played", [])}
+            return [f"card:{c['name']}" for c in self.power_watch.public().get("cards", []) if c["name"] not in played]
         n = self.choices_open()
         if not n:
             return []
@@ -236,6 +243,8 @@ class Store:
                 action = {"type": "back"}
             elif not self.game.history:
                 raise ActionError("nothing to undo")
+        elif kind == "play_card":
+            action = {"type": "play_card", "card": action["card"]}
         elif kind == "choose":
             if not 1 <= action["option"] <= self.choices_open():
                 raise ActionError("not one of the options")
@@ -437,7 +446,7 @@ class Store:
         s = self.game.state
         pw = self.power_watch.public() if getattr(self, "power_watch", None) else {}
         cards = list(pw.get("cards") or [])
-        if s["step"] in ("fast", "slow"):
+        if s["step"] in ("spirit.powers", "fast", "slow"):
             seen = {c["name"] for c in cards}
             cards += [c for c in s.get("played", []) if c["name"] not in seen]
         if s["step"] not in ("spirit.powers", "fast", "slow") or not cards:
@@ -452,6 +461,7 @@ class Store:
             out.append({**c, "src": src, "options": options(s, c["name"]),
                         "spirit": bool(R.POWER_TARGETS.get(c["name"], {}).get("spirit")),
                         "resolved": c["name"] in s.get("resolved", {}),
+                        "played": any(p["name"] == c["name"] for p in s.get("played", [])),
                         "now": s["step"] == c["speed"]})
         return out
 
@@ -564,15 +574,29 @@ def card_guide(state, focus, base):
         # (The card picture sits under the list; the side keeps the drawn board, with the
         # choices lit in the same colours.)
     if step == "spirit.powers":
-        cost = sum(c["cost"] or 0 for c in focus)
+        # Pointing plays a card (paid at once): one screen with every card in view.
+        from .engine import game as G
+        st = G.spirit_stats(state, 0)
         have = (state.get("spirits", {}).get("0", {}) or {}).get("energy", 0)
-        if state.get("energy_from_camera") and cost:
-            do.append({"text": f"Pay: take {cost} energy token{'s' if cost > 1 else ''} off your panel "
-                               f"({have} → {have - cost}). The game moves on when the camera sees it.",
-                       "colour": "#ffd968"})
-        else:
-            do.append("Press → to pay and move on.")
-    elif any(c["now"] and not c["resolved"] for c in focus):
+        n_played = len(state.get("played", []))
+        do = []
+        for i, c in enumerate(focus):
+            pics.append({"src": c["src"], "items": [i], "caption": c["name"] + (" ✓ played" if c["played"] else "")})
+            head = f"{c['name']}: {c['cost']} energy, {c['speed']}."
+            if c["played"]:
+                do.append({"text": head + " Played ✓", "colour": "#7fdc8a"})
+            elif c["cost"] is not None and c["cost"] > have:
+                do.append(head + f" Needs {c['cost']} energy, you have {have}.")
+            else:
+                do.append(head + " Point at it and hold still to play it.")
+        do.append({"text": f"Energy {have}" + (f" · cards played {n_played} of {st['card_plays']}" if st else "")
+                           + ". Double tap when you're done; two-finger double tap takes the last one back.",
+                   "colour": "#ffd968"})
+        from .engine import innate
+        do += innate.lines(state, [c["name"] for c in state.get("played", [])])
+        return {**base, "title": "Play powers", "do": do, "pictures": pics, "single": True,
+                "helper": {"kind": "card_options", "cards": focus}, "why": "", "tips": []}
+    if any(c["now"] and not c["resolved"] for c in focus):
         do.append("Do it at the table. The camera spots the change and moves on, or press the option's number.")
     from .engine import innate
     do += innate.lines(state, [c["name"] for c in focus])
@@ -621,6 +645,8 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
     store = Store(data_dir or cfg["data_dir"])
     app.config["STORE"] = store
     store.camera_tracking = bool(cfg["camera_tracking"])
+    from .engine.game import Game as _Game
+    _Game.camera_energy = store.camera_tracking  # else the app adds energy on Gain energy
     # The background watchers only make sense while the camera tracks the board.
     start_vision = start_vision and store.camera_tracking
     url = cfg["board_camera_url"] if vision_url is None else vision_url
@@ -658,6 +684,11 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
                 pointers.append(bp.PanelPointer(panel, players[0]["spirit"]).start())
             except Exception as e:
                 print(f"Pointing at the spirit panel is off: {e}")
+        # Power cards laid down in the gesture camera's view: shown on Play powers, and
+        # pointing at one plays it.
+        from .power_cards import CardWatch
+        store.power_watch = CardWatch(store).start()
+        pointers.append(store.power_watch)
         store.gestures = GestureLink(cfg["touch_camera_url"], on_action=store.gesture_action,
                                      choices=store.choices_open, board=board,
                                      targets=store.point_targets, pointers=pointers).start()
@@ -721,11 +752,13 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
                                              fallback=cfg["camera_snapshot_url"])
             if start_vision and url:
                 store.change_watch.start()
-        from .power_cards import PowerWatch
-        store.power_watch = PowerWatch(store, cfg["camera_snapshot_url"])
+        if getattr(store, "power_watch", None) is None:  # (the gesture camera reads cards)
+            from .power_cards import PowerWatch
+            store.power_watch = PowerWatch(store, cfg["camera_snapshot_url"])
         if start_vision and url:
             store.slot_watch.start()
-            store.power_watch.start()
+            if not hasattr(store.power_watch, "target_at"):
+                store.power_watch.start()
 
     @app.get("/api/slot_watch.jpg")
     def slot_watch_photo():

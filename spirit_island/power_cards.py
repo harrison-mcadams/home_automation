@@ -143,3 +143,92 @@ class PowerWatch:
                 except Exception as e:
                     print(f"{hook.__name__} failed: {e}")
             self.store.broadcast(self.store.snapshot())
+
+
+CARD_STEPS = ("spirit.powers", "fast", "slow")
+CARD_EVERY_S = 1.0     # read the cards in view this often
+CARD_KEEP = 3          # a card missing from this many reads in a row is gone (a hand over it)
+
+
+class CardWatch:
+    """The power cards lying in the gesture camera's view, read from its own frames (no
+    second camera connection). Each card's outline is kept, so pointing at it can play it.
+    Reads only cards: the app, not the camera, keeps energy and the board."""
+    kinds = {"card"}
+
+    def __init__(self, store, every=CARD_EVERY_S):
+        self.store = store
+        self.every = every
+        self.reader = None
+        self.spirit = None
+        self._frame = None
+        self.frame_size = None
+        self.seen = {}            # name -> {"quad": [...], "missed": n}
+        self.status = "off"
+        self.lock = threading.Lock()
+        self._stop = threading.Event()
+
+    # -- pointing ------------------------------------------------------------------------
+    def give_frame(self, frame):
+        self._frame = frame
+
+    def target_at(self, pt):
+        with self.lock:
+            items = list(self.seen.items())
+        for name, c in items:
+            quad = np.float32(c["quad"]).reshape(-1, 1, 2)
+            if cv2.pointPolygonTest(quad, (float(pt[0]), float(pt[1])), False) >= 0:
+                return f"card:{name}"
+        return None
+
+    # -- what the game reads -------------------------------------------------------------
+    def public(self) -> dict:
+        s = self.store.game.state
+        if s.get("step") not in CARD_STEPS:
+            return {"active": False}
+        with self.lock:
+            names = sorted(self.seen)
+        cards = [{"name": n, "cost": rules.POWER_INFO.get(n, (None, None))[0],
+                  "speed": rules.POWER_INFO.get(n, (None, None))[1]} for n in names]
+        return {"active": True, "cards": cards, "cost": sum(c["cost"] or 0 for c in cards),
+                "status": self.status}
+
+    def start(self):
+        threading.Thread(target=self._run, daemon=True, name="card-watch").start()
+        return self
+
+    def stop(self):
+        self._stop.set()
+
+    def update(self, found):
+        """Fold one read into the cards in view; True when the list of names changed."""
+        with self.lock:
+            before = set(self.seen)
+            for f in found:
+                self.seen[f["name"]] = {"quad": f["quad"], "missed": 0}
+            names = {f["name"] for f in found}
+            for n in list(self.seen):
+                if n not in names:
+                    self.seen[n]["missed"] += 1
+                    if self.seen[n]["missed"] >= CARD_KEEP:
+                        del self.seen[n]
+            return set(self.seen) != before
+
+    def _run(self):
+        while not self._stop.is_set():
+            s = self.store.game.state
+            if s.get("step") in CARD_STEPS and s.get("players") and self._frame is not None:
+                try:
+                    spirit = s["players"][0]["spirit"]
+                    if self.reader is None or self.spirit != spirit:
+                        self.reader, self.spirit = PowerCardReader(card_paths(spirit)), spirit
+                    self.status = "lined up"
+                    if self.update(self.reader.read(self._frame)):
+                        self.store.broadcast(self.store.snapshot())
+                except Exception as e:
+                    self.status = f"failed: {type(e).__name__}"
+            elif self.seen:
+                with self.lock:
+                    self.seen = {}
+                self.status = "off"
+            self._stop.wait(self.every)

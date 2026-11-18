@@ -5,7 +5,7 @@ it sees into game actions.
   Gestures count only with your palm inside that spot (not over the map).
 - Double tap with one finger: Next. With two fingers: Undo (Back during setup).
 - Point at what you want and hold still: a land on the map, a growth option or a presence
-  row on your spirit panel. A held point is taken straight away (no confirm).
+  row on your spirit panel, or a power card you laid down (plays it). A held point is taken straight away (no confirm).
 - Holding up N fingers picks option N only when the camera can't see what the question
   is about (a backup).
 
@@ -34,6 +34,8 @@ def label(key):
         return f"growth option {what}"
     if kind == "track":
         return {"energy": "the energy row", "cards": "the card plays row"}.get(what, what)
+    if kind == "card":
+        return what
     return key
 
 
@@ -65,7 +67,7 @@ class GestureLink:
         seen, everyone = len(hands), hands
         hands = self.zone.update(t, hands)
         wants_number = self.choices() > 0
-        targets = self.targets() if wants_number else []
+        targets = self.targets()
         aim = self._aimers(targets)
         # Asking for a number above 5: with one hand in your spot, a second hand anywhere
         # in view adds its fingers (land choices can go up to 8).
@@ -97,7 +99,9 @@ class GestureLink:
             for ev in self.pointer.update(t, everyone):
                 if ev["kind"] == "hold" and ev.get("tip") is not None:
                     key = self._target_at(aim, ev["tip"])
-                    if key in targets:
+                    if key in targets and key.startswith("card:"):
+                        self._act({"type": "play_card", "card": key[5:]}, f"Played {key[5:]}")
+                    elif key in targets:
                         self._act({"type": "choose", "option": targets.index(key) + 1}, label(key).capitalize())
         else:
             self.pointer.reset()

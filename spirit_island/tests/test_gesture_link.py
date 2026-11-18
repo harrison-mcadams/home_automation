@@ -328,3 +328,92 @@ def test_drawn_map_follows_the_game_board_not_the_first_folder():
     v.game_board = lambda: "C"
     assert v.map.letter == "C"
     assert v.camera_board({"boards": ["C"]}) == "C"
+
+
+def _to_powers(store):
+    _to_growth(store)
+    store.gesture_action({"type": "choose", "option": 1})      # reclaim + card + 1 energy
+    for _ in range(10):
+        if store.game.state["step"] == "spirit.powers":
+            return
+        store.dispatch({"type": "next", "screen": True}, "manual")
+    raise AssertionError(store.game.state["step"])
+
+
+class _Cards:
+    """Stands in for the card watcher: Wash Away (1) and Flash Floods (2) in view; the
+    right half of the picture is Flash Floods, the left half Wash Away."""
+    kinds = {"card"}
+    status = "lined up"
+
+    def public(self):
+        return {"active": True, "cards": [{"name": "Flash Floods", "cost": 2, "speed": "fast"},
+                                          {"name": "Wash Away", "cost": 1, "speed": "slow"}], "cost": 3}
+
+    def target_at(self, pt):
+        return "card:Flash Floods" if pt[0] > 500 else "card:Wash Away"
+
+
+def test_gain_energy_adds_energy_when_the_camera_does_not_count_tokens(tmp_path):
+    app = create_app(str(tmp_path), vision_url="")
+    store = app.config["STORE"]
+    _to_powers(store)
+    s = store.game.state
+    s["energy_from_camera"] = True                   # an old save from the camera-tracking days
+    store.gesture_action({"type": "undo"})
+    while store.game.state["step"] != "spirit.energy":
+        store.gesture_action({"type": "undo"})
+    store.game.state["energy_from_camera"] = True
+    before = store.game.state["spirits"]["0"]["energy"]
+    store.dispatch({"type": "next", "screen": True}, "manual")
+    assert store.game.state["spirits"]["0"]["energy"] > before
+
+
+def test_pointing_at_a_card_plays_and_pays_for_it(tmp_path):
+    app = create_app(str(tmp_path), vision_url="")
+    store = app.config["STORE"]
+    store.power_watch = _Cards()
+    _to_powers(store)
+    s = store.game.state
+    s["spirits"]["0"]["energy"] = 2
+    s["spirits"]["0"]["taken"]["cards"] = 1           # 2 card plays
+    assert store.point_targets() == ["card:Flash Floods", "card:Wash Away"]
+    assert store.choices_open() == 0                 # double taps still go Next / Back
+    guide = store.snapshot()["guide"]
+    assert guide["single"] and "Point at it" in str(guide["do"])
+    store.gesture_action({"type": "play_card", "card": "Wash Away"})
+    s = store.game.state
+    assert s["spirits"]["0"]["energy"] == 1 and [c["name"] for c in s["played"]] == ["Wash Away"]
+    assert store.point_targets() == ["card:Flash Floods"]
+    with pytest.raises(Exception, match="needs 2 energy"):
+        store.gesture_action({"type": "play_card", "card": "Flash Floods"})
+    store.gesture_action({"type": "undo"})          # takes it back, energy too
+    assert store.game.state["spirits"]["0"]["energy"] == 2 and not store.game.state.get("played")
+    store.gesture_action({"type": "play_card", "card": "Flash Floods"})
+    store.gesture_action({"type": "next"})          # leaving charges nothing more
+    assert store.game.state["step"] == "fast" and store.game.state["spirits"]["0"]["energy"] == 0
+
+
+def test_link_plays_the_card_pointed_at_and_taps_still_work():
+    got = []
+    cards = _Cards()
+    link = with_spot(GestureLink(on_action=got.append, choices=lambda: 0,
+                                 targets=lambda: ["card:Flash Floods", "card:Wash Away"], pointers=[cards]))
+    feed(link, [[hand(("index",), at=(900, 700))]] * 20, t0=0)
+    assert got == [{"type": "play_card", "card": "Flash Floods"}]
+    feed(link, [[]] * 10, t0=5)
+    feed(link, double_tap(1), t0=10)
+    assert got[-1] == {"type": "next"}
+
+
+def test_card_watch_keeps_a_card_through_a_missed_read():
+    from spirit_island.power_cards import CARD_KEEP, CardWatch
+    w = CardWatch(store=None)
+    quad = [[0, 0], [100, 0], [100, 150], [0, 150]]
+    assert w.update([{"name": "Wash Away", "quad": quad}])
+    assert w.target_at((50, 50)) == "card:Wash Away" and w.target_at((300, 50)) is None
+    for _ in range(CARD_KEEP - 1):
+        w.update([])                                 # a hand over it
+    assert w.target_at((50, 50)) == "card:Wash Away"
+    assert w.update([])                              # gone now
+    assert w.target_at((50, 50)) is None

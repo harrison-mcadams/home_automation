@@ -564,7 +564,8 @@ keepAwake();
         else if (g.camera === "ok" && g.hands && !g.in_spot) words = "hand outside your tap spot";
         else if (g.camera === "ok" && g.pointing) words = "Pointing at " + g.pointing;
         else if (g.camera === "ok" && g.point_kind) words = {land: "Point at a lit land and hold still",
-          growth: "Point at a growth option on your panel", track: "Point at the row on your panel"}[g.point_kind] || "Point at your choice";
+          growth: "Point at a growth option on your panel", track: "Point at the row on your panel",
+          card: "Point at a card to play it · double tap: done"}[g.point_kind] || "Point at your choice";
         else if (g.camera === "ok" && g.wants_number) words = "Camera can't see it: hold up fingers for your option";
         else if (g.camera === "ok") words = "Double tap: next · two fingers: back";
         if (ring && g.spot && g.spot.setting) box.querySelector("b").textContent = "✋";

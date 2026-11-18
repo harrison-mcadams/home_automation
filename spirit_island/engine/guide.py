@@ -624,15 +624,18 @@ def _energy(s):
 
 def _powers_base(s):
     st = g.spirit_stats(s, 0) if len(s["players"]) == 1 else None
+    played = s.get("played", [])
     extra = [f"You have {st['energy']} energy and can play up to {st['card_plays']} card"
-             f"{'s' if st['card_plays'] != 1 else ''}. When you press →, the cost of the cards the camera "
-             "sees played is paid from your energy."] if st else []
+             f"{'s' if st['card_plays'] != 1 else ''}"
+             + (f" ({len(played)} played)" if played else "")
+             + ". Lay a card down in the camera's view to see it here, then point at it to play it: "
+               "its cost is paid straight away. Double tap when you're done."] if st else []
     return {
         "title": "Choose and pay for powers",
+        "single": True,   # all of it is reference: Next leaves the step at once
         "do": extra + [
             "Each spirit plays power cards from hand face up in front of them, up to the number "
-            "visible on their card-plays track. Lay them in the camera's view, off the island: "
-            "the screen lists them with their total cost.",
+            "visible on their card-plays track.",
             "Pay each card's energy cost (top-left corner).",
             "Count the elements on the cards you played (plus any from your tracks). If they meet "
             "a threshold on one of your innate powers, that innate power will happen this round.",
