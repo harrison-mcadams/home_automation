@@ -495,10 +495,11 @@ def _growth_question(s, p, chosen, q, st, pictures):
         te, tc = sp["taken"]["energy"], sp["taken"]["cards"]
         # One line only: the screen numbers its lines, which would read like finger counts.
         do = [f"Option {chosen}, {title}: add {which}. Which track does the disc come from? "
-              f"Hold up 1 finger for the energy track (top: energy each turn "
-              f"{vals['energy'][min(te, len(vals['energy']) - 1)]} → {vals['energy'][min(te + 1, len(vals['energy']) - 1)]}), "
-              f"or 2 for the card plays track (bottom: card plays "
-              f"{vals['cards'][min(tc, len(vals['cards']) - 1)]} → {vals['cards'][min(tc + 1, len(vals['cards']) - 1)]})."]
+              f"Point at that row on your panel and hold still: the energy row (top: energy each turn "
+              f"{vals['energy'][min(te, len(vals['energy']) - 1)]} → {vals['energy'][min(te + 1, len(vals['energy']) - 1)]}) "
+              f"or the card plays row (bottom: card plays "
+              f"{vals['cards'][min(tc, len(vals['cards']) - 1)]} → {vals['cards'][min(tc + 1, len(vals['cards']) - 1)]}). "
+              f"If the camera can't see your panel, hold up 1 or 2 fingers."]
         ttl = "Growth: which track?"
     else:
         lands = q["options"]
@@ -506,8 +507,8 @@ def _growth_question(s, p, chosen, q, st, pictures):
             marks[lid] = {"text": str(k), "colour": "#5fd0e8"}
         src = {"energy": "the energy track", "cards": "the card plays track"}.get(q.get("track"), "your track")
         do = [f"Option {chosen}: take the leftmost disc from {src} and put it in a land within "
-              f"{q['range']} of your presence. Point at it on the board and hold still, or hold up the number lit on it: "
-              + ", ".join(f"{k} for land {lid.lstrip('ABCDEFGHIJKLMNOPQRSTUVWXYZ')}" for k, lid in enumerate(lands, 1)) + "."]
+              f"{q['range']} of your presence. Point at one of the lit lands on the board and hold still. "
+              "If the camera can't see the board, hold up the number lit on it."]
         ttl = "Growth: which land?"
     return {"title": ttl, "single": True, "do": do, "pictures": pictures, "marks": marks,
             "why": "Two-finger double tap takes the last answer back.",
@@ -568,7 +569,8 @@ def _growth_base(s):
                 "tips": [],
             }
         items.append((f"You chose option {chosen}. " if chosen else
-                      "Hold up 1, 2 or 3 fingers in your gesture spot (or press 1, 2, 3 on the remote or phone). ")
+                      "Point at the option on your panel and hold still to pick it (or press 1, 2, 3 on the "
+                      "remote or phone; if the camera can't see your panel, hold up 1, 2 or 3 fingers). ")
                      + "The app then walks you through it.")
     else:
         items = [

@@ -87,11 +87,14 @@ def test_store_maps_gestures_to_game_actions(tmp_path):
         store.gesture_action({"type": "undo"})      # nothing to undo yet: refused
     _to_growth(store)
     assert store.choices_open() == 3
+    assert store.point_targets() == ["growth:1", "growth:2", "growth:3"]
     store.gesture_action({"type": "choose", "option": 2})
     assert store.game.state["growth_choice"]["0"] == 2
     assert store.game.state["log"][-1]["source"] == "gesture"
     assert store.choices_open() == 2                    # now: which track?
+    assert store.point_targets() == ["track:energy", "track:cards"]
     store.gesture_action({"type": "choose", "option": 1})
+    assert store.point_targets()[0].startswith("land:")
     n = store.choices_open()                            # which land?
     assert n >= 1 and store.game.state["pending"]["kind"] == "land"
     store.gesture_action({"type": "undo"})              # back to: which track?
@@ -206,16 +209,16 @@ def test_pointing_at_a_lit_land_answers_which_land():
     link = with_spot(GestureLink(on_action=got.append, choices=lambda: 2,
                                  land_options=lambda: ["C2", "C4"], board=_Board()))
     over_map = hand(("index",), at=(300, 700))        # outside the spot, over "C4"
-    feed(link, [[over_map]] * 15, t0=0)
+    feed(link, [[over_map]] * 20, t0=0)
     assert got == [{"type": "choose", "option": 2}]
-    assert link.public()["pointing"] == "C4"
+    assert link.public()["pointing"] == "land 4"
 
 
 def test_pointing_off_the_lit_lands_does_nothing():
     got = []
     link = with_spot(GestureLink(on_action=got.append, choices=lambda: 2,
                                  land_options=lambda: ["C2", "C4"], board=_Board()))
-    feed(link, [[hand(("index",), at=(900, 700))]] * 15, t0=0)
+    feed(link, [[hand(("index",), at=(900, 700))]] * 20, t0=0)
     assert got == []
 
 
@@ -237,3 +240,78 @@ def test_an_implausible_alignment_is_rejected():
     assert plausible(np.eye(3), (400, 600), (1280, 720))
     squash = np.diag([50.0, 50.0, 1.0])                 # board would be a speck
     assert not plausible(squash, (400, 600), (1280, 720))
+
+
+class _Panel:
+    """Stands in for the panel finder: three growth boxes across the top of the picture,
+    the energy row below them, the card plays row below that."""
+    kinds = {"growth", "track"}
+    status = "lined up"
+
+    def target_at(self, pt):
+        x, y = pt
+        if x < 400:
+            return None              # where the tap spot is
+        if y < 200:
+            return f"growth:{int(x // 400)}"
+        if y < 400:
+            return "track:energy"
+        if y < 600:
+            return "track:cards"
+        return None
+
+
+def test_pointing_at_a_growth_option_picks_it_without_counting():
+    got = []
+    link = with_spot(GestureLink(on_action=got.append, choices=lambda: 3,
+                                 targets=lambda: ["growth:1", "growth:2", "growth:3"], pointers=[_Panel()]))
+    # A pointing finger in the spot no longer reads as "1" while you can point instead.
+    feed(link, [[hand(("index",))]] * 30, t0=0)
+    assert got == []
+    feed(link, [[]] * 10, t0=5)
+    feed(link, [[hand(("index",), at=(1000, 250))]] * 20, t0=10)   # over option 2
+    assert got == [{"type": "choose", "option": 2}]
+
+
+def test_pointing_at_a_presence_row():
+    got = []
+    link = GestureLink(on_action=got.append, choices=lambda: 2,
+                       targets=lambda: ["track:energy", "track:cards"], pointers=[_Panel()])
+    feed(link, [[hand(("index",), at=(500, 650))]] * 20, t0=0)
+    assert got == [{"type": "choose", "option": 2}]
+    assert link.public()["pointing"] == "the card plays row"
+
+
+def test_one_long_point_answers_only_one_question():
+    """Option 2 asks for two lands, and the same land can be legal both times: the second
+    answer needs the hand to move or lift first."""
+    got = []
+    link = GestureLink(on_action=got.append, choices=lambda: 2,
+                       land_options=lambda: ["C2", "C4"], board=_Board())
+    feed(link, [[hand(("index",), at=(300, 700))]] * 60, t0=0)
+    assert got == [{"type": "choose", "option": 2}]
+
+
+def test_finger_counts_are_the_backup_when_the_panel_isnt_found():
+    got = []
+    panel = _Panel()
+    panel.status = "can't find the board"
+    link = with_spot(GestureLink(on_action=got.append, choices=lambda: 3,
+                                 targets=lambda: ["growth:1", "growth:2", "growth:3"], pointers=[panel]))
+    feed(link, [[hand(("index", "middle"))]] * 15, t0=0)
+    assert got == [{"type": "choose", "option": 2}]
+
+
+def test_panel_regions_and_lookup():
+    import numpy as np
+    from spirit_island.touch.board_point import PanelLookup, panel_regions
+    regions = panel_regions("River Surges in Sunlight")
+    assert set(regions) == {"growth:1", "growth:2", "growth:3", "track:energy", "track:cards"}
+    look = PanelLookup(regions)
+    assert look.target_at((700, 100)) is None              # not lined up yet
+    look.homography, look.frame_size = np.eye(3), (1600, 1066)
+    assert look.target_at((700, 100)) == "growth:1"
+    assert look.target_at((1400, 120)) == "growth:3"
+    assert look.target_at((682 + 3 * 117, 320)) == "track:energy"
+    assert look.target_at((682, 489)) == "track:cards"
+    assert look.target_at((100, 900)) is None              # the spirit's art

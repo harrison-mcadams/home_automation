@@ -213,6 +213,21 @@ class Store:
         q = self.game.state.get("pending")
         return list(q["options"]) if q and q.get("kind") == "land" else []
 
+    def point_targets(self):
+        """The question's options as things to point at, in option order: "land:C4" on the
+        map, "growth:2" or "track:energy" on the spirit panel ([] when nothing is asked)."""
+        n = self.choices_open()
+        if not n:
+            return []
+        q = self.game.state.get("pending")
+        if q and q.get("kind") == "land":
+            return [f"land:{l}" for l in q["options"]]
+        if q and q.get("kind") == "track":
+            return [f"track:{t}" for t in q["options"]]
+        if not q:
+            return [f"growth:{k}" for k in range(1, n + 1)]
+        return []
+
     def gesture_action(self, action):
         """A gesture from the camera, as a game action."""
         kind = action["type"]
@@ -631,9 +646,20 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
             board = bp.BoardPointer(sources, letter).start() if sources else None
         except Exception as e:  # pointing is optional: numbers still work
             print(f"Pointing at lands is off: {e}")
+        pointers = [board] if board is not None else []
+        players = store.game.state.get("players") or []
+        if players:
+            try:
+                from .engine import rules as _rules
+                from .touch import board_point as bp
+                panel = os.path.join(BASE_DIR, "assets", "spirits",
+                                     _rules.SPIRIT_ART[players[0]["spirit"]][0], "panel_front.jpg")
+                pointers.append(bp.PanelPointer(panel, players[0]["spirit"]).start())
+            except Exception as e:
+                print(f"Pointing at the spirit panel is off: {e}")
         store.gestures = GestureLink(cfg["touch_camera_url"], on_action=store.gesture_action,
-                                     choices=store.choices_open, land_options=store.land_options,
-                                     board=board).start()
+                                     choices=store.choices_open, board=board,
+                                     targets=store.point_targets, pointers=pointers).start()
 
     # Scripts and styles carry the server's start id, so a restart always loads fresh copies
     # instead of whatever the browser cached.

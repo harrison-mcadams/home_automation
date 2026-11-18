@@ -32,24 +32,45 @@ def rotate_point(x, y, w, h, degrees):
     return x, y
 
 
-class LandLookup:
-    """Reference-pixel land labels plus the latest camera -> reference alignment."""
+class Aligned:
+    """The latest camera -> reference alignment, and carrying a camera point through it."""
+    kinds = set()               # which kinds of target ("land", "growth", "track") it finds
 
-    def __init__(self, labels, names, letter, rotate=0):
-        self.labels, self.names, self.letter, self.rotate = labels, names, letter, rotate
+    def __init__(self, rotate=0):
+        self.rotate = rotate
         self.homography = None      # camera (rotated) pixels -> reference pixels
         self.frame_size = None      # (w, h) of the camera picture, before rotating
         self.located_at = 0.0
 
-    def land_at(self, pt):
-        """Land id (e.g. "C4") under a camera-picture point, or None."""
+    def to_ref(self, pt):
+        """A camera-picture point on the reference picture, or None when not lined up."""
         if self.homography is None or self.frame_size is None:
             return None
-        from spirit_island.perception.lands import land_at
         w, h = self.frame_size
         x, y = rotate_point(pt[0], pt[1], w, h, self.rotate)
         ref = cv2.perspectiveTransform(np.float32([[[x, y]]]), self.homography)[0, 0]
-        name = land_at(self.labels, self.names, float(ref[0]), float(ref[1]), search=0)
+        return float(ref[0]), float(ref[1])
+
+
+class LandLookup(Aligned):
+    """Reference-pixel land labels plus the latest camera -> reference alignment."""
+    kinds = {"land"}
+
+    def __init__(self, labels, names, letter, rotate=0):
+        super().__init__(rotate)
+        self.labels, self.names, self.letter = labels, names, letter
+
+    def target_at(self, pt):
+        lid = self.land_at(pt)
+        return f"land:{lid}" if lid else None
+
+    def land_at(self, pt):
+        """Land id (e.g. "C4") under a camera-picture point, or None."""
+        ref = self.to_ref(pt)
+        if ref is None:
+            return None
+        from spirit_island.perception.lands import land_at
+        name = land_at(self.labels, self.names, ref[0], ref[1], search=0)
         if name is None or not str(name).isdigit():
             return None   # off the board, or the ocean
         return f"{self.letter}{name}"
@@ -105,21 +126,16 @@ def reference_sources(ref_dir):
     return out
 
 
-class BoardPointer(LandLookup):
-    """Keeps the camera lined up with the board, in the background.
+class _Locator:
+    """Lines the camera up with one of several pictures, every few seconds, in the
+    background. Keeps the last good alignment when a frame can't be matched (a hand over
+    the art, say)."""
 
-    Tries each known picture of the board (the clean scans and the old camera's reference
-    photos; their folder letters aren't trusted, since on 2026-11-18 Harrison's board C
-    matched the folder named A) and keeps whichever lines up with a believable outline.
-    Land ids always use the game's own board letter."""
-
-    def __init__(self, sources, letter):
+    def _setup(self, sources):
         if not sources:
-            raise FileNotFoundError("no pictures of the board to line up with")
+            raise FileNotFoundError("no pictures to line up with")
         self.sources = sources
         self.active = 0
-        s0 = sources[0]
-        super().__init__(s0["labels"], s0["names"], letter, s0["rotate"])
         self.status = "not lined up yet"
         self.source_name = None
         self._frame = None
@@ -154,7 +170,8 @@ class BoardPointer(LandLookup):
             if H is not None:
                 src = self.sources[i]
                 self.active, self.source_name = i, src["name"]
-                self.labels, self.names, self.rotate = src["labels"], src["names"], src["rotate"]
+                self._use(src)
+                self.rotate = src["rotate"]
                 self.homography, self.frame_size = H, (frame.shape[1], frame.shape[0])
                 self.located_at, self.status = time.time(), "lined up"
                 return True
@@ -167,3 +184,72 @@ class BoardPointer(LandLookup):
             if self._frame is not None:
                 self.locate_once(self._frame)
             self._stop.wait(LOCATE_EVERY_S)
+
+
+class BoardPointer(_Locator, LandLookup):
+    """Keeps the camera lined up with the island board.
+
+    Tries each known picture of the board (the clean scans and the old camera's reference
+    photos; their folder letters aren't trusted, since on 2026-11-18 Harrison's board C
+    matched the folder named A) and keeps whichever lines up with a believable outline.
+    Land ids always use the game's own board letter."""
+
+    def __init__(self, sources, letter):
+        s0 = sources[0] if sources else {"labels": None, "names": None, "rotate": 0}
+        LandLookup.__init__(self, s0["labels"], s0["names"], letter, s0["rotate"])
+        self._setup(sources)
+
+    def _use(self, src):
+        self.labels, self.names = src["labels"], src["names"]
+
+
+def panel_regions(spirit):
+    """Pointable boxes on the spirit panel picture (panel_front.jpg, 1600 x 1066):
+    "growth:<n>" for each growth option and "track:energy" / "track:cards" for the two
+    presence rows. Empty for a spirit whose layout isn't written down yet."""
+    from spirit_island.engine import rules
+    out = {}
+    for n, box in enumerate(rules.GROWTH_BOXES.get(spirit, []), 1):
+        out[f"growth:{n}"] = box
+    t = rules.PRESENCE_TRACKS.get(spirit)
+    if t:
+        half = 0.45 * (t["cards_y"] - t["energy_y"])
+        for row, y, n in (("energy", t["energy_y"], t["energy"]), ("cards", t["cards_y"], t["cards"])):
+            out[f"track:{row}"] = (t["x0"] - 0.6 * t["dx"], y - half, t["x0"] + (n - 0.4) * t["dx"], y + half)
+    return out
+
+
+class PanelLookup(Aligned):
+    """Growth options and presence rows on the spirit panel, through the alignment."""
+    kinds = {"growth", "track"}
+
+    def __init__(self, regions):
+        super().__init__(0)
+        self.regions = regions
+
+    def target_at(self, pt):
+        ref = self.to_ref(pt)
+        if ref is None:
+            return None
+        for key, (x0, y0, x1, y1) in self.regions.items():
+            if x0 <= ref[0] <= x1 and y0 <= ref[1] <= y1:
+                return key
+        return None
+
+
+class PanelPointer(_Locator, PanelLookup):
+    """Keeps the camera lined up with the spirit panel (its printed art), like the board."""
+
+    def __init__(self, panel_path, spirit):
+        img = cv2.imread(str(panel_path))
+        if img is None:
+            raise FileNotFoundError(panel_path)
+        regions = panel_regions(spirit)
+        if not regions:
+            raise KeyError(f"no panel layout for {spirit}")
+        PanelLookup.__init__(self, regions)
+        self._setup([{"name": f"panel {Path(panel_path).parent.name}", "reference": img,
+                      "mask": None, "rotate": 0}])
+
+    def _use(self, src):
+        pass

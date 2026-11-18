@@ -562,8 +562,10 @@ keepAwake();
         if (g.camera === "ok" && g.spot && g.spot.setting)
           words = "Hold an open hand still for 2 seconds where you'll tap";
         else if (g.camera === "ok" && g.hands && !g.in_spot) words = "hand outside your tap spot";
-        else if (g.camera === "ok" && g.pointing) words = "Pointing at land " + g.pointing.replace(/^[A-Z]+/, "");
-        else if (g.camera === "ok" && g.wants_number) words = "Hold up fingers for your option" + (g.board === "lined up" ? ", or point at a lit land" : "");
+        else if (g.camera === "ok" && g.pointing) words = "Pointing at " + g.pointing;
+        else if (g.camera === "ok" && g.point_kind) words = {land: "Point at a lit land and hold still",
+          growth: "Point at a growth option on your panel", track: "Point at the row on your panel"}[g.point_kind] || "Point at your choice";
+        else if (g.camera === "ok" && g.wants_number) words = "Camera can't see it: hold up fingers for your option";
         else if (g.camera === "ok") words = "Double tap: next · two fingers: back";
         if (ring && g.spot && g.spot.setting) box.querySelector("b").textContent = "✋";
         if (lastT === null) lastT = g.last ? g.last.t : 0;  // don't replay an old one

@@ -69,13 +69,14 @@ def test_moving_hand_does_not_hold():
 
 
 def test_swipe_left_and_right():
-    GestureReader.__init__.__defaults__ = (True,)  # swipes are off by default
+    defaults = GestureReader.__init__.__defaults__
+    GestureReader.__init__.__defaults__ = (True,) + defaults[1:]  # swipes are off by default
     left = [[hand((), at=(500 - i * 40, 300))] for i in range(8)]
     ev = run(left)
     assert [e["direction"] for e in ev if e["kind"] == "swipe"] == ["left"]
     right = [[hand((), at=(100 + i * 40, 300))] for i in range(8)]
     assert [e["direction"] for e in run(right) if e["kind"] == "swipe"] == ["right"]
-    GestureReader.__init__.__defaults__ = (False,)
+    GestureReader.__init__.__defaults__ = defaults
 
 
 def test_swipes_off_by_default():

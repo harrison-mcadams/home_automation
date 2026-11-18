@@ -23,6 +23,7 @@ import math
 from collections import deque
 
 HOLD_S = 0.5          # a hold commits after this long
+POINT_HOLD_S = 0.8    # pointing at a target: a held point is taken at once, so a bit longer
 STILL = 0.35          # a hold's palm may wander this far (in palm lengths) and still count
 SWIPE_MAX_S = 0.8     # a swipe happens within this long
 SWIPE_MIN = 2.2       # ... and covers at least this many palm lengths sideways
@@ -149,7 +150,8 @@ class _Tap:
 
 
 class GestureReader:
-    def __init__(self, swipes=False):
+    def __init__(self, swipes=False, hold_s=HOLD_S):
+        self.hold_s = hold_s
         self.swipes = swipes  # off: Harrison found them unreliable (2026-11-18 touch test)
         self.reset()
 
@@ -219,7 +221,7 @@ class GestureReader:
             if key != self._hold_key or moved:
                 self._hold_key, self._hold_since, self._hold_anchor = key, t, (cx, cy)
                 self._hold_fired = False
-            frac = min(1.0, (t - self._hold_since) / HOLD_S)
+            frac = min(1.0, (t - self._hold_since) / self.hold_s)
             self._progress = (0.0 if self._hold_fired else frac, total)
             if frac >= 1.0 and not self._hold_fired:
                 self._hold_fired = True
