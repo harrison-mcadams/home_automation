@@ -315,3 +315,16 @@ def test_panel_regions_and_lookup():
     assert look.target_at((682 + 3 * 117, 320)) == "track:energy"
     assert look.target_at((682, 489)) == "track:cards"
     assert look.target_at((100, 900)) is None              # the spirit's art
+
+
+def test_drawn_map_follows_the_game_board_not_the_first_folder():
+    from spirit_island.vision_link import VisionLink
+
+    class M:
+        def __init__(self, letter):
+            self.letter = letter
+    v = VisionLink("http://x", board_map={"A": M("A"), "C": M("C")})
+    assert v.map.letter == "A"                      # nothing known: first folder
+    v.game_board = lambda: "C"
+    assert v.map.letter == "C"
+    assert v.camera_board({"boards": ["C"]}) == "C"

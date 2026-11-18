@@ -627,6 +627,7 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
     if url:
         store.vision = VisionLink(url, on_change=store.vision_changed,
                                   board_map=load_board_map(cfg.get("board_reference"), os.path.join(BASE_DIR, cfg["board_art_dir"])))
+        store.vision.game_board = lambda: (store.game.state.get("boards") or [None])[0]
         if start_vision:
             store.vision.start()
 
