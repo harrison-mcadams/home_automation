@@ -1,0 +1,19 @@
+# Double taps in small_taps.mp4: first-lift-start second-lift-start (seconds from clip start).
+# Read by hand from small_taps_trace.csv; every tap is one finger.
+# The lone lift at about 20.13 s, as the hand settled, is not a double tap and must not count.
+1.07 1.40
+7.06 7.37
+8.15 8.53
+9.33 9.69
+10.43 10.71
+11.56 11.84
+13.06 13.24
+14.01 14.34
+15.19 15.43
+16.27 16.60
+20.83 21.19
+22.09 22.35
+24.32 24.59
+25.43 25.70
+27.67 27.88
+28.57 28.87
