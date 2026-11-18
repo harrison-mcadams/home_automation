@@ -1,6 +1,8 @@
 """Camera gestures for the live game: watches the phone camera for hands and turns what
 it sees into game actions.
 
+- First, hold an open hand still for 2 seconds where you want your gesture spot.
+  Gestures count only with your palm inside that spot (not over the map).
 - Double tap with one finger: Next. With two fingers: Undo (Back during setup).
 - Hold up N fingers for half a second: pick option N of the choice the game is asking
   for (only while it asks, e.g. a growth option).
@@ -17,7 +19,7 @@ from __future__ import annotations
 import threading
 import time
 
-from .gestures import GestureReader
+from .gestures import GestureReader, GestureZone
 
 ONE_FINGER_WAIT_S = 1.0  # extra wait before a 1-finger hold counts (a double tap may follow)
 
@@ -31,6 +33,7 @@ class GestureLink:
         self.choices = choices or (lambda: 0)
         self.work_width = work_width
         self.reader = GestureReader()
+        self.zone = GestureZone()  # gestures only count in the spot you set with an open hand
         self._pending_one = None   # time a 1-finger hold was seen, waiting to count
         self._stop = threading.Event()
         self.status = {"camera": "off", "fps": 0.0, "hands": 0}
@@ -38,6 +41,8 @@ class GestureLink:
 
     # -- the pipeline ------------------------------------------------------------------
     def process(self, t, hands):
+        seen = len(hands)
+        hands = self.zone.update(t, hands)
         events = self.reader.update(t, hands)
         for ev in events:
             if ev["kind"] == "double_tap":
@@ -59,9 +64,14 @@ class GestureLink:
             self._pending_one = None
             if self.choices() >= 1:
                 self._choose(1)
-        self.status["hands"] = len(hands)
+        self.status["hands"] = seen
+        self.status["in_spot"] = len(hands)
         prog = self.reader.progress()
-        self.status["ring"] = prog if prog["count"] and prog["count"] <= self.choices() else None
+        if self.zone.setting:
+            f = self.zone.progress()
+            self.status["ring"] = {"fraction": f, "count": 5} if f else None
+        else:
+            self.status["ring"] = prog if prog["count"] and prog["count"] <= self.choices() else None
         return events
 
     def _choose(self, n):
@@ -74,8 +84,12 @@ class GestureLink:
         except Exception as e:  # a refused action (e.g. nothing to undo) must not stop the camera
             self.last = {"what": f"{what}: {e}", "t": time.time()}
 
+    def set_spot_again(self):
+        self.zone.reset()
+        self.reader.reset()
+
     def public(self):
-        return {**self.status, "last": self.last}
+        return {**self.status, "last": self.last, "spot": self.zone.public()}
 
     # -- the camera thread ---------------------------------------------------------------
     def start(self):

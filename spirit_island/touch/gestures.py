@@ -254,3 +254,60 @@ class GestureReader:
             if _d((x, y), (cx, cy)) > TAP_STILL * p or abs(q - p) > TAP_SIZE * p:
                 return False
         return True
+
+
+ZONE_HOLD_S = 2.0     # hold an open hand still this long to set the gesture spot
+ZONE_RADIUS = 1.2     # the spot reaches this many palm lengths from where the palm was
+
+
+class GestureZone:
+    """The one spot on the table where gestures count (Harrison, 2026-11-18): set by
+    holding an open hand still there for 2 s. Afterwards only a hand whose palm is inside
+    the spot is passed on, so a hand moving pieces on the map is ignored.
+
+    `update(t, hands)` returns the hands to read gestures from: none while the spot is
+    being set, then only those inside it."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.spot = None            # (x, y, radius) in frame pixels
+        self._since = None
+        self._anchor = None
+
+    @property
+    def setting(self):
+        return self.spot is None
+
+    def progress(self):
+        if self.spot is not None or self._since is None:
+            return 0.0
+        return min(1.0, (self._last - self._since) / ZONE_HOLD_S)
+
+    def update(self, t, hands):
+        self._last = t
+        if self.spot is not None:
+            return [h for h in hands if self.inside(h)]
+        open_ = [h for h in hands if count_up(h) == 5]
+        if not open_:
+            self._since = None
+            return []
+        h = max(open_, key=palm_size)
+        c, p = palm_centre(h), palm_size(h)
+        if self._since is None or _d(c, self._anchor) > STILL * p:
+            self._since, self._anchor = t, c
+        elif t - self._since >= ZONE_HOLD_S:
+            self.spot = (c[0], c[1], ZONE_RADIUS * p)
+            self._since = None
+        return []
+
+    def inside(self, h):
+        x, y, r = self.spot
+        return _d(palm_centre(h), (x, y)) <= r
+
+    def public(self):
+        if self.spot is None:
+            return {"setting": True, "progress": round(self.progress(), 2)}
+        x, y, r = self.spot
+        return {"setting": False, "x": round(x), "y": round(y), "r": round(r)}

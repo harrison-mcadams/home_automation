@@ -803,6 +803,14 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
         g = getattr(store, "gestures", None)
         return jsonify(g.public() if g else {"camera": "off"})
 
+    @app.post("/api/gestures/spot")
+    def gesture_spot():
+        """Forget the gesture spot: the next open hand held still for 2 s sets it again."""
+        g = getattr(store, "gestures", None)
+        if g:
+            g.set_spot_again()
+        return jsonify(g.public() if g else {"camera": "off"})
+
     @app.get("/api/reference")
     def reference():
         return jsonify(REFERENCE)

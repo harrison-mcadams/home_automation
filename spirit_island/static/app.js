@@ -414,6 +414,15 @@ function diffText(d) {
 let lastCamStamp = null;
 function renderCamera() {
   const box = $("tab-camera"); box.replaceChildren();
+  const gs = S.gestures;
+  if (gs) {
+    const spot = gs.spot || {};
+    box.append(el("h3", {}, "Hand gestures"),
+      el("p", {}, gs.camera === "ok" ? (spot.setting ? "Waiting for you to hold an open hand still where you'll tap."
+                                                     : "Gesture spot set. Taps and finger counts only count there.")
+                                     : "Gesture camera: " + gs.camera),
+      el("button", { onclick: async () => { await fetch("/api/gestures/spot", { method: "POST" }); } }, "Set the gesture spot again"));
+  }
   const v = S.vision;
   if (!v) { box.append(el("p", {}, "The camera link is turned off for this server.")); return; }
   if (!v.connected) {

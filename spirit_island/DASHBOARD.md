@@ -45,6 +45,9 @@ At home: `http://192.168.1.169:5055`. Away over Tailscale: `http://100.98.2.44:5
 Start with `--touch-camera <phone video URL>` (or set `touch_camera_url` in
 `config.json`) and the phone camera watches your hand:
 
+- **First, set your gesture spot**: hold an open hand still for 2 seconds on the open
+  table, off the map. Gestures then count only with your palm in that spot, so moving
+  pieces never sets anything off. Set it again from the phone's Camera tab.
 - **Double tap with one finger** (rest it on the table, lift twice quickly): next step.
 - **Double tap with two fingers**: undo (back, during setup).
 - **Hold up 1, 2 or 3 fingers** for half a second during Growth: pick that option.

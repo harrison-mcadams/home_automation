@@ -15,6 +15,13 @@ def feed(link, frames, t0=0.0, dt=1 / 20):
     return t0 + len(frames) * dt
 
 
+def with_spot(link):
+    """Set the gesture spot first, as at the start of a session (open hand, 2 s)."""
+    feed(link, [[hand(("thumb", "index", "middle", "ring", "pinky"))]] * 45, t0=-100)
+    assert not link.zone.setting
+    return link
+
+
 def double_tap(fingers=1):
     up = ("index", "middle") if fingers == 2 else ("index",)
     rest, lift = hand(up), hand(up, index_len=1.12)
@@ -23,7 +30,7 @@ def double_tap(fingers=1):
 
 def test_taps_become_next_and_undo():
     got = []
-    link = GestureLink(on_action=got.append)
+    link = with_spot(GestureLink(on_action=got.append))
     feed(link, double_tap(1))
     t = feed(link, [[]] * 20, t0=10)
     feed(link, double_tap(2), t0=t + 1)
@@ -33,7 +40,7 @@ def test_taps_become_next_and_undo():
 def test_numbers_only_count_while_a_choice_is_open():
     got = []
     open_ = [0]
-    link = GestureLink(on_action=got.append, choices=lambda: open_[0])
+    link = with_spot(GestureLink(on_action=got.append, choices=lambda: open_[0]))
     feed(link, [[hand(("index", "middle", "ring"))]] * 20)
     assert got == []
     open_[0] = 3
@@ -47,7 +54,7 @@ def test_numbers_only_count_while_a_choice_is_open():
 
 def test_one_finger_choice_waits_and_a_double_tap_cancels_it():
     got = []
-    link = GestureLink(on_action=got.append, choices=lambda: 3)
+    link = with_spot(GestureLink(on_action=got.append, choices=lambda: 3))
     feed(link, [[hand(("index",))]] * 50)  # held 2.5 s: counts as option 1
     assert got == [{"type": "choose", "option": 1}]
     got.clear()
@@ -89,3 +96,43 @@ def test_store_maps_gestures_to_game_actions(tmp_path):
 def test_gesture_status_endpoint(tmp_path):
     app = create_app(str(tmp_path), vision_url="")
     assert app.test_client().get("/api/gestures").json == {"camera": "off"}
+
+
+def test_nothing_counts_until_the_spot_is_set_and_only_inside_it():
+    got = []
+    link = GestureLink(on_action=got.append, choices=lambda: 3)
+    feed(link, double_tap(1))
+    assert got == [] and link.public()["spot"]["setting"]
+    with_spot(link)                                        # spot around (300, 300)
+    far = [[hand(("index",), at=(900, 300))]] * 8 + [[hand(("index",), at=(900, 300), index_len=1.12)]] * 3 \
+        + [[hand(("index",), at=(900, 300))]] * 3 + [[hand(("index",), at=(900, 300), index_len=1.12)]] * 3 \
+        + [[hand(("index",), at=(900, 300))]] * 8
+    feed(link, far, t0=10)                                 # over the map: ignored
+    assert got == []
+    feed(link, double_tap(1), t0=20)
+    assert [a["type"] for a in got] == ["next"]
+    link.set_spot_again()
+    assert link.public()["spot"]["setting"]
+
+
+def test_spot_endpoint(tmp_path):
+    app = create_app(str(tmp_path), vision_url="")
+    store = app.config["STORE"]
+    store.gestures = with_spot(GestureLink(on_action=store.gesture_action, choices=store.choices_open))
+    r = app.test_client().post("/api/gestures/spot")
+    assert r.json["spot"]["setting"] is True
+
+
+def test_moving_pieces_on_the_map_fires_nothing_with_a_spot_set():
+    """Harrison's piece-moving check (2026-11-18) fired one false Next with no spot. With
+    the spot where his palm was during that day's live tap run, the same hand points fire
+    nothing (his hand came within 253 px of it; the spot reaches about 205)."""
+    import csv
+    from pathlib import Path
+    got = []
+    link = GestureLink(on_action=got.append, choices=lambda: 3)
+    link.zone.spot = (941, 484, 1.2 * 170)   # where his palm was in the live tap run
+    for row in csv.DictReader(open(Path(__file__).parent / "data" / "rest_moves_frames.csv")):
+        hands = [[(float(row[f"x{i}"]), float(row[f"y{i}"])) for i in range(21)]] if row["x0"] else []
+        link.process(float(row["t"]), hands)
+    assert got == []
