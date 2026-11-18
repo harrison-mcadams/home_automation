@@ -277,3 +277,14 @@ body.gallery.watch #side { display: grid; }
 .a-advance.out { animation-name: a-advance-out; }
 @keyframes a-advance { 0%, 30% { transform: translateX(0); } 60%, 100% { transform: translateX(var(--dx)); } }
 @keyframes a-advance-out { 0%, 30% { transform: translateX(0); opacity: 1; } 60%, 100% { transform: translateX(var(--dx)); opacity: .45; } }
+
+/* camera gestures: a small light, and a ring that fills while you hold up fingers */
+#hand { position: fixed; right: 2vw; bottom: 7vh; display: flex; align-items: center; gap: 1vw;
+  background: rgba(10, 20, 15, .9); border: 1px solid var(--line); border-radius: 2vh; padding: 1vh 1.2vw; }
+#hand svg { width: 9vh; height: 9vh; transform: rotate(-90deg); }
+#hand circle { fill: none; stroke-width: 4; }
+#hand .bg { stroke: var(--line); }
+#hand .fill { stroke: var(--accent); stroke-dasharray: 106.8; stroke-dashoffset: 106.8; }
+#hand b { font-size: 6vh; min-width: 3vh; }
+#hand span { font-size: 2.2vh; color: var(--muted); max-width: 18vw; }
+#hand.off b, #hand.off .fill { display: none; }

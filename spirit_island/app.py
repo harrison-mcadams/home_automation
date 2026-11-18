@@ -49,7 +49,9 @@ def load_config():
            "camera_snapshot_url": "http://localhost:8091/photo.jpg",
            # Off by default: the game is the truth about the board, and the camera only reads
            # cards on request. True brings back live piece tracking and the background watchers.
-           "camera_tracking": False}
+           "camera_tracking": False,
+           # Phone video URL for hand gestures (Next, Undo, finger-number choices); "" = off.
+           "touch_camera_url": ""}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             cfg.update(json.load(f))
@@ -156,6 +158,8 @@ class Store:
         if self.cards is not None:
             out["card_scan"] = self.cards.public()
         out["paused"] = bool(getattr(self, "paused", False))
+        if getattr(self, "gestures", None) is not None:
+            out["gestures"] = self.gestures.public()
         if getattr(self, "slot_watch", None) is not None:
             out["slot_watch"] = self.slot_watch.public()
         if getattr(self, "change_watch", None) is not None:
@@ -183,6 +187,32 @@ class Store:
                 out["targets"] = {c["name"]: {o["land"]: o["text"] for o in c["options"]} for c in focus}
                 out["guide"] = card_guide(self.game.state, focus, out["guide"])
         return out
+
+    # -- camera gestures -----------------------------------------------------------------
+    def choices_open(self):
+        """How many numbered options the game is asking you to pick from right now."""
+        from .engine.guide import GROWTH
+        s = self.game.state
+        if s["status"] == "playing" and s["step"] == "spirit.growth" and s["players"]:
+            return len(GROWTH.get(s["players"][0]["spirit"], []))
+        return 0
+
+    def gesture_action(self, action):
+        """A gesture from the camera, as a game action."""
+        kind = action["type"]
+        if kind == "undo":
+            if self.game.state["status"] == "setup":
+                action = {"type": "back"}
+            elif not self.game.history:
+                return
+        elif kind == "choose":
+            if not 1 <= action["option"] <= self.choices_open():
+                return
+            action = {"type": "growth_choice", "option": action["option"]}
+        try:
+            self.dispatch(action, "gesture")
+        except ActionError:
+            pass
 
     def vision_changed(self):
         """Called by the vision link when a new camera reading arrives (or the link drops).
@@ -549,10 +579,12 @@ REFERENCE = {
 }
 
 
-def create_app(data_dir=None, vision_url=None, start_vision=True, camera_tracking=None):
+def create_app(data_dir=None, vision_url=None, start_vision=True, camera_tracking=None, touch_camera=None):
     cfg = load_config()
     if camera_tracking is not None:
         cfg["camera_tracking"] = camera_tracking
+    if touch_camera is not None:
+        cfg["touch_camera_url"] = touch_camera
     app = Flask(__name__, template_folder="templates", static_folder="static")
     store = Store(data_dir or cfg["data_dir"])
     app.config["STORE"] = store
@@ -565,6 +597,11 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
                                   board_map=load_board_map(cfg.get("board_reference"), os.path.join(BASE_DIR, cfg["board_art_dir"])))
         if start_vision:
             store.vision.start()
+
+    if cfg.get("touch_camera_url"):
+        from .touch.link import GestureLink
+        store.gestures = GestureLink(cfg["touch_camera_url"], on_action=store.gesture_action,
+                                     choices=store.choices_open).start()
 
     # Scripts and styles carry the server's start id, so a restart always loads fresh copies
     # instead of whatever the browser cached.
@@ -760,6 +797,12 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
     def get_state():
         return jsonify(store.snapshot())
 
+    @app.get("/api/gestures")
+    def gestures():
+        """Camera gesture status and the hold ring, polled by the TV (often, and cheap)."""
+        g = getattr(store, "gestures", None)
+        return jsonify(g.public() if g else {"camera": "off"})
+
     @app.get("/api/reference")
     def reference():
         return jsonify(REFERENCE)
@@ -814,8 +857,12 @@ def main():
                     help="URL of the live board page (board_view.py); pass '' to run without the camera")
     ap.add_argument("--camera-tracking", action="store_true", default=None,
                     help="let the camera track pieces and change the game (old behaviour; off by default)")
+    ap.add_argument("--touch-camera", default=None,
+                    help="phone video URL for hand gestures (double tap = Next, two-finger double "
+                         "tap = Undo, hold up fingers = pick an option)")
     args = ap.parse_args()
-    app = create_app(args.data_dir, vision_url=args.board_camera, camera_tracking=args.camera_tracking)
+    app = create_app(args.data_dir, vision_url=args.board_camera, camera_tracking=args.camera_tracking,
+                     touch_camera=args.touch_camera)
     ip = lan_address()
     print(f"Spirit Island dashboard on port {args.port}")
     print(f"  phone (controls): http://{ip}:{args.port}/phone")

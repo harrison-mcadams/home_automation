@@ -538,3 +538,31 @@ async function keepAwake() {
 }
 document.addEventListener("visibilitychange", keepAwake);
 keepAwake();
+
+// Camera gestures: poll the gesture status a few times a second (cheap, not the full
+// state) to draw the hold ring and say what the last gesture did.
+(function gestures() {
+  const box = $("hand"), fill = box.querySelector(".fill");
+  let lastT = null, live = false;
+  async function poll() {
+    try {
+      const g = await (await fetch("/api/gestures")).json();
+      live = g.camera && g.camera !== "off";
+      box.classList.toggle("hidden", !live);
+      if (live) {
+        const ring = g.ring;
+        box.classList.toggle("off", !ring);
+        if (ring) {
+          fill.style.strokeDashoffset = 106.8 * (1 - ring.fraction);
+          box.querySelector("b").textContent = ring.count;
+        }
+        let words = g.camera === "ok" ? (g.hands ? "hand seen" : "camera on") : "camera: " + g.camera;
+        if (lastT === null) lastT = g.last ? g.last.t : 0;  // don't replay an old one
+        else if (g.last && g.last.t > lastT) { toast(g.last.what); lastT = g.last.t; }
+        box.querySelector("span").textContent = words;
+      }
+    } catch (e) { /* the state stream reports a lost server */ }
+    setTimeout(poll, live ? 120 : 3000);
+  }
+  poll();
+})();
