@@ -193,6 +193,14 @@ const HELPERS = {
       el("button", { class: h.chosen === i + 1 ? "sel" : "", onclick: () => act({ type: "growth_choice", option: i + 1 }) }, `Option ${i + 1}`))));
     return box;
   },
+  choose(h) {
+    // A question inside a step (which track, which land): one button per numbered option.
+    const q = S.state.pending || { options: [] };
+    const label = (o) => o === "energy" ? "Energy track (top)" : o === "cards" ? "Card plays (bottom)" : "Land " + String(o).replace(/^[A-Z]+/, "");
+    return el("div", { class: "helper" }, el("h3", {}, h.question === "track" ? "Which track?" : "Which land?"),
+      el("div", { class: "btngrid" }, q.options.map((o, i) =>
+        el("button", { onclick: () => act({ type: "choose", option: i + 1 }) }, `${i + 1}: ${label(o)}`))));
+  },
   gain_power(h) {
     const box = el("div", { class: "helper" });
     for (const p of h.players || []) {
@@ -414,6 +422,15 @@ function diffText(d) {
 let lastCamStamp = null;
 function renderCamera() {
   const box = $("tab-camera"); box.replaceChildren();
+  const gs = S.gestures;
+  if (gs) {
+    const spot = gs.spot || {};
+    box.append(el("h3", {}, "Hand gestures"),
+      el("p", {}, gs.camera === "ok" ? (spot.setting ? "Waiting for you to hold an open hand still where you'll tap."
+                                                     : "Gesture spot set. Taps and finger counts only count there.")
+                                     : "Gesture camera: " + gs.camera),
+      el("button", { onclick: async () => { await fetch("/api/gestures/spot", { method: "POST" }); } }, "Set the gesture spot again"));
+  }
   const v = S.vision;
   if (!v) { box.append(el("p", {}, "The camera link is turned off for this server.")); return; }
   if (!v.connected) {

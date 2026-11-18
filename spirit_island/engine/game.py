@@ -240,6 +240,8 @@ class Game:
         self.history = history or []
 
     # -- public -----------------------------------------------------------
+    camera_energy = False   # the panel camera counts energy tokens (old camera-tracking mode)
+
     def dispatch(self, action, source="manual"):
         kind = action.get("type")
         handler = getattr(self, f"_do_{kind}", None)
@@ -394,7 +396,7 @@ class Game:
             return QUIET
         s["sub"] = 0
         step = s["step"]
-        if step == "spirit.energy" and not s.get("energy_from_camera"):
+        if step == "spirit.energy" and not (s.get("energy_from_camera") and self.camera_energy):
             for i, p in enumerate(s["players"]):
                 st = spirit_stats(s, i)
                 if st:
@@ -411,6 +413,7 @@ class Game:
                 if bonus:
                     self._spirit(int(i))["energy"] += bonus
             s["growth_choice"] = {}
+            s["pending"], s["growth_todo"] = None, []
         if step == "time_passes":
             s["resolved"] = {}
             s["played"] = []
@@ -514,7 +517,68 @@ class Game:
         else:
             choices.pop(str(i), None)
         s.setdefault("growth_suggest", {}).pop(str(i), None)
+        # The option's presence placements become questions, one at a time.
+        s["growth_todo"] = list(rules.GROWTH_PRESENCE.get(spirit, {}).get(n, [])) if n and i == 0 else []
+        self._next_growth_question()
         return f"{s['players'][i]['name']} chose growth option {n}" if n else "Growth choice cleared"
+
+    # -- questions inside a step (one at a time: "pending") ------------------------------
+    def _tracks_left(self):
+        s = self.state
+        vals = rules.TRACK_VALUES.get(s["players"][0]["spirit"]) if s["players"] else None
+        if not vals:
+            return []
+        taken = self._spirit(0)["taken"]
+        return [t for t in ("energy", "cards") if taken[t] < len(vals[t]) - 1]
+
+    def lands_within(self, rng):
+        """Lands within `rng` of any land with your presence, in land order."""
+        s = self.state
+        reach = {lid for lid, l in s["lands"].items() if l.get("presence")}
+        frontier = set(reach)
+        for _ in range(rng):
+            frontier = {n for lid in frontier for n in invader_plan.neighbours(s, lid)} - reach
+            reach |= frontier
+        return sorted(reach, key=lambda l: (l.rstrip("0123456789"), int(invader_plan.land_number(l) or 0)))
+
+    def _next_growth_question(self):
+        s = self.state
+        todo = s.get("growth_todo") or []
+        if not todo:
+            s["pending"] = None
+            return
+        tracks = self._tracks_left()
+        if len(tracks) == 2:
+            s["pending"] = {"kind": "track", "range": todo[0], "options": ["energy", "cards"]}
+        else:
+            self._ask_land(tracks[0] if tracks else None)
+
+    def _ask_land(self, track):
+        s = self.state
+        rng = (s.get("growth_todo") or [0])[0]
+        s["pending"] = {"kind": "land", "range": rng, "track": track, "options": self.lands_within(rng)}
+
+    def _do_choose(self, action):
+        """Answer the question the step is asking, by its number (1 = first option)."""
+        s = self.state
+        q = s.get("pending")
+        if not q:
+            raise ActionError("nothing to choose right now")
+        n = int(action.get("option", 0))
+        if not 1 <= n <= len(q["options"]):
+            raise ActionError(f"pick 1 to {len(q['options'])}")
+        pick = q["options"][n - 1]
+        if q["kind"] == "track":
+            self._ask_land(pick)
+            return f"Presence from the {'energy' if pick == 'energy' else 'card plays'} track"
+        if q["kind"] == "land":
+            if q.get("track"):
+                self._spirit(0)["taken"][q["track"]] += 1
+            s["lands"][pick]["presence"] += 1
+            s["growth_todo"] = (s.get("growth_todo") or [])[1:]
+            self._next_growth_question()
+            return f"Presence added to land {invader_plan.land_number(pick)}"
+        raise ActionError("unknown question")
 
     def _spirit(self, i):
         sp = self.state.setdefault("spirits", {})
@@ -558,6 +622,29 @@ class Game:
         sp = self._spirit(int(action.get("player", 0)))
         sp["energy"] = max(0, sp["energy"] + int(action.get("delta", 0)))
         return f"Energy {'+' if int(action.get('delta', 0)) >= 0 else ''}{int(action.get('delta', 0))} (now {sp['energy']})"
+
+    def _do_play_card(self, action):
+        """Play a power card on Choose and pay for powers: pay its cost now and use a card
+        play (Harrison, 2026-11-18: lay it down, point at it, it's played). Undo takes it back."""
+        s = self.state
+        if s["step"] != "spirit.powers":
+            raise ActionError("cards are played on Choose and pay for powers")
+        name = action.get("card")
+        cost, speed = rules.POWER_INFO.get(name, (action.get("cost"), action.get("speed")))
+        if cost is None:
+            raise ActionError(f"{name}: cost not known")
+        played = s.setdefault("played", [])
+        if any(c["name"] == name for c in played):
+            raise ActionError(f"{name} is already played")
+        st = spirit_stats(s, 0)
+        sp = self._spirit(0)
+        if st and len(played) >= st["card_plays"]:
+            raise ActionError(f"no card plays left ({st['card_plays']} this round)")
+        if sp["energy"] < cost:
+            raise ActionError(f"{name} needs {cost} energy, you have {sp['energy']}")
+        sp["energy"] -= cost
+        played.append({"name": name, "cost": cost, "speed": speed})
+        return f"Played {name}: -{cost} energy (now {sp['energy']})"
 
     def _do_card_resolved(self, action):
         """A played power card was carried out (by a number key, or seen by the camera)."""

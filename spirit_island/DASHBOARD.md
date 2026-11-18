@@ -40,6 +40,23 @@ on the other at once. Use both together, or either alone.
 At home: `http://192.168.1.169:5055`. Away over Tailscale: `http://100.98.2.44:5055`.
 (Set `public_urls` in `config.json` if those change.)
 
+## Hand gestures
+
+Start with `--touch-camera <phone video URL>` (or set `touch_camera_url` in
+`config.json`) and the phone camera watches your hand:
+
+- **First, set your gesture spot**: hold an open hand still for 2 seconds on the open
+  table, off the map. Gestures then count only with your palm in that spot, so moving
+  pieces never sets anything off. Set it again from the phone's Camera tab.
+- **Double tap with one finger** (rest it on the table, lift twice quickly): next step.
+- **Double tap with two fingers**: undo (back, during setup).
+- **Hold up 1, 2 or 3 fingers** for half a second during Growth: pick that option.
+  One finger waits a second longer, since a resting finger looks the same.
+
+The TV shows a small box in the corner while the camera is on, with a ring that
+fills as you hold up fingers and a note of what the last gesture did. Tune the
+gestures with `python -m spirit_island.touch.test_page`.
+
 ## Camera
 
 **Off by default (since the 2026-11 redesign).** The game is the truth about the

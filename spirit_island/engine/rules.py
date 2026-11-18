@@ -89,6 +89,12 @@ PRESENCE_TRACKS = {
     "Vital Strength of the Earth": {"x0": 703, "dx": 117.4, "energy_y": 321, "energy": 6, "cards_y": 489, "cards": 6},
 }
 
+# The growth option boxes at the top of each panel picture (x0, y0, x1, y1), measured by
+# matching growth_<n>.jpg on panel_front.jpg (2026-11-18). For pointing at an option.
+GROWTH_BOXES = {
+    "River Surges in Sunlight": [(640, 40, 1018, 200), (1018, 40, 1291, 200), (1291, 40, 1590, 200)],
+}
+
 # Numbers printed on the presence tracks, left to right (the first is uncovered at the start).
 # A space without a number keeps the one before it (River's "Reclaim One").
 TRACK_VALUES = {
@@ -96,6 +102,8 @@ TRACK_VALUES = {
 }
 # Energy a growth option gives right away.
 GROWTH_ENERGY = {"River Surges in Sunlight": {1: 1}}
+# Presence each growth option adds, as the range from your presence for each disc.
+GROWTH_PRESENCE = {"River Surges in Sunlight": {1: [], 2: [1, 1], 3: [2]}}
 
 # Starting presence from each panel's back: (terrain, discs) in the highest-numbered land
 # of that terrain on the player's board.

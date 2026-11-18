@@ -26,7 +26,7 @@ from flask import Flask, Response, jsonify, request
 from vision.capture import Camera
 
 from . import mat as matmod
-from .gestures import GestureReader, fingers_up, palm_size
+from .gestures import GestureReader, GestureZone, fingers_up, palm_size
 from .hands import HandFinder, draw_hand
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -194,8 +194,9 @@ def _plain(ev):
 class Runner:
     """Reads frames, finds hands, turns them into events, draws the live picture."""
 
-    def __init__(self, source, session, record=None, work_width=480, use_mat=False):
+    def __init__(self, source, session, record=None, work_width=480, use_mat=False, spot=False):
         self.use_mat = use_mat
+        self.zone = GestureZone() if spot else None
         self.cam = Camera(source)
         self.finder = HandFinder(work_width=work_width)
         self.reader = GestureReader()
@@ -228,6 +229,8 @@ class Runner:
                     self._writer = cv2.VideoWriter(self.record, cv2.VideoWriter_fourcc(*"mp4v"), 15, (w, h))
                 self._writer.write(img)
             hands = self.finder.find(img, t)
+            if self.zone is not None:
+                hands = self.zone.update(t, hands)  # open hand 2 s sets the spot; then only it counts
             if self.use_mat and time.time() - last_mat_t > 1.0:
                 found = matmod.find_mat(img, hands)
                 mat = found or mat if hands else found  # keep the last mat while a hand covers it
@@ -373,11 +376,13 @@ def main(argv=None):
     ap.add_argument("--record", help="also save the raw video to this file (mp4)")
     ap.add_argument("--only", help="only these prompt kinds, e.g. double_tap or hold,double_tap")
     ap.add_argument("--mat", action="store_true", help="look for the dark input mat (and cards on it)")
+    ap.add_argument("--spot", action="store_true",
+                    help="gestures count only in a spot set by holding an open hand still for 2 s")
     ap.add_argument("--work-width", type=int, default=480, help="frame width used for hand finding")
     args = ap.parse_args(argv)
     session = Session(back_is=args.back, only=args.only.split(",") if args.only else None)
     runner = Runner(args.camera, session, record=args.record, work_width=args.work_width,
-                    use_mat=args.mat).start()
+                    use_mat=args.mat, spot=args.spot).start()
     app = create_app(runner, session)
     print(f"Touch test on port {args.port}: open http://<this computer>:{args.port}/ on the TV")
     app.run(host="0.0.0.0", port=args.port, threaded=True, debug=False)

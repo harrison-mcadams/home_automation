@@ -165,6 +165,7 @@ class VisionLink:
         self.error: str | None = "not checked yet"
         self.last_ok = 0.0
         self.board = None          # which game board the camera is pointed at (None = auto)
+        self.game_board = lambda: None  # the game's own board letter (set by the app)
         self.auto = True           # copy settled camera presence into the game automatically
         self.stopping = threading.Event()
         self._thread = None
@@ -178,8 +179,13 @@ class VisionLink:
     def map(self):
         if not self.maps:
             return None
+        # The game's own board first: the app is ground truth, and with the board camera
+        # off the fallback was the first folder (A), drawn under a board C game (2026-11-18).
         seen = (self.raw or {}).get("board")
-        return self.maps.get(seen) or next(iter(self.maps.values()))
+        for letter in (self.board, self.game_board(), seen):
+            if letter in self.maps:
+                return self.maps[letter]
+        return next(iter(self.maps.values()))
 
     # -- polling --
     def fetch_once(self) -> bool:

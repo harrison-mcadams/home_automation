@@ -23,6 +23,7 @@ import math
 from collections import deque
 
 HOLD_S = 0.5          # a hold commits after this long
+POINT_HOLD_S = 0.8    # pointing at a target: a held point is taken at once, so a bit longer
 STILL = 0.35          # a hold's palm may wander this far (in palm lengths) and still count
 SWIPE_MAX_S = 0.8     # a swipe happens within this long
 SWIPE_MIN = 2.2       # ... and covers at least this many palm lengths sideways
@@ -33,7 +34,9 @@ TAP_GAP = 0.05        # the finger's two levels (resting, tapping) differ by at 
 TAP_HYST = 0.1        # switch level only past this share of the gap beyond the midpoint
 TAP_LEVELS_S = 1.0    # the two levels are read from this much recent history
 TAP_MAX_S = 0.4       # each tap, and the touch between the two, lasts at most this long
-TAP_REST_S = 0.25     # the finger rests at least this long before a double tap
+TAP_REST_S = 0.1      # the finger rests at least this long before a double tap (short, so
+                      # back-to-back double taps both count)
+TAP_MIN_GAP_S = 0.5   # two double taps fire at least this far apart (faster is jitter)
 TAP_STILL = 0.25      # during taps the palm stays within this many palm lengths
 TAP_SIZE = 0.25       # ... and its size changes by less than this fraction (two-finger
                       # taps tilt the hand: palm 165 -> 145 px on the 2026-11-18 run)
@@ -100,6 +103,7 @@ class _Tap:
         self.since = 0.0
         self.runs = deque(maxlen=6)  # finished (state, start, end), oldest first
         self.first_down = 0.0  # when the double tap's first tap started
+        self.fired = -1e9
 
     def update(self, t, length):
         self.history.append((t, length))
@@ -131,6 +135,9 @@ class _Tap:
             return None
         if any(r[2] - r[1] > TAP_MAX_S for r in (p1, r1, p2)):
             return None
+        if p2[2] - self.fired < TAP_MIN_GAP_S:
+            return None
+        self.fired = p2[2]
         self.first_down = p1[1]
         self.runs.clear()
         self.runs.append((self.state, self.since - 1.0, self.since))  # fresh rest
@@ -143,7 +150,8 @@ class _Tap:
 
 
 class GestureReader:
-    def __init__(self, swipes=False):
+    def __init__(self, swipes=False, hold_s=HOLD_S):
+        self.hold_s = hold_s
         self.swipes = swipes  # off: Harrison found them unreliable (2026-11-18 touch test)
         self.reset()
 
@@ -213,7 +221,7 @@ class GestureReader:
             if key != self._hold_key or moved:
                 self._hold_key, self._hold_since, self._hold_anchor = key, t, (cx, cy)
                 self._hold_fired = False
-            frac = min(1.0, (t - self._hold_since) / HOLD_S)
+            frac = min(1.0, (t - self._hold_since) / self.hold_s)
             self._progress = (0.0 if self._hold_fired else frac, total)
             if frac >= 1.0 and not self._hold_fired:
                 self._hold_fired = True
@@ -254,3 +262,71 @@ class GestureReader:
             if _d((x, y), (cx, cy)) > TAP_STILL * p or abs(q - p) > TAP_SIZE * p:
                 return False
         return True
+
+
+ZONE_HOLD_S = 2.0     # hold an open hand still this long to set the gesture spot
+ZONE_RADIUS = 0.8     # the spot reaches this many palm lengths from where the palm was
+ZONE_KEEP = 1.6       # a hand that came into the spot stays counted out to this many times
+                      # its radius, so drifting while tapping doesn't drop it
+
+
+class GestureZone:
+    """The one spot on the table where gestures count (Harrison, 2026-11-18): set by
+    holding an open hand still there for 2 s. Afterwards only a hand whose palm is inside
+    the spot is passed on, so a hand moving pieces on the map is ignored.
+
+    `update(t, hands)` returns the hands to read gestures from: none while the spot is
+    being set, then only those inside it."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.spot = None            # (x, y, radius) in frame pixels
+        self._in = False            # a hand came into the spot and hasn't left it
+        self._seen = -1e9
+        self._since = None
+        self._anchor = None
+
+    @property
+    def setting(self):
+        return self.spot is None
+
+    def progress(self):
+        if self.spot is not None or self._since is None:
+            return 0.0
+        return min(1.0, (self._last - self._since) / ZONE_HOLD_S)
+
+    def update(self, t, hands):
+        self._last = t
+        if self.spot is not None:
+            if hands:
+                self._seen = t
+            elif t - self._seen > LOST_S:
+                self._in = False
+            reach = ZONE_KEEP if self._in else 1.0
+            kept = [h for h in hands if self.inside(h, reach)]
+            self._in = bool(kept)
+            return kept
+        open_ = [h for h in hands if count_up(h) == 5]
+        if not open_:
+            self._since = None
+            return []
+        h = max(open_, key=palm_size)
+        c, p = palm_centre(h), palm_size(h)
+        if self._since is None or _d(c, self._anchor) > STILL * p:
+            self._since, self._anchor = t, c
+        elif t - self._since >= ZONE_HOLD_S:
+            self.spot = (c[0], c[1], ZONE_RADIUS * p)
+            self._since = None
+        return []
+
+    def inside(self, h, reach=1.0):
+        x, y, r = self.spot
+        return _d(palm_centre(h), (x, y)) <= r * reach
+
+    def public(self):
+        if self.spot is None:
+            return {"setting": True, "progress": round(self.progress(), 2)}
+        x, y, r = self.spot
+        return {"setting": False, "x": round(x), "y": round(y), "r": round(r)}

@@ -497,6 +497,7 @@ document.addEventListener("keydown", (e) => {
     const o = c && c.options.find((x) => x.key === +k);
     if (o) { e.preventDefault(); act({ type: "card_resolved", card: c.name, land: o.land, fear: o.fear }, `${c.name}: land ${o.land.slice(1)}`); return; }
   }
+  if (/^[1-9]$/.test(k) && S.state.pending) { e.preventDefault(); act({ type: "choose", option: +k }, "Choice " + k); return; }
   if (/^[1-3]$/.test(k) && S.state.step === "spirit.growth") { e.preventDefault(); act({ type: "growth_choice", option: +k }, "Growth option " + k); return; }
   const st0 = (S.derived.spirits || [])[0];
   if ((k === "c" || k === "C") && st0 && st0.unassigned) { e.preventDefault(); act({ type: "take_presence", track: "cards" }, "Disc from the card plays track"); return; }
@@ -538,3 +539,57 @@ async function keepAwake() {
 }
 document.addEventListener("visibilitychange", keepAwake);
 keepAwake();
+
+// Camera gestures: poll the gesture status a few times a second (cheap, not the full
+// state) to draw the hold ring and say what the last gesture did.
+(function gestures() {
+  const box = $("hand"), fill = box.querySelector(".fill");
+  let lastT = null, live = false;
+  async function poll() {
+    try {
+      const g = await (await fetch("/api/gestures")).json();
+      live = g.camera && g.camera !== "off";
+      box.classList.toggle("hidden", !live);
+      document.body.classList.toggle("gestures", live);
+      if (live) {
+        const ring = g.ring;
+        box.classList.toggle("off", !ring);
+        if (ring) {
+          fill.style.strokeDashoffset = 106.8 * (1 - ring.fraction);
+          box.querySelector("b").textContent = ring.count;
+        }
+        let words = g.camera === "ok" ? (g.hands ? "hand seen" : "camera on") : "camera: " + g.camera;
+        if (g.camera === "ok" && g.spot && g.spot.setting)
+          words = "Hold an open hand still for 2 seconds where you'll tap";
+        else if (g.camera === "ok" && g.hands && !g.in_spot) words = "hand outside your tap spot";
+        else if (g.camera === "ok" && g.pointing) words = "Pointing at " + g.pointing;
+        else if (g.camera === "ok" && g.point_kind) words = {land: "Point at a lit land and hold still",
+          growth: "Point at a growth option on your panel", track: "Point at the row on your panel",
+          card: "Point at a card to play it · double tap: done"}[g.point_kind] || "Point at your choice";
+        else if (g.camera === "ok" && g.wants_number) words = "Camera can't see it: hold up fingers for your option";
+        else if (g.camera === "ok") words = "Double tap: next · two fingers: back";
+        if (ring && g.spot && g.spot.setting) box.querySelector("b").textContent = "✋";
+        if (lastT === null) lastT = g.last ? g.last.t : 0;  // don't replay an old one
+        else if (g.last && g.last.t > lastT) { toast(g.last.what); lastT = g.last.t; }
+        box.querySelector("span").textContent = words;
+      }
+    } catch (e) { /* the state stream reports a lost server */ }
+    setTimeout(poll, live ? 120 : 3000);
+  }
+  poll();
+})();
+
+// Keep the TV awake while the game is up (the PC otherwise blanks the screen when the
+// mouse sits still). Chrome allows this on localhost or https only, so open the TV page
+// as http://localhost:5055/tv on the PC itself.
+(function keepAwake() {
+  if (!("wakeLock" in navigator)) return;
+  let lock = null;
+  const get = async () => {
+    try { if (!lock && document.visibilityState === "visible") { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; }); } }
+    catch (e) { /* not allowed here (plain http on another host) */ }
+  };
+  document.addEventListener("visibilitychange", get);
+  document.addEventListener("click", get);
+  get();
+})();

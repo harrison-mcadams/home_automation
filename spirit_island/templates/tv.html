@@ -49,11 +49,12 @@
 
   <footer id="foot">
     <span id="f-links"></span>
-    <span id="f-keys">Remote: <kbd>→</kbd> next step · <kbd>←</kbd> undo · <kbd>F</kbd> +1 fear · <kbd>V</kbd> photo / drawn board · <kbd>R</kbd> turn board · <kbd>C</kbd> camera view</span>
+    <span id="f-keys">Double tap: next step · two-finger double tap: undo · Remote: <kbd>→</kbd> next · <kbd>←</kbd> undo · <kbd>F</kbd> +1 fear · <kbd>V</kbd> photo / drawn board · <kbd>R</kbd> turn board · <kbd>C</kbd> camera view</span>
     <span id="conn">●</span>
   </footer>
 </div>
 <div id="toast" class="hidden"></div>
+<div id="hand" class="hidden"><svg viewBox="0 0 40 40"><circle class="bg" cx="20" cy="20" r="17"/><circle class="fill" cx="20" cy="20" r="17"/></svg><b></b><span></span></div>
 <script src="{{ url_for('static', filename='board_map.js', v=v) }}"></script>
 <script src="{{ url_for('static', filename='anim.js', v=v) }}"></script>
 <script src="{{ url_for('static', filename='tv.js', v=v) }}"></script>
