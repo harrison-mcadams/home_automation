@@ -69,11 +69,18 @@ def test_moving_hand_does_not_hold():
 
 
 def test_swipe_left_and_right():
+    GestureReader.__init__.__defaults__ = (True,)  # swipes are off by default
     left = [[hand((), at=(500 - i * 40, 300))] for i in range(8)]
     ev = run(left)
     assert [e["direction"] for e in ev if e["kind"] == "swipe"] == ["left"]
     right = [[hand((), at=(100 + i * 40, 300))] for i in range(8)]
     assert [e["direction"] for e in run(right) if e["kind"] == "swipe"] == ["right"]
+    GestureReader.__init__.__defaults__ = (False,)
+
+
+def test_swipes_off_by_default():
+    left = [[hand((), at=(500 - i * 40, 300))] for i in range(8)]
+    assert not [e for e in run(left) if e["kind"] == "swipe"]
 
 
 def test_slow_drift_is_not_a_swipe():
@@ -81,11 +88,25 @@ def test_slow_drift_is_not_a_swipe():
     assert not [e for e in run(frames) if e["kind"] == "swipe"]
 
 
-def test_double_tap():
+def test_double_tap_one_finger_is_next():
     up, down = hand(("index",)), hand(("index",), index_len=0.6)
     frames = [[up]] * 3 + [[down]] * 2 + [[up]] * 2 + [[down]] * 2 + [[up]] * 3
-    ev = run(frames)
-    assert [e["kind"] for e in ev].count("double_tap") == 1
+    taps = [e for e in run(frames) if e["kind"] == "double_tap"]
+    assert len(taps) == 1 and taps[0]["fingers"] == 1
+
+
+def test_double_tap_two_fingers_is_back():
+    up = hand(("index", "middle"))
+    down = hand(("middle",), index_len=0.6)  # both folded: build a short pair by hand
+    down = [list(p) for p in up]
+    for base in (5, 9):
+        for k in (2, 3):
+            x, y = up[base]
+            tx, ty = up[base + k]
+            down[base + k] = (x + (tx - x) * 0.55, y + (ty - y) * 0.55)
+    frames = [[up]] * 3 + [[down]] * 2 + [[up]] * 2 + [[down]] * 2 + [[up]] * 3
+    taps = [e for e in run(frames) if e["kind"] == "double_tap"]
+    assert len(taps) == 1 and taps[0]["fingers"] == 2
 
 
 def test_single_tap_is_not_double():

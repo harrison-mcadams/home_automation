@@ -66,7 +66,7 @@ def replay(path, every=1, work_width=480):
                 row += "   EVENT " + ", ".join(f"{e['kind']}:{e.get('direction') or e.get('count') or ''}" for e in ev)
             print(row)
         i += 1
-    print(f"frames {i}, frame size {img.shape[1] if i else 0}")
+    print(f"frames {i}")
 
 
 def main(argv=None):

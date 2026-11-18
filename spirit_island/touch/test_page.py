@@ -42,18 +42,17 @@ PROMPTS = [
     ("Hold up 3 fingers again", {"kind": "hold", "count": 3}),
     ("Hold up 2 fingers again", {"kind": "hold", "count": 2}),
     ("Two hands: 7 fingers", {"kind": "hold", "count": 7}),
-    ("Back swipe (Undo)", {"kind": "swipe", "direction": "back"}),
-    ("Back swipe again", {"kind": "swipe", "direction": "back"}),
-    ("Back swipe once more", {"kind": "swipe", "direction": "back"}),
-    ("Forward swipe", {"kind": "swipe", "direction": "forward"}),
-    ("Forward swipe again", {"kind": "swipe", "direction": "forward"}),
-    ("Double tap the table (Next)", {"kind": "double_tap"}),
-    ("Double tap again", {"kind": "double_tap"}),
-    ("Double tap once more", {"kind": "double_tap"}),
-    ("Double tap a fourth time", {"kind": "double_tap"}),
+    ("Double tap with ONE finger (Next)", {"kind": "double_tap", "fingers": 1}),
+    ("Double tap with one finger again", {"kind": "double_tap", "fingers": 1}),
+    ("Double tap with one finger once more", {"kind": "double_tap", "fingers": 1}),
+    ("Double tap with one finger, fourth time", {"kind": "double_tap", "fingers": 1}),
+    ("Double tap with TWO fingers (Back)", {"kind": "double_tap", "fingers": 2}),
+    ("Double tap with two fingers again", {"kind": "double_tap", "fingers": 2}),
+    ("Double tap with two fingers once more", {"kind": "double_tap", "fingers": 2}),
+    ("Double tap with two fingers, fourth time", {"kind": "double_tap", "fingers": 2}),
     ("Point at any land and hold still", {"kind": "hold", "count": 1, "tip": True}),
     ("Point at a different land and hold", {"kind": "hold", "count": 1, "tip": True}),
-    ("Rest: move a few pieces around normally for 15 seconds. Nothing should fire.", {"kind": "rest", "seconds": 15}),
+    ("Rest: move a few pieces around normally for 15 seconds. No double taps should fire.", {"kind": "rest", "seconds": 15}),
 ]
 TIMEOUT_S = 10.0
 
@@ -83,6 +82,8 @@ class Session:
             return False
         if want["kind"] == "hold":
             return ev["count"] == want["count"] and (not want.get("tip") or ev.get("tip") is not None)
+        if want["kind"] == "double_tap":
+            return ev.get("fingers") == want["fingers"]
         if want["kind"] == "swipe":
             back = ev["direction"] == self.back_is
             return (want["direction"] == "back") == back
@@ -111,7 +112,7 @@ class Session:
             else:
                 self.extra.append({"prompt": text, "event": _plain(ev)})
                 # A wrong commit of the same kind (e.g. 4 fingers read as 3) is a miss.
-                if want["kind"] == ev["kind"] and want["kind"] == "hold" and ev.get("count", 0) > 0:
+                if want["kind"] == ev["kind"] and (want["kind"] == "double_tap" or ev.get("count", 0) > 0):
                     self._advance("wrong", ev)
 
     def tick(self):
@@ -138,7 +139,7 @@ class Session:
                 if want["kind"] == "rest":
                     continue
                 k = {"hold": "fingers" if not want.get("tip") else "point", "swipe": "swipe",
-                     "double_tap": "double tap"}[want["kind"]]
+                     "double_tap": f"double tap, {want.get('fingers', 1)} finger"}[want["kind"]]
                 d = by_kind.setdefault(k, {"pass": 0, "of": 0, "latency": []})
                 d["of"] += 1
                 if x["outcome"] == "pass":
@@ -266,7 +267,7 @@ table{border-collapse:collapse;width:100%;margin-top:12px}td{padding:6px 4px;bor
 <script>
 const $=id=>document.getElementById(id);
 const say=e=>!e?"":e.kind=="hold"?(e.count+" finger"+(e.count==1?"":"s")+(e.tip?" (pointing)":"")):
-  e.kind=="swipe"?("swipe "+e.direction):e.kind=="double_tap"?"double tap":e.kind=="card_down"?"card laid down":e.kind=="card_up"?"card picked up":e.kind;
+  e.kind=="swipe"?("swipe "+e.direction):e.kind=="double_tap"?("double tap, "+e.fingers+" finger"+(e.fingers==1?" (Next)":"s (Back)")):e.kind=="card_down"?"card laid down":e.kind=="card_up"?"card picked up":e.kind;
 async function tick(){try{const s=await (await fetch("/state")).json();const q=s.session,c=s.camera;
 $("cam").textContent=c.camera=="ok"?`camera ${c.fps} fps, hand finding ${c.detect_ms} ms, ${c.hands} hand(s)`:"camera: "+(c.camera||"starting");
 $("step").textContent=q.prompt?`Test ${q.index+1} of ${q.total}`:"";

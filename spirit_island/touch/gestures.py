@@ -10,7 +10,7 @@ events, each a dict with a "kind":
                of the index tip when exactly one finger is up, "hands": n}
     swipe      a hand moved sideways across the mat: {"direction": "left" | "right"}
                (left = towards smaller x in the image)
-    double_tap two quick taps of a pointing finger: {"tip": (x, y)}
+    double_tap two quick taps: {"fingers": 1 (Next) or 2 (Back), "tip": (x, y)}
 
 `progress()` says how far a hold has got (0..1) and what it would be, for the ring on
 the TV. Everything is relative to the hand's own size, so nothing depends on camera
@@ -114,7 +114,8 @@ class _Tap:
 
 
 class GestureReader:
-    def __init__(self):
+    def __init__(self, swipes=False):
+        self.swipes = swipes  # off: Harrison found them unreliable (2026-11-18 touch test)
         self.reset()
 
     def reset(self):
@@ -127,6 +128,7 @@ class GestureReader:
         self._last_seen = -1e9
         self._tap = _Tap()
         self._pointed_at = -1e9
+        self._tap_pose = None
         self._progress = (0.0, None)
 
     def progress(self):
@@ -152,7 +154,7 @@ class GestureReader:
 
         # --- swipe: the main hand travels sideways fast enough --------------------------
         swiped = False
-        if t - self._last_swipe > SWIPE_COOLDOWN_S:
+        if self.swipes and t - self._last_swipe > SWIPE_COOLDOWN_S:
             need = SWIPE_MIN * p
             if mat and mat.get("width"):
                 need = min(need, SWIPE_MAT_FRAC * mat["width"])
@@ -193,17 +195,28 @@ class GestureReader:
                             tip = tuple(h[8])
                 events.append({"kind": "hold", "count": total, "tip": tip, "hands": key[1]})
 
-        # --- double tap: a pointing finger dips twice ---------------------------------
-        # The index may look folded at the bottom of a tap, so only the other fingers
-        # need to stay curled while it's being watched.
+        # --- double tap with 1 finger (Next) or 2 fingers (Back) ----------------------
+        # The raised fingers may look folded at the bottom of a tap, so the pose is the one
+        # last seen clearly, and only the ring and little fingers must stay curled.
         f = fingers_up(main)
-        if len(hands) == 1 and not (f[2] or f[3] or f[4]) and (f[1] or t - self._pointed_at < 0.5):
-            if f[1]:
-                self._pointed_at = t
-            if self._tap.update(t, _d(main[5], main[8])) == "double":
-                events.append({"kind": "double_tap", "tip": tuple(main[8])})
-                # Taps wobble the finger count; don't let that also count as a hold.
-                self._hold_fired = True
+        if len(hands) == 1 and not (f[3] or f[4]):
+            pose = 2 if (f[1] and f[2]) else 1 if (f[1] and not f[2]) else None
+            if pose:
+                if pose != self._tap_pose:
+                    self._tap.reset()
+                self._tap_pose, self._pointed_at = pose, t
+            if self._tap_pose and t - self._pointed_at < 0.5:
+                tips = [main[8]] + ([main[12]] if self._tap_pose == 2 else [])
+                bases = [main[5]] + ([main[9]] if self._tap_pose == 2 else [])
+                length = sum(_d(a_, b_) for a_, b_ in zip(bases, tips)) / len(tips)
+                if self._tap.update(t, length) == "double":
+                    events.append({"kind": "double_tap", "fingers": self._tap_pose, "tip": tuple(main[8])})
+                    # Taps wobble the finger count; don't let that also count as a hold.
+                    self._hold_fired = True
+            else:
+                self._tap.reset()
+                self._tap_pose = None
         else:
             self._tap.reset()
+            self._tap_pose = None
         return events
