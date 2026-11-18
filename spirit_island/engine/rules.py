@@ -96,6 +96,8 @@ TRACK_VALUES = {
 }
 # Energy a growth option gives right away.
 GROWTH_ENERGY = {"River Surges in Sunlight": {1: 1}}
+# Presence each growth option adds, as the range from your presence for each disc.
+GROWTH_PRESENCE = {"River Surges in Sunlight": {1: [], 2: [1, 1], 3: [2]}}
 
 # Starting presence from each panel's back: (terrain, discs) in the highest-numbered land
 # of that terrain on the player's board.

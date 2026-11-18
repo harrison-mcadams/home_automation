@@ -197,12 +197,15 @@ class Store:
 
     # -- camera gestures -----------------------------------------------------------------
     def choices_open(self):
-        """How many numbered options the game is asking you to pick from right now (0 once
-        one is picked: then gestures only go Next or Back)."""
+        """How many numbered options the game is asking you to pick from right now (0 when
+        it isn't asking: then gestures only go Next or Back)."""
         from .engine.guide import GROWTH
         s = self.game.state
-        if s["status"] == "playing" and s["step"] == "spirit.growth" and s["players"] \
-                and not s.get("growth_choice", {}).get("0"):
+        if s["status"] != "playing" or s["step"] != "spirit.growth" or not s["players"]:
+            return 0
+        if s.get("pending"):
+            return len(s["pending"]["options"])
+        if not s.get("growth_choice", {}).get("0"):
             return len(GROWTH.get(s["players"][0]["spirit"], []))
         return 0
 
@@ -217,7 +220,10 @@ class Store:
         elif kind == "choose":
             if not 1 <= action["option"] <= self.choices_open():
                 raise ActionError("not one of the options")
-            action = {"type": "growth_choice", "option": action["option"]}
+            if self.game.state.get("pending"):
+                action = {"type": "choose", "option": action["option"]}
+            else:
+                action = {"type": "growth_choice", "option": action["option"]}
         # A refused action (ActionError) reaches the gesture link, which shows why on the TV.
         self.dispatch(action, "gesture")
 

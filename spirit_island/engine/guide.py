@@ -467,7 +467,40 @@ def _growth(s):
         n = land.get("presence", 0) - before.get(lid, land.get("presence", 0))
         if n > 0:
             marks[lid] = {"text": f"+{n} presence (new)", "colour": "#5fd0e8"}
+    marks.update(g.get("marks") or {})  # the lands a question offers win
     return {**g, "marks": marks} if marks else g
+
+
+def _growth_question(s, p, chosen, q, st, pictures):
+    """Growth after picking an option: the one question it is asking now."""
+    title = GROWTH[p["spirit"]][chosen - 1][0]
+    vals = rules.TRACK_VALUES.get(p["spirit"], {})
+    left = len(s.get("growth_todo") or [])
+    total = len(rules.GROWTH_PRESENCE[p["spirit"]][chosen])
+    which = f"presence {total - left + 1} of {total}" if total > 1 else "1 presence"
+    marks = {}
+    if q["kind"] == "track":
+        sp = s.get("spirits", {}).get("0", {"taken": {"energy": 0, "cards": 0}})
+        te, tc = sp["taken"]["energy"], sp["taken"]["cards"]
+        # One line only: the screen numbers its lines, which would read like finger counts.
+        do = [f"Option {chosen}, {title}: add {which}. Which track does the disc come from? "
+              f"Hold up 1 finger for the energy track (top: energy each turn "
+              f"{vals['energy'][min(te, len(vals['energy']) - 1)]} → {vals['energy'][min(te + 1, len(vals['energy']) - 1)]}), "
+              f"or 2 for the card plays track (bottom: card plays "
+              f"{vals['cards'][min(tc, len(vals['cards']) - 1)]} → {vals['cards'][min(tc + 1, len(vals['cards']) - 1)]})."]
+        ttl = "Growth: which track?"
+    else:
+        lands = q["options"]
+        for k, lid in enumerate(lands, 1):
+            marks[lid] = {"text": str(k), "colour": "#5fd0e8"}
+        src = {"energy": "the energy track", "cards": "the card plays track"}.get(q.get("track"), "your track")
+        do = [f"Option {chosen}: take the leftmost disc from {src} and put it in a land within "
+              f"{q['range']} of your presence. Hold up the number lit on that land: "
+              + ", ".join(f"{k} for land {lid.lstrip('ABCDEFGHIJKLMNOPQRSTUVWXYZ')}" for k, lid in enumerate(lands, 1)) + "."]
+        ttl = "Growth: which land?"
+    return {"title": ttl, "single": True, "do": do, "pictures": pictures, "marks": marks,
+            "why": "Two-finger double tap takes the last answer back.",
+            "helper": {"kind": "choose", "options": len(q["options"]), "question": q["kind"]}, "tips": []}
 
 
 def _growth_base(s):
@@ -502,6 +535,9 @@ def _growth_base(s):
         track_q = ([f"Which track did your new disc{'s' if st['unassigned'] > 1 else ''} come from? "
                     "Press E (energy, top) or C (card plays, bottom)" + (f", {st['unassigned']} to go." if st['unassigned'] > 1 else ".")]
                    if st and st["unassigned"] else [])
+        q = s.get("pending")
+        if chosen and q:
+            return _growth_question(s, p, chosen, q, st, [dict(pp, items=[0]) for pp in pics if pp.get("items") == [chosen]])
         if chosen or suggested:
             # Picked with a key, or suggested by the camera: show just that option, big.
             # A suggestion is only taken when you press → (or a number key).
@@ -511,7 +547,8 @@ def _growth_base(s):
                 "title": f"Growth: option {n} ✓" if chosen else f"Growth: option {n}?",
                 "single": True,
                 "do": ([f"Chosen: option {n}, {title}. " + text.format(nextcard=nxt),
-                        "Press 1, 2 or 3 to change it, or → for Gain energy."] if chosen else
+                        (f"Presence placed. " if rules.GROWTH_PRESENCE.get(p["spirit"], {}).get(n) else "")
+                        + "Double tap (or →) for Gain energy; two-finger double tap to go back."] if chosen else
                        [f"The camera thinks you took option {n}, {title}: " + text.format(nextcard=nxt),
                         f"Right? Press → to confirm it and go on to Gain energy. Otherwise press 1, 2 or 3."]) + track_q,
                 "pictures": [dict(pp, items=[0]) for pp in pics if pp.get("items") == [n]],
@@ -520,8 +557,8 @@ def _growth_base(s):
                 "tips": [],
             }
         items.append((f"You chose option {chosen}. " if chosen else
-                      "Choose with the number keys 1, 2, 3 on the remote/keyboard (or on the phone). ")
-                     + "Do it at the table: the camera adds new presence discs by itself. Then Next.")
+                      "Hold up 1, 2 or 3 fingers in your gesture spot (or press 1, 2, 3 on the remote or phone). ")
+                     + "The app then walks you through it.")
     else:
         items = [
             "Each spirit picks ONE growth option on the top of their panel and does everything in it.",

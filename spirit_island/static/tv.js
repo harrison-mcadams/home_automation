@@ -497,6 +497,7 @@ document.addEventListener("keydown", (e) => {
     const o = c && c.options.find((x) => x.key === +k);
     if (o) { e.preventDefault(); act({ type: "card_resolved", card: c.name, land: o.land, fear: o.fear }, `${c.name}: land ${o.land.slice(1)}`); return; }
   }
+  if (/^[1-9]$/.test(k) && S.state.pending) { e.preventDefault(); act({ type: "choose", option: +k }, "Choice " + k); return; }
   if (/^[1-3]$/.test(k) && S.state.step === "spirit.growth") { e.preventDefault(); act({ type: "growth_choice", option: +k }, "Growth option " + k); return; }
   const st0 = (S.derived.spirits || [])[0];
   if ((k === "c" || k === "C") && st0 && st0.unassigned) { e.preventDefault(); act({ type: "take_presence", track: "cards" }, "Disc from the card plays track"); return; }

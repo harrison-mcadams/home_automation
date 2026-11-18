@@ -193,6 +193,14 @@ const HELPERS = {
       el("button", { class: h.chosen === i + 1 ? "sel" : "", onclick: () => act({ type: "growth_choice", option: i + 1 }) }, `Option ${i + 1}`))));
     return box;
   },
+  choose(h) {
+    // A question inside a step (which track, which land): one button per numbered option.
+    const q = S.state.pending || { options: [] };
+    const label = (o) => o === "energy" ? "Energy track (top)" : o === "cards" ? "Card plays (bottom)" : "Land " + String(o).replace(/^[A-Z]+/, "");
+    return el("div", { class: "helper" }, el("h3", {}, h.question === "track" ? "Which track?" : "Which land?"),
+      el("div", { class: "btngrid" }, q.options.map((o, i) =>
+        el("button", { onclick: () => act({ type: "choose", option: i + 1 }) }, `${i + 1}: ${label(o)}`))));
+  },
   gain_power(h) {
     const box = el("div", { class: "helper" });
     for (const p of h.players || []) {

@@ -90,6 +90,16 @@ def test_store_maps_gestures_to_game_actions(tmp_path):
     store.gesture_action({"type": "choose", "option": 2})
     assert store.game.state["growth_choice"]["0"] == 2
     assert store.game.state["log"][-1]["source"] == "gesture"
+    assert store.choices_open() == 2                    # now: which track?
+    store.gesture_action({"type": "choose", "option": 1})
+    n = store.choices_open()                            # which land?
+    assert n >= 1 and store.game.state["pending"]["kind"] == "land"
+    store.gesture_action({"type": "undo"})              # back to: which track?
+    assert store.game.state["pending"]["kind"] == "track"
+    store.gesture_action({"type": "undo"})              # back to picking the option
+    assert store.choices_open() == 3
+    store.gesture_action({"type": "choose", "option": 1})   # option 1 asks nothing more
+    assert store.choices_open() == 0
     store.gesture_action({"type": "next"})
     assert store.game.state["step"] != "spirit.growth" or store.game.state.get("sub", 0) > 0
     store.gesture_action({"type": "undo"})

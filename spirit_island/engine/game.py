@@ -411,6 +411,7 @@ class Game:
                 if bonus:
                     self._spirit(int(i))["energy"] += bonus
             s["growth_choice"] = {}
+            s["pending"], s["growth_todo"] = None, []
         if step == "time_passes":
             s["resolved"] = {}
             s["played"] = []
@@ -514,7 +515,68 @@ class Game:
         else:
             choices.pop(str(i), None)
         s.setdefault("growth_suggest", {}).pop(str(i), None)
+        # The option's presence placements become questions, one at a time.
+        s["growth_todo"] = list(rules.GROWTH_PRESENCE.get(spirit, {}).get(n, [])) if n and i == 0 else []
+        self._next_growth_question()
         return f"{s['players'][i]['name']} chose growth option {n}" if n else "Growth choice cleared"
+
+    # -- questions inside a step (one at a time: "pending") ------------------------------
+    def _tracks_left(self):
+        s = self.state
+        vals = rules.TRACK_VALUES.get(s["players"][0]["spirit"]) if s["players"] else None
+        if not vals:
+            return []
+        taken = self._spirit(0)["taken"]
+        return [t for t in ("energy", "cards") if taken[t] < len(vals[t]) - 1]
+
+    def lands_within(self, rng):
+        """Lands within `rng` of any land with your presence, in land order."""
+        s = self.state
+        reach = {lid for lid, l in s["lands"].items() if l.get("presence")}
+        frontier = set(reach)
+        for _ in range(rng):
+            frontier = {n for lid in frontier for n in invader_plan.neighbours(s, lid)} - reach
+            reach |= frontier
+        return sorted(reach, key=lambda l: (l.rstrip("0123456789"), int(invader_plan.land_number(l) or 0)))
+
+    def _next_growth_question(self):
+        s = self.state
+        todo = s.get("growth_todo") or []
+        if not todo:
+            s["pending"] = None
+            return
+        tracks = self._tracks_left()
+        if len(tracks) == 2:
+            s["pending"] = {"kind": "track", "range": todo[0], "options": ["energy", "cards"]}
+        else:
+            self._ask_land(tracks[0] if tracks else None)
+
+    def _ask_land(self, track):
+        s = self.state
+        rng = (s.get("growth_todo") or [0])[0]
+        s["pending"] = {"kind": "land", "range": rng, "track": track, "options": self.lands_within(rng)}
+
+    def _do_choose(self, action):
+        """Answer the question the step is asking, by its number (1 = first option)."""
+        s = self.state
+        q = s.get("pending")
+        if not q:
+            raise ActionError("nothing to choose right now")
+        n = int(action.get("option", 0))
+        if not 1 <= n <= len(q["options"]):
+            raise ActionError(f"pick 1 to {len(q['options'])}")
+        pick = q["options"][n - 1]
+        if q["kind"] == "track":
+            self._ask_land(pick)
+            return f"Presence from the {'energy' if pick == 'energy' else 'card plays'} track"
+        if q["kind"] == "land":
+            if q.get("track"):
+                self._spirit(0)["taken"][q["track"]] += 1
+            s["lands"][pick]["presence"] += 1
+            s["growth_todo"] = (s.get("growth_todo") or [])[1:]
+            self._next_growth_question()
+            return f"Presence added to land {invader_plan.land_number(pick)}"
+        raise ActionError("unknown question")
 
     def _spirit(self, i):
         sp = self.state.setdefault("spirits", {})
