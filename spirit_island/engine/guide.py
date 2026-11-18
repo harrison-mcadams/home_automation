@@ -6,7 +6,7 @@ wins (that is also how the real game works).
 """
 
 from . import game as g
-from . import innate, rules
+from . import innate, invader_plan, rules
 
 
 def _lands_for(state, card):
@@ -342,8 +342,7 @@ def _pieces(s):
             "Dahan: round wooden pieces. Town: small white house. City: tall white tower. "
             "Blight: grey-blue bumpy piece (from the box, not the blight card).",
             "Ignore the paw and spiral icons; they're for an expansion.",
-            "The TV marks each land live as the camera spots its pieces. When every land shows a tick "
-            "you're done; tap Verify on the phone to record them.",
+            "Place them, then press Next. The app records them for you; it never needs to check.",
         ],
         "why": "This is the island as the invaders first find it.",
         "tips": [],
@@ -663,73 +662,86 @@ def _victory_text(tl):
     }[tl]
 
 
+COLOURS = {"blight": "#ff6b6b", "cities": "#ff8f6b", "towns": "#f2c14e", "explorers": "#7fc8f8",
+           "dahan": "#ff6b6b", None: "#8a948c"}
+
+
+def _colour(changes):
+    for p in ("blight", "cities", "towns", "explorers", "dahan"):
+        if changes.get(p):
+            return COLOURS[p]
+    return COLOURS[None]
+
+
+def _plan_items(rows):
+    """One instruction per land: what to place or remove, then why."""
+    items, marks = [], {}
+    for r in rows:
+        n = invader_plan.land_number(r["land"])
+        what = r["text"]
+        if not r["changes"]:
+            items.append({"text": f"Land {n}: nothing, because {r['why']}", "colour": COLOURS[None]})
+            marks[r["land"]] = {"text": "nothing", "colour": COLOURS[None]}
+            continue
+        what = what[0].upper() + what[1:]
+        items.append({"text": f"Land {n}: {what}. Why: {r['why']}", "colour": _colour(r["changes"])})
+        # Several rows can land in one land (its own ravage and a cascade into it).
+        old = marks.get(r["land"])
+        marks[r["land"]] = {"text": (old["text"] + "; " if old and old["text"] != "nothing" else "") + r["text"],
+                            "colour": _colour(r["changes"])}
+    return items, marks
+
+
+def _plan_helper(kind, rows):
+    return {"kind": kind, "rows": [{"land": r["land"], "text": r["text"], "why": r["why"],
+                                    "changes": r["changes"], "explore": "yes" if r["changes"] else "no"}
+                                   for r in rows]}
+
+
 def _ravage(s):
     card = s["invaders"]["slots"]["ravage"]
     if not card:
-        return {"title": "Ravage", "do": ["No card in the Ravage space yet, so nothing ravages. Tap Next."],
+        return {"title": "Ravage", "do": ["No card in the Ravage space yet, so nothing ravages. Press Next."],
                 "why": "Cards reach the Ravage space after two rounds on the board.", "tips": []}
-    hit, unknown = _lands_for(s, card)
-    rows = []
-    for lid in hit:
-        land = s["lands"][lid]
-        if g.invaders_in(land):
-            rows.append({"land": lid, **g.ravage_preview(land)})
-    do = [
-        f"Ravage card: {rules.card_label(card)}. In every land of that terrain that has invaders:",
-        "1. Add up invader damage: explorer 1, town 2, city 3 (minus any Defend from powers).",
-        "2. If that is 2 or more, add 1 blight from the blight card to the land. If the land already "
-        "had blight, the blight cascades: add one more to an adjacent land too (your choice). Each "
-        "time blight lands, it destroys a Presence there.",
-        "3. The same damage hits the Dahan: each 2 damage destroys a Dahan (health 2).",
-        "4. Surviving Dahan fight back: 2 damage each, split among the invaders as you like "
-        "(explorer 1 health, town 2, city 3).",
-    ] + _unknown_note(unknown)
-    if hit and not rows:
-        do.append("By the tracked pieces no matching land has invaders, so nothing ravages.")
+    rows = invader_plan.ravage_plan(s, card)
+    items, marks = _plan_items(rows)
+    if not rows:
+        items = [f"No {rules.card_label(card)} land has invaders, so nothing ravages. Press Next."]
+    else:
+        items.append("Make these changes on the table, then press Next. The app has already worked them out.")
     return {
-        "title": "Ravage",
-        "do": do,
-        "why": "Ravages are how the island gets blighted. Stopping them is a big part of the game.",
-        "tips": ["Use 'Apply' for a land if no power changed it; otherwise adjust pieces by hand."] if rows else [],
-        "helper": {"kind": "ravage", "rows": rows},
+        "title": f"Ravage: {rules.card_label(card)}",
+        "single": True,
+        "do": [f"Ravage card: {rules.card_label(card)}."] + items,
+        "why": "Rule: invaders deal damage (explorer 1, town 2, city 3). 2 or more adds a blight, and a land "
+               "that already had blight cascades one into a neighbour. The damage also destroys Dahan (2 each), "
+               "and surviving Dahan fight back for 2 each.",
+        "tips": ["If a power gave a land Defend, change that land by hand on the phone before pressing Next."]
+                if rows else [],
+        "helper": _plan_helper("ravage", rows),
+        "marks": marks,
     }
 
 
 def _build(s):
     card = s["invaders"]["slots"]["build"]
     if not card:
-        return {"title": "Build", "do": ["No card in the Build space yet, so nothing builds. Tap Next."],
+        return {"title": "Build", "do": ["No card in the Build space yet, so nothing builds. Press Next."],
                 "why": "", "tips": []}
-    hit, unknown = _lands_for(s, card)
-    rows = [{"land": lid, "adds": g.build_preview(s["lands"][lid])}
-            for lid in hit if g.build_preview(s["lands"][lid])]
-    # Land by land: what to add, and why (colour-coded to match the drawn board).
-    items, marks = [f"Build card: {rules.card_label(card)}. In each {rules.card_label(card)} land:"], {}
-    colours = {"towns": "#f2c14e", "cities": "#ff8f6b", None: "#8a948c"}
-    for lid in hit:
-        land = s["lands"][lid]
-        adds = g.build_preview(land)
-        t, c, e = land.get("towns", 0), land.get("cities", 0), land.get("explorers", 0)
-        have = ", ".join(x for x in (f"{e} explorer{'s' if e != 1 else ''}" if e else "",
-                                     f"{t} town{'s' if t != 1 else ''}" if t else "",
-                                     f"{c} cit{'ies' if c != 1 else 'y'}" if c else "") if x) or "no invaders"
-        if adds == "cities":
-            what, why = "add a city", f"has {have}: more towns than cities"
-        elif adds == "towns":
-            what, why = "add a town", f"has {have}: not more towns than cities"
-        else:
-            what, why = "nothing", "no invaders, so it doesn't build"
-        items.append({"text": f"Land {lid[len(lid.rstrip('0123456789')):]}: {what} ({why})", "colour": colours[adds]})
-        marks[lid] = {"text": what, "colour": colours[adds]}
-    items.append("Place them: the game moves on when the camera sees them (or press →).")
+    rows = invader_plan.build_plan(s, card)
+    items, marks = _plan_items(rows)
+    if not rows:
+        items = [f"No {rules.card_label(card)} land has invaders, so nothing builds. Press Next."]
+    else:
+        items.append("Place them, then press Next.")
     return {
         "title": f"Build: {rules.card_label(card)}",
         "single": True,
-        "do": items + _unknown_note(unknown),
+        "do": [f"Build card: {rules.card_label(card)}."] + items,
         "why": "Rule: a land with invaders adds a city if it has more towns than cities, otherwise a town. "
                "Dahan don't stop a build.",
         "tips": [],
-        "helper": {"kind": "build", "rows": rows},
+        "helper": _plan_helper("build", rows),
         "marks": marks,
     }
 
@@ -750,19 +762,19 @@ def _explore(s):
             "tips": ["Stage II includes a 'Coastal lands' card; Stage III cards name two terrains."],
             "helper": helper,
         }
-    hit, unknown = _lands_for(s, slot)
-    rows = [{"land": lid, "explore": g.explore_preview(s["lands"][lid], s, lid)} for lid in hit]
-    helper.update({"rows": rows})
+    rows = invader_plan.explore_plan(s, slot)
+    items, marks = _plan_items(rows)
+    helper.update(_plan_helper("reveal", rows))
     return {
-        "title": "Explore",
-        "do": [
-            f"Explore card: {rules.card_label(slot)}. Add 1 explorer to each land of that terrain that is:",
-            "next to the ocean (coastal), OR has a town or city in it, OR is next to a land with a "
-            "town or city.",
-        ] + _unknown_note(unknown),
-        "why": "Invaders arrive by sea and spread out from their settlements.",
-        "tips": ["Lands marked 'check' only get an explorer if a neighbouring land has a town or city."],
+        "title": f"Explore: {rules.card_label(slot)}",
+        "single": True,
+        "do": [f"Explore card: {rules.card_label(slot)}."] + items
+              + ["Place the explorers, then press Next."],
+        "why": "Rule: a land gets an explorer if it touches the ocean, has a town or city, or is next to a "
+               "land with a town or city.",
+        "tips": [],
         "helper": helper,
+        "marks": marks,
     }
 
 

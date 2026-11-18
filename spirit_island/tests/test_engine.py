@@ -97,7 +97,8 @@ def test_earning_whole_fear_deck_wins():
     game.dispatch({"type": "next", "screen": True})
     game.dispatch({"type": "fear", "amount": 4 * 9})
     assert game.state["status"] == "won"
-    assert game.state["result"]["score"] == 10 + 2 * g.invader_cards_left(game.state)
+    t = g.totals(game.state)  # the printed starting Dahan and blight count too
+    assert game.state["result"]["score"] == 10 + 2 * g.invader_cards_left(game.state) + t["dahan"] - t["blight"]
 
 
 def test_ravage_preview_and_apply():
@@ -169,9 +170,10 @@ def test_invader_deck_running_out_loses():
 
 def test_undo_restores_previous_state():
     game = setup_game()
+    before = game.state["lands"]["A3"]["dahan"]
     game.dispatch({"type": "land", "land": "A3", "piece": "dahan", "delta": 2})
     game.dispatch({"type": "undo"})
-    assert game.state["lands"]["A3"]["dahan"] == 0
+    assert game.state["lands"]["A3"]["dahan"] == before
 
 
 def test_observe_records_vision_source():
