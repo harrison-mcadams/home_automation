@@ -259,6 +259,8 @@ class GestureReader:
 
 ZONE_HOLD_S = 2.0     # hold an open hand still this long to set the gesture spot
 ZONE_RADIUS = 0.8     # the spot reaches this many palm lengths from where the palm was
+ZONE_KEEP = 1.6       # a hand that came into the spot stays counted out to this many times
+                      # its radius, so drifting while tapping doesn't drop it
 
 
 class GestureZone:
@@ -274,6 +276,8 @@ class GestureZone:
 
     def reset(self):
         self.spot = None            # (x, y, radius) in frame pixels
+        self._in = False            # a hand came into the spot and hasn't left it
+        self._seen = -1e9
         self._since = None
         self._anchor = None
 
@@ -289,7 +293,14 @@ class GestureZone:
     def update(self, t, hands):
         self._last = t
         if self.spot is not None:
-            return [h for h in hands if self.inside(h)]
+            if hands:
+                self._seen = t
+            elif t - self._seen > LOST_S:
+                self._in = False
+            reach = ZONE_KEEP if self._in else 1.0
+            kept = [h for h in hands if self.inside(h, reach)]
+            self._in = bool(kept)
+            return kept
         open_ = [h for h in hands if count_up(h) == 5]
         if not open_:
             self._since = None
@@ -303,9 +314,9 @@ class GestureZone:
             self._since = None
         return []
 
-    def inside(self, h):
+    def inside(self, h, reach=1.0):
         x, y, r = self.spot
-        return _d(palm_centre(h), (x, y)) <= r
+        return _d(palm_centre(h), (x, y)) <= r * reach
 
     def public(self):
         if self.spot is None:

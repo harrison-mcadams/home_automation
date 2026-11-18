@@ -156,3 +156,13 @@ def test_next_leaves_a_screen_that_shows_a_single_line(tmp_path):
     store._snapshot = one_line
     store.dispatch({"type": "next"}, "gesture")
     assert store.game.state["step"] != step
+
+
+def test_a_hand_drifting_while_tapping_stays_in_the_spot():
+    got = []
+    link = with_spot(GestureLink(on_action=got.append))   # spot at (300, 300), r = 48 px
+    drift = (300 + 1.2 * 0.8 * 60, 300)                  # past the edge, inside the keep reach
+    rest, lift = hand(("index",), at=drift), hand(("index",), at=drift, index_len=1.12)
+    feed(link, [[hand(("index",))]] * 5, t0=0)           # comes in at the centre
+    feed(link, [[rest]] * 15 + [[lift]] * 3 + [[rest]] * 3 + [[lift]] * 3 + [[rest]] * 8, t0=0.25)
+    assert [a["type"] for a in got] == ["next"]
