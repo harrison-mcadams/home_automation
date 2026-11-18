@@ -30,14 +30,13 @@ SWIPE_MAT_FRAC = 0.3  # ... or this fraction of the mat's width, whichever is sm
 SWIPE_COOLDOWN_S = 0.8
 TAP_GAP = 0.05        # the finger's two levels (resting, tapping) differ by at least this
                       # fraction of its length (Harrison's taps: 7-11%; rest wobble 2-3%)
-TAP_HYST = 0.2        # switch level only past this share of the gap beyond the midpoint
-TAP_LEVELS_S = 1.5    # the two levels are read from this much recent history
+TAP_HYST = 0.1        # switch level only past this share of the gap beyond the midpoint
+TAP_LEVELS_S = 1.0    # the two levels are read from this much recent history
 TAP_MAX_S = 0.4       # each tap, and the touch between the two, lasts at most this long
 TAP_REST_S = 0.25     # the finger rests at least this long before a double tap
 TAP_STILL = 0.25      # during taps the palm stays within this many palm lengths
 TAP_SIZE = 0.12       # ... and its size changes by less than this fraction
-TAP_STILL_S = 1.0     # ... over this long
-TAP_MAX_S = 0.5       # one tap (down and up) takes at most this long
+TAP_STILL_S = 0.5     # ... over this long
 LOST_S = 0.25         # a hand missing this long counts as gone
 
 

@@ -180,3 +180,25 @@ def test_hold_then_lower_and_raise_slowly_is_not_a_double_tap():
     one, fist = hand(("index",)), hand(())
     frames = [[one]] * 30 + [[fist]] * 20 + [[one]] * 30  # 1.5 s up, 1 s down, up again
     assert not [e for e in run(frames) if e["kind"] == "double_tap"]
+
+
+def test_recorded_small_taps_clip():
+    """Harrison's 30 s clip of small one-finger double taps (2026-11-18), as a per-frame
+    trace: every double tap is found, as 1 finger, and nothing else fires (including the
+    lone lift at 20.13 s as his hand settled)."""
+    import csv
+    from pathlib import Path
+    data = Path(__file__).parent / "data"
+    ref = [tuple(map(float, line.split())) for line in (data / "small_taps_lifts.txt").read_text().splitlines()
+           if line and line[0].isdigit()]
+    r, events = GestureReader(), []
+    for row in csv.DictReader(open(data / "small_taps_trace.csv")):
+        t, p = float(row["t"]), float(row["palm"])
+        up = ("index", "middle") if row["fingers"] == "2" else ("index",)
+        h = hand(up, at=(float(row["cx"]), float(row["cy"])), p=p,
+                 index_len=float(row["index"]) / (0.9 * p))
+        events += [(t, e["fingers"]) for e in r.update(t, [h]) if e["kind"] == "double_tap"]
+    within = lambda t, a, b: a <= t <= b + 0.6  # noqa: E731
+    assert all(any(within(t, a, b) for t, _ in events) for a, b in ref)
+    assert all(any(within(t, a, b) for a, b in ref) for t, _ in events)
+    assert len(events) == len(ref) and all(f == 1 for _, f in events)
