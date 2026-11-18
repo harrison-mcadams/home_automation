@@ -113,3 +113,20 @@ def test_single_tap_is_not_double():
     up, down = hand(("index",)), hand(("index",), index_len=0.6)
     frames = [[up]] * 3 + [[down]] * 2 + [[up]] * 30
     assert not [e for e in run(frames) if e["kind"] == "double_tap"]
+
+
+def test_double_tap_as_flashing_fingers():
+    one, fist = hand(("index",)), hand(())
+    frames = [[fist]] * 4 + [[one]] * 3 + [[fist]] * 3 + [[one]] * 3 + [[fist]] * 4
+    taps = [e for e in run(frames) if e["kind"] == "double_tap"]
+    assert len(taps) == 1 and taps[0]["fingers"] == 1
+    two = hand(("index", "middle"))
+    frames = [[fist]] * 4 + [[two]] * 3 + [[]] * 3 + [[two]] * 3 + [[fist]] * 4
+    taps = [e for e in run(frames) if e["kind"] == "double_tap"]
+    assert len(taps) == 1 and taps[0]["fingers"] == 2
+
+
+def test_hold_then_lower_and_raise_slowly_is_not_a_double_tap():
+    one, fist = hand(("index",)), hand(())
+    frames = [[one]] * 30 + [[fist]] * 20 + [[one]] * 30  # 1.5 s up, 1 s down, up again
+    assert not [e for e in run(frames) if e["kind"] == "double_tap"]

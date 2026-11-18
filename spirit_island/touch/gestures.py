@@ -113,6 +113,32 @@ class _Tap:
         self.taps.clear()
 
 
+class _Flash:
+    """A double tap seen as the fingers flashing: shown briefly, gone (folded, fist or
+    hand out of view), and shown again. Finger counts are what the camera reads best, so
+    this catches taps however the hand moves."""
+
+    MAX_SHOW_S = 0.8   # the first showing is short (a longer one is a hold)
+    GAP_S = (0.04, 0.7)
+
+    def __init__(self):
+        self.segs = []  # (value, start time); value 1 / 2 = that pose, 0 = none, -1 = other
+
+    def update(self, t, value):
+        """Fires when the second short showing ends: N, gone, N, gone. (Firing on the
+        second appearance would also catch a single tap that folds the finger.)"""
+        if not self.segs or self.segs[-1][0] != value:
+            self.segs.append((value, t))
+            self.segs = self.segs[-5:]
+            if value == 0 and len(self.segs) >= 4:
+                (a, ta), (b, tb), (c, tc) = self.segs[-4:-1]
+                if a in (1, 2) and a == c and b == 0 and tb - ta <= self.MAX_SHOW_S and \
+                        t - tc <= self.MAX_SHOW_S and self.GAP_S[0] <= tc - tb <= self.GAP_S[1]:
+                    self.segs = [(0, t)]
+                    return a
+        return None
+
+
 class GestureReader:
     def __init__(self, swipes=False):
         self.swipes = swipes  # off: Harrison found them unreliable (2026-11-18 touch test)
@@ -129,6 +155,7 @@ class GestureReader:
         self._tap = _Tap()
         self._pointed_at = -1e9
         self._tap_pose = None
+        self._flash = _Flash()
         self._progress = (0.0, None)
 
     def progress(self):
@@ -139,6 +166,7 @@ class GestureReader:
         "width" in pixels, used to size swipes."""
         events = []
         if not hands:
+            self._flash.update(t, 0)
             if t - self._last_seen > LOST_S:
                 self._hold_key, self._hold_fired = None, False
                 self._track.clear()
@@ -196,6 +224,18 @@ class GestureReader:
                 events.append({"kind": "hold", "count": total, "tip": tip, "hands": key[1]})
 
         # --- double tap with 1 finger (Next) or 2 fingers (Back) ----------------------
+        # Two ways to see it: the fingers flash twice, or they dip towards the table twice.
+        fu = fingers_up(main)
+        n = sum(fu[1:]) if not fu[0] else -1
+        flash_val = 0 if n == 0 else (1 if (fu[1] and n == 1) else 2 if (fu[1] and fu[2] and n == 2) else -1)
+        if len(hands) > 1:
+            flash_val = -1
+        got = self._flash.update(t, flash_val)
+        if got:
+            events.append({"kind": "double_tap", "fingers": got, "tip": tuple(main[8]), "how": "flash"})
+            self._hold_fired = True
+            self._tap.reset()
+            return events
         # The raised fingers may look folded at the bottom of a tap, so the pose is the one
         # last seen clearly, and only the ring and little fingers must stay curled.
         f = fingers_up(main)
@@ -210,7 +250,8 @@ class GestureReader:
                 bases = [main[5]] + ([main[9]] if self._tap_pose == 2 else [])
                 length = sum(_d(a_, b_) for a_, b_ in zip(bases, tips)) / len(tips)
                 if self._tap.update(t, length) == "double":
-                    events.append({"kind": "double_tap", "fingers": self._tap_pose, "tip": tuple(main[8])})
+                    events.append({"kind": "double_tap", "fingers": self._tap_pose, "tip": tuple(main[8]), "how": "dip"})
+                    self._flash.segs = []
                     # Taps wobble the finger count; don't let that also count as a hold.
                     self._hold_fired = True
             else:

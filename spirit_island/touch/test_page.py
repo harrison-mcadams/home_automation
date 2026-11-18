@@ -108,12 +108,12 @@ class Session:
                 self.rest_hits.append(_plain(ev))
                 return
             if self._matches(want, ev):
-                self._advance("pass", ev)
+                tries = sum(1 for x in self.extra if x["prompt"] == text)
+                self._advance("pass" if not tries else f"pass after {tries} wrong", ev)
             else:
                 self.extra.append({"prompt": text, "event": _plain(ev)})
-                # A wrong commit of the same kind (e.g. 4 fingers read as 3) is a miss.
-                if want["kind"] == ev["kind"] and (want["kind"] == "double_tap" or ev.get("count", 0) > 0):
-                    self._advance("wrong", ev)
+                # A wrong reading is recorded but doesn't move on: you can try again until
+                # the prompt times out (moving on put the test a step ahead of the hand).
 
     def tick(self):
         with self.lock:
@@ -133,7 +133,7 @@ class Session:
     def summary(self):
         with self.lock:
             r = [x for x in self.results if x["outcome"] != "rest"]
-            passed = [x for x in r if x["outcome"] == "pass"]
+            passed = [x for x in r if x["outcome"].startswith("pass")]
             by_kind = {}
             for x, (_, want) in zip(self.results, PROMPTS):
                 if want["kind"] == "rest":
@@ -142,7 +142,7 @@ class Session:
                      "double_tap": f"double tap, {want.get('fingers', 1)} finger"}[want["kind"]]
                 d = by_kind.setdefault(k, {"pass": 0, "of": 0, "latency": []})
                 d["of"] += 1
-                if x["outcome"] == "pass":
+                if x["outcome"].startswith("pass"):
                     d["pass"] += 1
                     d["latency"].append(x["latency_s"])
             cur = self.current()
@@ -256,7 +256,7 @@ img{width:100%;border-radius:12px;background:#000}
 .big{font-size:30px}
 .ev{font-size:34px;color:var(--hi);min-height:46px}
 table{border-collapse:collapse;width:100%;margin-top:12px}td{padding:6px 4px;border-bottom:1px solid #26302b}
-.pass{color:var(--ok)}.wrong,.missed{color:var(--bad)}
+[class^=pass]{color:var(--ok)}.wrong,.missed{color:var(--bad)}
 @media (max-width:900px){.wrap{grid-template-columns:1fr;height:auto}.prompt{font-size:36px}}
 </style></head><body><div class=wrap>
 <div><img id=live alt="live camera with the hand drawn over it"><div class=sub id=cam></div></div>
@@ -276,7 +276,7 @@ $("left").textContent=q.prompt?`${q.seconds_left}s`:"";
 const ev=q.last_event;$("ev").textContent=ev&&Date.now()/1000-ev.t<4?say(ev):"";
 $("score").textContent=`Passed ${q.passed} of ${q.tried}`+(q.false_in_rest?` · ${q.false_in_rest} false alarm(s) while resting`:"");
 $("kinds").innerHTML=Object.entries(q.by_kind).map(([k,d])=>`<tr><td>${k}</td><td>${d.pass}/${d.of}</td><td class=sub>${d.latency.length?(d.latency.reduce((a,b)=>a+b,0)/d.latency.length).toFixed(1)+" s avg":""}</td></tr>`).join("");
-$("recent").innerHTML=q.results.slice().reverse().map(r=>`<tr><td class=${r.outcome}>${r.outcome}</td><td>${r.prompt}</td><td class=sub>${r.event?say(r.event):""}</td></tr>`).join("");
+$("recent").innerHTML=q.results.slice().reverse().map(r=>`<tr><td class="${r.outcome.split(' ')[0]}">${r.outcome}</td><td>${r.prompt}</td><td class=sub>${r.event?say(r.event):""}</td></tr>`).join("");
 }catch(e){}}
 setInterval(tick,250);tick();
 // The live picture: one JPEG at a time, the next asked for as soon as one arrives. Steadier in
