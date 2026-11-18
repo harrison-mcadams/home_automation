@@ -1,0 +1,23 @@
+# Lift pairs in touch-test run 20261118-135619: first-lift-start second-lift-start (seconds from the run's first frame).
+# Found automatically from index length (points 5 to 8); the finder matched 15 of 16 pairs on small_taps.
+# The third column is the prompt index, and 'fired' or 'missed' says whether the current rule fired on the saved points.
+19.21 19.55 4 missed
+20.58 20.79 4 missed
+21.86 22.09 4 missed
+23.08 23.36 4 missed
+25.49 25.80 4 missed
+26.74 27.03 4 missed
+28.00 28.31 4 missed
+29.24 29.54 4 missed
+31.87 32.14 5 missed
+33.18 33.37 5 missed
+34.34 34.58 5 missed
+36.70 36.97 5 missed
+37.85 38.16 5 missed
+39.04 39.29 5 missed
+40.05 40.40 5 missed
+41.36 41.61 5 missed
+42.50 42.74 6 missed
+43.64 43.95 6 missed
+44.82 45.13 6 missed
+45.85 46.24 6 missed
