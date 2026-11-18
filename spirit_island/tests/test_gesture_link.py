@@ -193,3 +193,47 @@ def test_a_second_hand_anywhere_adds_fingers_when_more_than_five_options():
     feed(link, [[]] * 10, t0=5)
     feed(link, [[hand(("index", "middle")), hand(("index",), at=(900, 300))]] * 15, t0=10)
     assert got == [{"type": "choose", "option": 2}]
+
+
+class _Board:
+    """Stands in for the board finder: the left half of the picture is land C4."""
+    def land_at(self, pt):
+        return "C4" if pt[0] < 500 else None
+
+
+def test_pointing_at_a_lit_land_answers_which_land():
+    got = []
+    link = with_spot(GestureLink(on_action=got.append, choices=lambda: 2,
+                                 land_options=lambda: ["C2", "C4"], board=_Board()))
+    over_map = hand(("index",), at=(300, 700))        # outside the spot, over "C4"
+    feed(link, [[over_map]] * 15, t0=0)
+    assert got == [{"type": "choose", "option": 2}]
+    assert link.public()["pointing"] == "C4"
+
+
+def test_pointing_off_the_lit_lands_does_nothing():
+    got = []
+    link = with_spot(GestureLink(on_action=got.append, choices=lambda: 2,
+                                 land_options=lambda: ["C2", "C4"], board=_Board()))
+    feed(link, [[hand(("index",), at=(900, 700))]] * 15, t0=0)
+    assert got == []
+
+
+def test_land_lookup_through_the_alignment():
+    import numpy as np
+    from spirit_island.touch.board_point import LandLookup, rotate_point
+    labels = np.zeros((100, 200), np.uint8)
+    labels[:, :100], labels[:, 100:] = 1, 2
+    look = LandLookup(labels, ["3", "ocean"], "C")
+    assert look.land_at((10, 10)) is None              # not lined up yet
+    look.homography, look.frame_size = np.eye(3), (200, 100)
+    assert look.land_at((10, 10)) == "C3" and look.land_at((150, 10)) is None  # ocean
+    assert rotate_point(0, 0, 200, 100, 90) == (99, 0)
+
+
+def test_an_implausible_alignment_is_rejected():
+    import numpy as np
+    from spirit_island.touch.board_point import plausible
+    assert plausible(np.eye(3), (400, 600), (1280, 720))
+    squash = np.diag([50.0, 50.0, 1.0])                 # board would be a speck
+    assert not plausible(squash, (400, 600), (1280, 720))

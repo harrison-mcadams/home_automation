@@ -506,7 +506,7 @@ def _growth_question(s, p, chosen, q, st, pictures):
             marks[lid] = {"text": str(k), "colour": "#5fd0e8"}
         src = {"energy": "the energy track", "cards": "the card plays track"}.get(q.get("track"), "your track")
         do = [f"Option {chosen}: take the leftmost disc from {src} and put it in a land within "
-              f"{q['range']} of your presence. Hold up the number lit on that land: "
+              f"{q['range']} of your presence. Point at it on the board and hold still, or hold up the number lit on it: "
               + ", ".join(f"{k} for land {lid.lstrip('ABCDEFGHIJKLMNOPQRSTUVWXYZ')}" for k, lid in enumerate(lands, 1)) + "."]
         ttl = "Growth: which land?"
     return {"title": ttl, "single": True, "do": do, "pictures": pictures, "marks": marks,

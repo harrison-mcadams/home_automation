@@ -19,19 +19,25 @@ from __future__ import annotations
 import threading
 import time
 
-from .gestures import GestureReader, GestureZone
+from .gestures import GestureReader, GestureZone, pointing
 
 
 
 class GestureLink:
-    def __init__(self, source=None, on_action=None, choices=None, work_width=480):
+    def __init__(self, source=None, on_action=None, choices=None, work_width=480,
+                 land_options=None, board=None):
         """on_action(action dict): called for each game action. choices(): how many
-        numbered options the game is asking to pick from right now (0 = none)."""
+        numbered options the game is asking to pick from right now (0 = none).
+        land_options(): when the question is "which land", its land ids in option order.
+        board: a BoardPointer (or anything with land_at(point)) to point at lands with."""
         self.source = source
         self.on_action = on_action or (lambda a: None)
         self.choices = choices or (lambda: 0)
         self.work_width = work_width
         self.reader = GestureReader()
+        self.land_options = land_options or (lambda: [])
+        self.board = board
+        self.pointer = GestureReader()  # pointing at a land: any hand, anywhere over the map
         self.zone = GestureZone()  # gestures only count in the spot you set with an open hand
         self._stop = threading.Event()
         self.status = {"camera": "off", "fps": 0.0, "hands": 0}
@@ -56,6 +62,23 @@ class GestureLink:
                           "Next" if ev["fingers"] == 1 else "Back")
             elif ev["kind"] == "hold" and wants_number and 1 <= ev["count"] <= self.choices():
                 self._choose(ev["count"])
+        # Pointing at a lit land (fingertip held still for half a second) answers a
+        # "which land" question, wherever the board sits in the picture.
+        lands = self.land_options() if (wants_number and self.board is not None) else []
+        self.status["pointing"] = None
+        if lands:
+            for h in everyone:
+                if pointing(h):
+                    lid = self.board.land_at(h[8])
+                    if lid in lands:
+                        self.status["pointing"] = lid
+            for ev in self.pointer.update(t, everyone):
+                if ev["kind"] == "hold" and ev.get("tip") is not None:
+                    lid = self.board.land_at(ev["tip"])
+                    if lid in lands:
+                        self._act({"type": "choose", "option": lands.index(lid) + 1}, f"Land {lid[1:]}")
+        else:
+            self.pointer.reset()
         self.status["hands"] = seen
         self.status["wants_number"] = wants_number
         self.status["in_spot"] = len(hands)
@@ -85,7 +108,10 @@ class GestureLink:
         self.reader.reset()
 
     def public(self):
-        return {**self.status, "last": self.last, "spot": self.zone.public()}
+        out = {**self.status, "last": self.last, "spot": self.zone.public()}
+        if self.board is not None:
+            out["board"] = getattr(self.board, "status", "ok")
+        return out
 
     # -- the camera thread ---------------------------------------------------------------
     def start(self):
@@ -113,6 +139,8 @@ class GestureLink:
                 continue
             last_idx = pkt.index
             hands = finder.find(pkt.image, pkt.timestamp)
+            if self.board is not None and hasattr(self.board, "give_frame"):
+                self.board.give_frame(pkt.image)
             self.process(pkt.timestamp, hands)
             frames += 1
             if time.time() - t0 >= 2.0:

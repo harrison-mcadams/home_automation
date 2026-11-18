@@ -209,6 +209,10 @@ class Store:
             return len(GROWTH.get(s["players"][0]["spirit"], []))
         return 0
 
+    def land_options(self):
+        q = self.game.state.get("pending")
+        return list(q["options"]) if q and q.get("kind") == "land" else []
+
     def gesture_action(self, action):
         """A gesture from the camera, as a game action."""
         kind = action["type"]
@@ -613,8 +617,22 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
 
     if cfg.get("touch_camera_url"):
         from .touch.link import GestureLink
+        board = None
+        letter = (store.game.state.get("boards") or ["C"])[0]
+        scan = os.path.join(BASE_DIR, cfg["board_art_dir"], f"{letter}.png")
+        try:
+            from .touch.board_point import BoardPointer
+            if os.path.exists(scan):
+                with open(os.path.join(BASE_DIR, "board_seeds.json"), encoding="utf-8") as f:
+                    seeds = json.load(f)["boards"][letter]
+                board = BoardPointer.from_scan(scan, letter, seeds).start()
+            elif cfg.get("board_reference"):
+                board = BoardPointer(cfg["board_reference"], letter_hint=letter).start()
+        except Exception as e:  # pointing is optional: numbers still work
+            print(f"Pointing at lands is off: {e}")
         store.gestures = GestureLink(cfg["touch_camera_url"], on_action=store.gesture_action,
-                                     choices=store.choices_open).start()
+                                     choices=store.choices_open, land_options=store.land_options,
+                                     board=board).start()
 
     # Scripts and styles carry the server's start id, so a restart always loads fresh copies
     # instead of whatever the browser cached.
