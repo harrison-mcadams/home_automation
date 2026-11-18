@@ -39,8 +39,12 @@ class GestureLink:
 
     # -- the pipeline ------------------------------------------------------------------
     def process(self, t, hands):
-        seen = len(hands)
+        seen, everyone = len(hands), hands
         hands = self.zone.update(t, hands)
+        # Asking for a number above 5: with one hand in your spot, a second hand anywhere
+        # in view adds its fingers (land choices can go up to 8).
+        if hands and len(everyone) > len(hands) and self._wanted() > 5:
+            hands = everyone
         events = self.reader.update(t, hands)
         # One thing at a time (Harrison, 2026-11-18): while the game wants a number, only
         # a number counts; once it has one, only Next and Back do (Back also takes the
@@ -62,6 +66,9 @@ class GestureLink:
         else:
             self.status["ring"] = prog if prog["count"] and prog["count"] <= self.choices() else None
         return events
+
+    def _wanted(self):
+        return self.choices()
 
     def _choose(self, n):
         self._act({"type": "choose", "option": n}, f"Option {n}")

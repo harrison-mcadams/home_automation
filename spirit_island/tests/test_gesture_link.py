@@ -179,3 +179,17 @@ def test_a_hand_drifting_while_tapping_stays_in_the_spot():
     feed(link, [[hand(("index",))]] * 5, t0=0)           # comes in at the centre
     feed(link, [[rest]] * 15 + [[lift]] * 3 + [[rest]] * 3 + [[lift]] * 3 + [[rest]] * 8, t0=0.25)
     assert [a["type"] for a in got] == ["next"]
+
+
+def test_a_second_hand_anywhere_adds_fingers_when_more_than_five_options():
+    got = []
+    link = with_spot(GestureLink(on_action=got.append, choices=lambda: 7))
+    five = hand(("thumb", "index", "middle", "ring", "pinky"))
+    two_far = hand(("index", "middle"), at=(900, 300))
+    feed(link, [[five, two_far]] * 15, t0=0)
+    assert got == [{"type": "choose", "option": 7}]
+    got.clear()
+    link.choices = lambda: 3                             # 3 options: the far hand is ignored
+    feed(link, [[]] * 10, t0=5)
+    feed(link, [[hand(("index", "middle")), hand(("index",), at=(900, 300))]] * 15, t0=10)
+    assert got == [{"type": "choose", "option": 2}]
