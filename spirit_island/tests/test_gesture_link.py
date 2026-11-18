@@ -138,3 +138,21 @@ def test_moving_pieces_on_the_map_fires_nothing_with_a_spot_set():
         hands = [[(float(row[f"x{i}"]), float(row[f"y{i}"])) for i in range(21)]] if row["x0"] else []
         link.process(float(row["t"]), hands)
     assert got == []
+
+
+def test_next_leaves_a_screen_that_shows_a_single_line(tmp_path):
+    """The TV's "No fast powers this round" screen has one line; one Next must leave it
+    (it used to walk the plain guide's 8 hidden lines first)."""
+    app = create_app(str(tmp_path), vision_url="")
+    store = app.config["STORE"]
+    _to_growth(store)
+    step = store.game.state["step"]
+    plain = store._snapshot
+
+    def one_line():
+        out = plain()
+        out["guide"] = {**out["guide"], "single": True, "do": ["Nothing happens now."]}
+        return out
+    store._snapshot = one_line
+    store.dispatch({"type": "next"}, "gesture")
+    assert store.game.state["step"] != step

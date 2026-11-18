@@ -118,6 +118,13 @@ class Store:
         # it read, never pieces, steps or energy.
         if source == "camera" and not self.camera_tracking and action.get("type") not in CAMERA_CARD_ACTIONS:
             return self.snapshot()
+        # Next walks the numbered lines the screen shows. When the screen shows fewer lines
+        # than the plain guide (e.g. "No fast powers this round"), or none are left, Next
+        # leaves the step, instead of walking lines nobody can see.
+        if action.get("type") == "next" and not action.get("screen"):
+            shown = self._snapshot().get("guide") or {}
+            if shown.get("single") or self.game.state.get("sub", 0) >= len(shown.get("do") or []) - 1:
+                action = {**action, "screen": True}
         # With a card in view, Next leaves the step in one go (the card screen is one step).
         if action.get("type") == "next" and self.game.state["step"] in ("spirit.powers", "fast", "slow")                 and self.card_focus():
             action = {**action, "screen": True}
