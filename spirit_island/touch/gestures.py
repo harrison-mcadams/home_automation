@@ -33,7 +33,8 @@ TAP_GAP = 0.05        # the finger's two levels (resting, tapping) differ by at 
 TAP_HYST = 0.1        # switch level only past this share of the gap beyond the midpoint
 TAP_LEVELS_S = 1.0    # the two levels are read from this much recent history
 TAP_MAX_S = 0.4       # each tap, and the touch between the two, lasts at most this long
-TAP_REST_S = 0.25     # the finger rests at least this long before a double tap
+TAP_REST_S = 0.1      # the finger rests at least this long before a double tap (short, so
+                      # back-to-back double taps both count)
 TAP_STILL = 0.25      # during taps the palm stays within this many palm lengths
 TAP_SIZE = 0.25       # ... and its size changes by less than this fraction (two-finger
                       # taps tilt the hand: palm 165 -> 145 px on the 2026-11-18 run)
@@ -257,7 +258,7 @@ class GestureReader:
 
 
 ZONE_HOLD_S = 2.0     # hold an open hand still this long to set the gesture spot
-ZONE_RADIUS = 1.2     # the spot reaches this many palm lengths from where the palm was
+ZONE_RADIUS = 0.8     # the spot reaches this many palm lengths from where the palm was
 
 
 class GestureZone:

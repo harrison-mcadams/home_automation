@@ -223,3 +223,17 @@ def test_recorded_live_run_one_and_two_fingers():
     assert all(any(a <= t <= b + 0.6 for t, _, _ in events) for a, b in ref)
     assert all((f == 2) == (prompt >= 4) for _, prompt, f in events)
     assert all(any(e[1] == p for e in events) for p in (1, 2, 3))
+
+
+def test_back_to_back_double_taps_both_count():
+    """Two double taps with only a short rest between them (Harrison, 2026-11-18)."""
+    frames, dt = [], 1 / 28
+
+    def add(lifted, seconds):
+        frames.extend([[hand(("index",), index_len=1.12 if lifted else 1.0)]] * round(seconds / dt))
+    add(0, 0.6)
+    for _ in range(2):
+        add(1, 0.15); add(0, 0.12); add(1, 0.15); add(0, 0.12)  # noqa: E702
+    add(0, 0.8)
+    taps = [e for e in run(frames, dt=dt) if e["kind"] == "double_tap"]
+    assert len(taps) == 2
