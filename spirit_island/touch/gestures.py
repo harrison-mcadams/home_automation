@@ -35,7 +35,8 @@ TAP_LEVELS_S = 1.0    # the two levels are read from this much recent history
 TAP_MAX_S = 0.4       # each tap, and the touch between the two, lasts at most this long
 TAP_REST_S = 0.25     # the finger rests at least this long before a double tap
 TAP_STILL = 0.25      # during taps the palm stays within this many palm lengths
-TAP_SIZE = 0.12       # ... and its size changes by less than this fraction
+TAP_SIZE = 0.25       # ... and its size changes by less than this fraction (two-finger
+                      # taps tilt the hand: palm 165 -> 145 px on the 2026-11-18 run)
 TAP_STILL_S = 0.5     # ... over this long
 LOST_S = 0.25         # a hand missing this long counts as gone
 
@@ -75,8 +76,9 @@ def count_up(lm):
 
 
 def _middle_clearly_up(lm):
-    """A stricter test than fingers_up, so a half-curled middle finger isn't read as up."""
-    return _d(lm[12], lm[0]) > _d(lm[10], lm[0]) * 1.3
+    """Middle finger raised: tip well beyond its middle joint from the wrist. On the
+    2026-11-18 runs this ratio was 0.93-1.04 for one-finger taps and 1.27-1.40 for two."""
+    return _d(lm[12], lm[0]) > _d(lm[10], lm[0]) * 1.15
 
 
 def pointing(lm):
@@ -223,22 +225,20 @@ class GestureReader:
                 events.append({"kind": "hold", "count": total, "tip": tip, "hands": key[1]})
 
         # --- double tap with 1 finger (Next) or 2 fingers (Back) ----------------------
-        # Small taps only (Harrison, 2026-11-18): the hand stays put and the finger tips
-        # down to the table, which shortens it in the picture by ~10%. A moving hand or a
-        # palm changing size (a whole-hand lift) is not a tap. Mid-tap the finger count
-        # can flicker, so those frames are kept; the pose (1 or 2 fingers) is taken from
-        # the clear frames just before the first tap.
+        # Small taps (Harrison, 2026-11-18): the finger rests on the table and lifts twice
+        # quickly, which changes its length in the picture by 7-11%. The hand stays put;
+        # with two fingers it tilts a little, so the palm may change size by up to a
+        # quarter. Mid-tap the finger count flickers, so the pose is read from the middle
+        # finger across the whole double tap: up (clearly) in most frames means 2.
         f = fingers_up(main)
+        self._poses.append((t, _middle_clearly_up(main)))
         if len(hands) == 1 and not (f[3] or f[4]) and f[1]:
-            self._poses.append((t, 2 if (f[2] and _middle_clearly_up(main)) else 1))
             self._pointed_at = t
         if len(hands) == 1 and t - self._pointed_at < 0.6 and self._palm_still(t, cx, cy, p):
             if self._tap.update(t, _d(main[5], main[8])) == "double":
                 start = self._tap.first_down
-                before = [k for (s_, k) in self._poses if start - 1.0 <= s_ <= start]
-                if not before:
-                    before = [k for (s_, k) in self._poses if t - s_ < 1.5]
-                fingers = 2 if before and before.count(2) >= 2 * max(1, before.count(1)) else 1
+                during = [up for (s_, up) in self._poses if start <= s_ <= t]
+                fingers = 2 if during and sum(during) >= 0.5 * len(during) else 1
                 events.append({"kind": "double_tap", "fingers": fingers, "tip": tuple(main[8])})
                 # Taps wobble the finger count; don't let that also count as a hold.
                 self._hold_fired = True

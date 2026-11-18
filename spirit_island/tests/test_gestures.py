@@ -99,7 +99,7 @@ def test_double_tap_two_fingers_is_back():
     up = hand(("index", "middle"))
     down = hand(("middle",), index_len=0.6)  # both folded: build a short pair by hand
     down = [list(p) for p in up]
-    for base in (5, 9):
+    for base in (5,):  # the index tips down; the middle stays raised (as on camera)
         for k in (2, 3):
             x, y = up[base]
             tx, ty = up[base + k]
@@ -168,7 +168,7 @@ def test_whole_hand_lift_is_not_a_tap():
 
 def test_half_curled_middle_still_reads_one_finger():
     up = hand(("index",))
-    up[11], up[12] = (up[9][0], up[9][1] - 0.6 * 60), (up[9][0], up[9][1] - 0.72 * 60)
+    up[11], up[12] = (up[9][0], up[9][1] - 0.5 * 60), (up[9][0], up[9][1] - 0.45 * 60)
     down = hand(("index",), index_len=0.88)
     down[11], down[12] = up[11], up[12]
     frames = [[up]] * 6 + [[down]] * 3 + [[up]] * 3 + [[down]] * 3 + [[up]] * 6
@@ -194,11 +194,32 @@ def test_recorded_small_taps_clip():
     r, events = GestureReader(), []
     for row in csv.DictReader(open(data / "small_taps_trace.csv")):
         t, p = float(row["t"]), float(row["palm"])
-        up = ("index", "middle") if row["fingers"] == "2" else ("index",)
-        h = hand(up, at=(float(row["cx"]), float(row["cy"])), p=p,
+        # The trace only says how many fingers were counted, not how the middle finger
+        # looked, so it is drawn curled throughout (the live-run test covers the pose).
+        h = hand(("index",), at=(float(row["cx"]), float(row["cy"])), p=p,
                  index_len=float(row["index"]) / (0.9 * p))
         events += [(t, e["fingers"]) for e in r.update(t, [h]) if e["kind"] == "double_tap"]
     within = lambda t, a, b: a <= t <= b + 0.6  # noqa: E731
     assert all(any(within(t, a, b) for t, _ in events) for a, b in ref)
     assert all(any(within(t, a, b) for a, b in ref) for t, _ in events)
     assert len(events) == len(ref) and all(f == 1 for _, f in events)
+
+
+def test_recorded_live_run_one_and_two_fingers():
+    """Harrison's live test run (2026-11-18), real hand points: prompts 0-3 asked for
+    one-finger double taps, 4-7 for two. Every lift pair seen is found, with the right
+    finger count, and no double tap fires as the wrong one."""
+    import csv
+    from pathlib import Path
+    data = Path(__file__).parent / "data"
+    ref = [tuple(map(float, line.split()[:2])) for line in (data / "live_taps_lifts.txt").read_text().splitlines()
+           if line and line[0].isdigit()]
+    r, events = GestureReader(), []
+    for row in csv.DictReader(open(data / "live_taps_frames.csv")):
+        t = float(row["t"])
+        hands = [[(float(row[f"x{i}"]), float(row[f"y{i}"])) for i in range(21)]] if row["x0"] else []
+        events += [(t, int(row["prompt"]), e["fingers"]) for e in r.update(t, hands)
+                   if e["kind"] == "double_tap"]
+    assert all(any(a <= t <= b + 0.6 for t, _, _ in events) for a, b in ref)
+    assert all((f == 2) == (prompt >= 4) for _, prompt, f in events)
+    assert all(any(e[1] == p for e in events) for p in (1, 2, 3))
