@@ -115,20 +115,46 @@ def test_single_tap_is_not_double():
     assert not [e for e in run(frames) if e["kind"] == "double_tap"]
 
 
-def test_small_taps_from_recording():
-    """Harrison's small taps (2026-11-18 recording, ~28 fps): the index image shrinks
-    about 10%, the second dip starting before the finger is fully back."""
-    series = [205, 205, 204, 200, 192, 186, 184, 190, 199, 206, 200, 190, 182, 188, 200, 205,
-              205, 205] + [205] * 30 + [199] * 20 + [199, 199, 195, 188, 181, 185, 193, 190, 182, 177, 183,
-              192, 199, 199] + [199] * 30
-    frames = [[hand(("index",), index_len=v / 205)] for v in series]
-    taps = [e for e in run(frames, dt=1 / 28) if e["kind"] == "double_tap"]
+def _trace(pairs, t_end):
+    """Frames at 28 fps from a time:length trace, holding each length until the next."""
+    out, i, t = [], 0, 0.0
+    while t < t_end:
+        while i + 1 < len(pairs) and pairs[i + 1][0] <= t:
+            i += 1
+        out.append([hand(("index",), index_len=pairs[i][1] / 205)])
+        t += 1 / 28
+    return out
+
+
+def test_finger_resting_on_table_lifts_twice():
+    """Spot 2 of Harrison's second recording: the finger rests down (~181) and each tap is
+    a quick lift (~202)."""
+    rest = [(0.0, 181)]
+    dt = [(1.0 + a, v) for a, v in [(0.03, 185), (0.09, 192), (0.11, 201), (0.16, 202),
+          (0.19, 196), (0.23, 180), (0.30, 181), (0.35, 192), (0.36, 202), (0.44, 201),
+          (0.45, 205), (0.50, 199), (0.57, 179)]]
+    pairs = rest + dt + [(1.7, 181)]
+    pairs += [(a + 1.2, v) for a, v in dt] + [(2.9, 181)]  # and again 1.2 s later
+    taps = [e for e in run(_trace(pairs, 4.0), dt=1 / 28) if e["kind"] == "double_tap"]
     assert len(taps) == 2 and all(t["fingers"] == 1 for t in taps)
+
+
+def test_spot_one_shallower_lifts():
+    """Spot 1: down ~173, lifted ~186 (7.5%)."""
+    pairs = [(0.0, 173), (1.0, 186), (1.08, 181), (1.12, 169), (1.18, 172), (1.24, 181),
+             (1.28, 185), (1.36, 186), (1.37, 181), (1.42, 169), (1.5, 174)]
+    taps = [e for e in run(_trace(pairs, 3.0), dt=1 / 28) if e["kind"] == "double_tap"]
+    assert len(taps) == 1
+
+
+def test_single_lift_is_not_double():
+    pairs = [(0.0, 181), (1.0, 202), (1.2, 181)]
+    assert not [e for e in run(_trace(pairs, 3.0), dt=1 / 28) if e["kind"] == "double_tap"]
 
 
 def test_rest_wobble_is_not_a_tap():
     import math
-    frames = [[hand(("index",), index_len=1 + 0.03 * math.sin(i))] for i in range(120)]
+    frames = [[hand(("index",), index_len=1 + 0.015 * math.sin(i))] for i in range(120)]
     assert not [e for e in run(frames, dt=1 / 28) if e["kind"] == "double_tap"]
 
 

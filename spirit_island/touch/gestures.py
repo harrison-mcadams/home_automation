@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from dataclasses import dataclass, field
 
 HOLD_S = 0.5          # a hold commits after this long
 STILL = 0.35          # a hold's palm may wander this far (in palm lengths) and still count
@@ -29,15 +28,16 @@ SWIPE_MAX_S = 0.8     # a swipe happens within this long
 SWIPE_MIN = 2.2       # ... and covers at least this many palm lengths sideways
 SWIPE_MAT_FRAC = 0.3  # ... or this fraction of the mat's width, whichever is smaller
 SWIPE_COOLDOWN_S = 0.8
-TAP_DIP = 0.065       # a tap shortens the index finger's image by at least this fraction
-                      # (Harrison's small taps: 9-12%; rest wobble 2-3%; 2026-11-18)
-TAP_RECOVER = 0.4     # ... and it springs back at least this share of the dip (it need
-                      # not return all the way between the two taps)
+TAP_GAP = 0.05        # the finger's two levels (resting, tapping) differ by at least this
+                      # fraction of its length (Harrison's taps: 7-11%; rest wobble 2-3%)
+TAP_HYST = 0.2        # switch level only past this share of the gap beyond the midpoint
+TAP_LEVELS_S = 1.5    # the two levels are read from this much recent history
+TAP_MAX_S = 0.4       # each tap, and the touch between the two, lasts at most this long
+TAP_REST_S = 0.25     # the finger rests at least this long before a double tap
 TAP_STILL = 0.25      # during taps the palm stays within this many palm lengths
 TAP_SIZE = 0.12       # ... and its size changes by less than this fraction
 TAP_STILL_S = 1.0     # ... over this long
 TAP_MAX_S = 0.5       # one tap (down and up) takes at most this long
-DOUBLE_TAP_S = 1.0    # two taps within this long make a double tap
 LOST_S = 0.25         # a hand missing this long counts as gone
 
 
@@ -86,44 +86,59 @@ def pointing(lm):
     return f[1] and not (f[2] or f[3] or f[4])
 
 
-@dataclass
 class _Tap:
-    """Watches the index finger's length in the image: it shortens as the finger tips
-    down to the table (and the hand drops away from the camera), and springs back."""
-    history: deque = field(default_factory=lambda: deque(maxlen=60))
-    down: bool = False
-    peak: float = 0.0
-    low: float = 0.0
-    down_at: float = 0.0
-    first_down: float = 0.0
-    taps: deque = field(default_factory=lambda: deque(maxlen=4))
+    """Watches the index finger's length in the picture. A tap is a short trip from the
+    finger's resting length to another level and back. Which way depends on how the
+    finger rests: on the 2026-11-18 recordings Harrison's finger rests on the table and
+    each tap is a quick lift, which here made the finger look 7-11% longer. Both levels
+    are read from the last 1.5 s, since they change with where the hand is."""
+
+    def __init__(self):
+        self.history = deque(maxlen=90)
+        self.state = None     # "hi" or "lo"
+        self.since = 0.0
+        self.runs = deque(maxlen=6)  # finished (state, start, end), oldest first
+        self.first_down = 0.0  # when the double tap's first tap started
 
     def update(self, t, length):
         self.history.append((t, length))
-        recent = [v for (s, v) in self.history if t - s <= 0.4]
-        if not self.down:
-            self.peak = max(recent)
-            if length < self.peak * (1 - TAP_DIP):
-                self.down, self.low, self.down_at = True, length, t
-                if not self.taps or t - self.taps[-1] > DOUBLE_TAP_S:
-                    self.first_down = t
+        vals = [v for (s, v) in self.history if t - s <= TAP_LEVELS_S]
+        hi, lo = max(vals), min(vals)
+        if hi - lo < TAP_GAP * hi:
+            return None  # one level only: nothing to read
+        mid, band = (hi + lo) / 2, TAP_HYST * (hi - lo)
+        new = "hi" if length > mid + band else "lo" if length < mid - band else self.state
+        if new is None or new == self.state:
             return None
-        self.low = min(self.low, length)
-        if t - self.down_at > TAP_MAX_S:
-            self.down = False  # held down: not a tap
+        if self.state is None:
+            # First movement after a steady spell: that spell was the rest.
+            self.runs.clear()
+            self.runs.append(("hi" if new == "lo" else "lo", t - 1.0, t))
+        else:
+            self.runs.append((self.state, self.since, t))
+        self.state, self.since = new, t
+        return self._check()
+
+    def _check(self):
+        # rest (long) / tap / rest (short) / tap, and now back at rest.
+        if len(self.runs) < 4:
             return None
-        if length >= self.low + TAP_RECOVER * (self.peak - self.low):
-            self.down = False
-            self.taps.append(t)
-            if len(self.taps) >= 2 and self.taps[-1] - self.taps[-2] <= DOUBLE_TAP_S:
-                self.taps.clear()
-                return "double"
-        return None
+        r0, p1, r1, p2 = list(self.runs)[-4:]
+        if not (r0[0] == r1[0] == self.state and p1[0] == p2[0] != self.state):
+            return None
+        if r0[2] - r0[1] < TAP_REST_S:
+            return None
+        if any(r[2] - r[1] > TAP_MAX_S for r in (p1, r1, p2)):
+            return None
+        self.first_down = p1[1]
+        self.runs.clear()
+        self.runs.append((self.state, self.since - 1.0, self.since))  # fresh rest
+        return "double"
 
     def reset(self):
         self.history.clear()
-        self.down = False
-        self.taps.clear()
+        self.state = None
+        self.runs.clear()
 
 
 class GestureReader:
