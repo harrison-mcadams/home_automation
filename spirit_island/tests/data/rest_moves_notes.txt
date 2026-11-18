@@ -1,0 +1,15 @@
+rest_moves video, recorded during two 15-second 'move pieces normally' runs (gesture code 05d434b).
+The server stop did not finalise the mp4, so the frames were recovered from its raw video data.
+The recovered clip has 2337 frames. Frame times are not saved, so t = frame / 28.44 fps (82.17 s wall time); treat t as approximate.
+Approximate video time of the runs: run 1 starts near 7 s, run 2 near 33 s.
+
+Double taps the replay fires (t, fingers, where):
+  18.00 fingers=1 rest run 1
+
+Seen live in run 1 (20261118-141226), elapsed seconds in the 15 s run:
+  3 holds before about 9.9 s (1, 2 and 2 fingers, times not captured)
+  9.9 hold 2 fingers
+  10.8 double tap, 1 finger, tip near (665, 326)
+  14.1 hold 2 fingers
+  14.8 hold 2 fingers
+Seen live in run 2 (20261118-141252): nothing fired.
