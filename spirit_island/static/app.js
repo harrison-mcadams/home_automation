@@ -169,6 +169,19 @@ function landRow(lid, what, button) {
   return el("div", { class: "rowline" }, el("div", { class: "what" }, el("b", {}, lid), " ", what), button);
 }
 
+// Ravage / Build: the game has worked out each land. Next applies them all; "Apply now"
+// does one land early (e.g. to see the board update before moving pieces).
+function planRows(h, type, title) {
+  const box = el("div", { class: "helper" }, el("h3", {}, title));
+  if (!h.rows.length) box.append(el("p", {}, "Nothing happens this step."));
+  for (const r of h.rows) {
+    box.append(landRow(r.land, el("span", {}, el("b", {}, r.text), el("span", { class: "why" }, " " + r.why)),
+      r.changes && Object.keys(r.changes).length ? el("button", { onclick: () => act({ type, land: r.land }) }, "Apply now") : null));
+  }
+  if (h.rows.length) box.append(el("p", { class: "why" }, "Next applies every land you haven't applied yet."));
+  return box;
+}
+
 const HELPERS = {
   growth(h) {
     const box = el("div", { class: "helper" }, el("h3", {}, "Which growth option?"));
@@ -317,33 +330,15 @@ const HELPERS = {
       if (!h.rows.length) box.append(el("p", {}, "No tagged land matches this card."));
       for (const r of h.rows) {
         box.append(landRow(r.land, r.explore === "yes" ? el("span", { class: "badge bad" }, "gets explorer")
-          : el("span", { class: "badge" }, r.explore === "no" ? "no explorer" : "check neighbours"),
-          el("button", { onclick: () => act({ type: "apply_explore", land: r.land }) }, "+1 explorer")));
+          : el("span", { class: "badge" }, "no explorer"),
+          r.explore === "yes" ? el("button", { onclick: () => act({ type: "apply_explore", land: r.land }) }, "Apply now") : null));
       }
+      box.append(el("p", { class: "why" }, "Next applies every land you haven't applied yet."));
     }
     return box;
   },
-  ravage(h) {
-    const box = el("div", { class: "helper" }, el("h3", {}, "Ravaging lands (from tracked pieces)"));
-    if (!h.rows.length) box.append(el("p", {}, "None found among tagged lands."));
-    for (const r of h.rows) {
-      const k = r.invaders_killed;
-      const kills = [k.cities && `${k.cities} city`, k.towns && `${k.towns} town`, k.explorers && `${k.explorers} explorer`].filter(Boolean).join(", ");
-      box.append(landRow(r.land, el("span", {},
-        `${r.damage} dmg`, r.blight ? el("span", { class: "badge bad" }, r.cascade ? "blight + cascade!" : "blight") : el("span", { class: "badge ok" }, "no blight"),
-        r.dahan_killed ? el("span", { class: "badge bad" }, `-${r.dahan_killed} Dahan`) : null,
-        r.fight_back ? el("span", { class: "badge ok" }, `Dahan hit back ${r.fight_back}${kills ? ": " + kills : ""}`) : null),
-        el("button", { onclick: () => act({ type: "apply_ravage", land: r.land }) }, "Apply")));
-    }
-    return box;
-  },
-  build(h) {
-    const box = el("div", { class: "helper" }, el("h3", {}, "Building lands (from tracked pieces)"));
-    if (!h.rows.length) box.append(el("p", {}, "None found among tagged lands."));
-    for (const r of h.rows) box.append(landRow(r.land, `adds a ${r.adds === "cities" ? "city" : "town"}`,
-      el("button", { onclick: () => act({ type: "apply_build", land: r.land }) }, "Apply")));
-    return box;
-  },
+  ravage(h) { return planRows(h, "apply_ravage", "Ravaging lands"); },
+  build(h) { return planRows(h, "apply_build", "Building lands"); },
   fear_cards(h) {
     return el("div", { class: "helper" }, el("h3", {}, `${h.left} card(s) left to resolve`),
       el("button", { class: "primary", onclick: () => act({ type: "resolve_fear_card" }) }, "Resolved one"));

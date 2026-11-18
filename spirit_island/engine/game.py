@@ -10,7 +10,7 @@ import copy
 import time
 import uuid
 
-from . import rules
+from . import invader_plan, rules
 
 QUIET = "_quiet"  # an action summary that is not written to the log
 
@@ -418,11 +418,16 @@ class Game:
             # Entering Growth next: note the presence on the island, to tell the option later.
             s["presence_at_growth"] = sum(l["presence"] for l in s["lands"].values())
             s["presence_lands_at_growth"] = {lid: l["presence"] for lid, l in s["lands"].items()}
+        if step == "setup.pieces" and not s.get("start_placed"):
+            # The game owns the board: the printed starting pieces go in as you leave the step.
+            self._do_place_start({})
         if step == "setup.players" and not s["players"]:
             raise ActionError("choose players and spirits first")
         if step == "setup.first_explore":
             if s["invaders"]["slots"]["explore"] is None:
                 raise ActionError("tap the invader card you revealed first")
+            # The first explore puts its explorers on the island before the card moves on.
+            self._apply_rows("setup.first_explore", invader_plan.explore_plan(s, s["invaders"]["slots"]["explore"]))
             self._advance_cards()
             s["status"] = "playing"
             s["round"] = 1
@@ -430,6 +435,11 @@ class Game:
             return "Setup done; round 1 begins"
         if step == "invader.explore" and s["invaders"]["slots"]["explore"] is None:
             raise ActionError("tap the invader card you revealed first")
+        applied_note = ""
+        if step in invader_plan.STEP_SLOTS:
+            # The game owns the board: leaving Ravage, Build or Explore makes its changes to
+            # every land not already applied by hand this round.
+            applied_note = self._apply_invader_step(step)
         if step == "invader.advance":
             self._advance_cards()
         if step == "invader.fear" and s["fear"]["unresolved"]:
@@ -455,6 +465,8 @@ class Game:
                 self._end("lost", "The invader deck ran out: time is up and the invaders hold the island.")
                 return "Invader deck empty at Explore"
             s["step"] = nxt
+            if applied_note:
+                return f"{applied_note}; next: {nxt}"
             if nxt in ("spirit.energy", "spirit.powers"):
                 s["energy_at_step"] = s.get("spirits", {}).get("0", {}).get("energy", 0)
             return f"Next: {nxt}"
@@ -717,34 +729,56 @@ class Game:
             land["coastal"] = bool(action["coastal"])
         return f"{action['land']}: terrain {land['terrain']}, coastal {land['coastal']}"
 
+    def _applied(self, step):
+        key = f"{self.state['round']}:{step}"
+        return self.state.setdefault("invader_applied", {}).setdefault(key, [])
+
+    def _apply_rows(self, step, rows):
+        done = self._applied(step)
+        changed = []
+        for r in rows:
+            key = r.get("key", r["land"])
+            if key in done or not r["changes"]:
+                continue
+            invader_plan.apply_changes(self, r["land"], r["changes"])
+            done.append(key)
+            changed.append(f"{r['land']}: {r['text']}")
+        return changed
+
+    def _apply_invader_step(self, step):
+        rows = invader_plan.plan_for_step(self.state, step)
+        changed = self._apply_rows(step, rows)
+        name = step.split(".")[1].capitalize()
+        return f"{name} applied" + (f" ({'; '.join(changed)})" if changed else ", nothing changed")
+
     def _do_apply_ravage(self, action):
+        """Apply one land's ravage by hand (with any cascade it causes)."""
         lid = action.get("land")
-        land = self._land(lid)
-        p = ravage_preview(land, int(action.get("defend", 0)))
-        land["dahan"] -= p["dahan_killed"]
-        for piece, n in p["invaders_killed"].items():
-            land[piece] -= n
-        if p["blight"]:
-            land["blight"] += 1
-            self._take_blight(1)
-        k = p["invaders_killed"]
-        return (f"Ravage in {lid}: {p['damage']} damage, "
-                f"{'blight added, ' if p['blight'] else ''}{p['dahan_killed']} Dahan lost, "
-                f"Dahan destroyed {k['cities']} city/{k['towns']} town/{k['explorers']} explorer")
+        self._land(lid)
+        card = self.state["invaders"]["slots"].get("ravage")
+        if card and not action.get("defend"):
+            rows = invader_plan.ravage_plan(self.state, card)
+        else:
+            r = invader_plan.ravage_land(self.state, lid, defend=int(action.get("defend", 0)))
+            rows = [r] if r else []
+        mine = [r for r in rows if r["land"] == lid and "cascaded_from" not in r]
+        if not mine or not mine[0]["changes"]:
+            raise ActionError(f"nothing happens in {lid} this ravage")
+        mine += [r for r in rows if lid in r.get("cascaded_from", [])]
+        return "Ravage " + "; ".join(self._apply_rows("invader.ravage", mine))
 
     def _do_apply_build(self, action):
         lid = action.get("land")
-        land = self._land(lid)
-        piece = build_preview(land)
-        if piece is None:
+        r = invader_plan.build_land(self.state, lid) if lid in self.state["lands"] else None
+        if r is None:
             raise ActionError(f"{lid} has no invaders, so nothing builds there")
-        land[piece] += 1
-        return f"Build in {lid}: +1 {piece[:-1] if piece == 'towns' else 'city'}"
+        return "Build " + "; ".join(self._apply_rows("invader.build", [r]))
 
     def _do_apply_explore(self, action):
         lid = action.get("land")
-        self._land(lid)["explorers"] += 1
-        return f"Explore in {lid}: +1 explorer"
+        self._land(lid)
+        return "Explore " + "; ".join(self._apply_rows("invader.explore", [
+            {"land": lid, "changes": {"explorers": 1}, "text": "add 1 explorer"}]))
 
     def _do_end_game(self, action):
         outcome = action.get("outcome")

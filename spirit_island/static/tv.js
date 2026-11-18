@@ -144,17 +144,9 @@ function renderTrack() {
 function focusRows(h) {
   // The helper rows the phone shows as buttons, shown here as a read-out for the table.
   if (!h || !h.rows) return [];
-  if (h.kind === "ravage") return h.rows.map((r) => {
-    const k = r.invaders_killed, kills = [k.cities && `${k.cities} city`, k.towns && `${k.towns} town`, k.explorers && `${k.explorers} explorer`].filter(Boolean).join(", ");
-    return el("div", { class: "focus" + (r.blight ? " bad" : "") }, el("b", {}, r.land), `${r.damage} damage`,
-      r.blight ? el("span", { class: "tag" }, r.cascade ? "blight + cascade!" : "adds blight") : el("span", { class: "tag ok" }, "no blight"),
-      r.dahan_killed ? el("span", { class: "tag" }, `${r.dahan_killed} Dahan die`) : null,
-      r.fight_back ? el("span", { class: "tag ok" }, `Dahan fight back${kills ? ": " + kills : ""}`) : null);
-  });
-  if (h.kind === "build") return h.rows.map((r) => el("div", { class: "focus" }, el("b", {}, r.land), `builds a ${r.adds === "cities" ? "city" : "town"}`));
-  if (h.kind === "reveal") return h.rows.map((r) => el("div", { class: "focus" }, el("b", {}, r.land),
-    r.explore === "yes" ? "gets an explorer" : r.explore === "no" ? "no explorer (no ocean, town or city next to it)"
-      : "explorer if a neighbour has a town/city or is ocean"));
+  if (h.kind === "ravage" || h.kind === "build" || h.kind === "reveal") return h.rows.map((r) =>
+    el("div", { class: "focus" + (r.changes && r.changes.blight ? " bad" : "") },
+      el("b", {}, "Land " + r.land.replace(/^\D+/, "")), r.text));
   return [];
 }
 
