@@ -258,7 +258,7 @@ table{border-collapse:collapse;width:100%;margin-top:12px}td{padding:6px 4px;bor
 .pass{color:var(--ok)}.wrong,.missed{color:var(--bad)}
 @media (max-width:900px){.wrap{grid-template-columns:1fr;height:auto}.prompt{font-size:36px}}
 </style></head><body><div class=wrap>
-<div><img src="/stream.mjpg" alt="live camera with the hand drawn over it"><div class=sub id=cam></div></div>
+<div><img id=live alt="live camera with the hand drawn over it"><div class=sub id=cam></div></div>
 <div><div class=sub id=step></div><div class=prompt id=prompt>Starting...</div><div class="sub big" id=left></div>
 <div class=sub style="margin-top:18px">Last thing I saw</div><div class=ev id=ev></div>
 <div class=big id=score style="margin-top:14px"></div><table id=kinds></table><table id=recent></table>
@@ -278,6 +278,12 @@ $("kinds").innerHTML=Object.entries(q.by_kind).map(([k,d])=>`<tr><td>${k}</td><t
 $("recent").innerHTML=q.results.slice().reverse().map(r=>`<tr><td class=${r.outcome}>${r.outcome}</td><td>${r.prompt}</td><td class=sub>${r.event?say(r.event):""}</td></tr>`).join("");
 }catch(e){}}
 setInterval(tick,250);tick();
+// The live picture: one JPEG at a time, the next asked for as soon as one arrives. Steadier in
+// Chrome than a multipart stream, and it can't fall behind.
+const live=$("live");let n=0;
+function nextFrame(){const im=new Image();im.onload=()=>{live.src=im.src;setTimeout(nextFrame,30)};
+  im.onerror=()=>setTimeout(nextFrame,500);im.src="/frame.jpg?n="+(n++)}
+nextFrame();
 addEventListener("keydown",e=>{if(e.key=="Enter"||e.key=="ArrowRight")fetch("/skip",{method:"POST"});if(e.key=="r"||e.key=="R")fetch("/restart",{method:"POST"});});
 </script></body></html>"""
 
@@ -309,6 +315,12 @@ def create_app(runner, session):
         """{"is": "left"|"right"}: which way a back swipe goes in the camera's picture."""
         session.back_is = (request.get_json(silent=True) or {}).get("is", "left")
         return jsonify(ok=True)
+
+    @app.get("/frame.jpg")
+    def frame():
+        if not runner.jpeg:
+            return Response("no picture yet", status=503)
+        return Response(runner.jpeg, mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
 
     @app.get("/stream.mjpg")
     def stream():
