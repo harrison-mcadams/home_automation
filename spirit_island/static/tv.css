@@ -28,6 +28,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 #s-fear .meter i { background: var(--fear); }
 #s-blight .meter i { background: var(--blight); }
 .stat.wide > span { font-size: 3vh; }
+#s-spirit > span { font-size: 3.4vh; white-space: nowrap; }
 .stat .note { font-size: 2vh; color: var(--warn); font-weight: 700; margin-left: .6vw; }
 .stat.alarm { border-color: var(--bad); box-shadow: 0 0 2vh rgba(255, 122, 107, .35) inset; }
 
@@ -126,3 +127,153 @@ body.lost #now { border-color: var(--bad); }
 #cam-view span.on { background: var(--accent); color: #0b2412; }
 #cam-status { z-index: 2; }
 .land .cam.odd { color: var(--bad); }
+
+/* setup: no game status yet, and steps with pictures get a big gallery instead of the side panel */
+body.setup #status { display: none; }
+body.setup #tv { grid-template-rows: auto 1fr auto; }
+body.gallery main { grid-template-columns: .8fr 1.7fr; }
+body.gallery #side, body.gallery #n-words, body.gallery #n-why { display: none; }
+body.gallery.withmap main { grid-template-columns: .7fr 1.25fr .95fr; }
+body.gallery.withmap #side { display: grid; }
+body.gallery #n-title { font-size: 4.4vh; }
+body.gallery #n-do { font-size: 2.5vh; line-height: 1.32; }
+body.gallery #n-do li { margin-bottom: .9vh; }
+#gallery { overflow: hidden; display: flex; flex-direction: column; gap: 1.6vh; min-height: 0; align-items: center; justify-content: center; }
+#gallery figure { margin: 0; text-align: center; }
+#gallery figcaption { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.8vh; color: var(--muted); margin-top: .4vh; }
+.gsec { display: flex; flex-direction: column; gap: 1.6vh; min-height: 0; flex: 1 1 0; width: 100%; align-items: center; justify-content: center; }
+#gallery.multi .gsec { flex-direction: row; }
+.g-hero { min-height: 0; height: 100%; flex: 1 1 auto; display: flex; justify-content: center; }
+#gallery:not(.multi) .gsec .g-hero { height: auto; }
+.g-hero figure { display: flex; flex-direction: column; min-height: 0; }
+.g-hero img { max-height: 100%; max-width: 100%; min-height: 0; object-fit: contain; border-radius: 1.2vh; }
+.gsec > .g-rest:only-child { flex: 1 1 auto; align-content: center; }
+.g-rest { display: flex; flex-wrap: wrap; gap: 1.2vh 1vw; justify-content: center; }
+.g-rest.row { display: grid; width: 100%; gap: 1vw; align-items: end; flex: 0 0 auto; }
+.g-rest.row figure { min-width: 0; }
+.g-rest.row img { height: auto; width: 100%; }
+.g-rest img { height: var(--h, 27vh); border-radius: 1vh; display: block; }
+#gallery.multi .g-rest { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, auto); gap: .8vh .8vw; align-content: center; }
+#gallery.multi figcaption { font-size: 1.5vh; max-width: 12vw; }
+#gallery figure.mark img { outline: .6vh solid var(--accent); outline-offset: .3vh; }
+#gallery figure.mark figcaption { color: var(--accent); font-weight: 700; }
+
+/* players step roster */
+.player-card { width: 100%; background: var(--panel2); border: 1px solid var(--line); border-left: .7vh solid var(--accent);
+  border-radius: 1.2vh; padding: 1.2vh 1.2vw; }
+.pc-name { font-size: 3.4vh; font-weight: 800; display: flex; justify-content: space-between; align-items: baseline; }
+.pc-board { font-size: 2.2vh; color: var(--accent); font-weight: 700; }
+.pc-spirit { font-size: 2.6vh; margin-top: .4vh; }
+.pc-spirit .tag { font-size: 1.7vh; margin-left: .6vw; padding: .1vh .5vw; border-radius: .8vh; background: #1d3b23; color: #b8f2c0; }
+.pc-style { font-size: 2vh; color: var(--muted); margin-top: .4vh; }
+
+/* setup steps show only the step itself */
+body.bare #side, body.bare #n-words, body.bare #n-why { display: none; }
+body.bare:not(.gallery) main { grid-template-columns: 1fr; max-width: 70vw; margin: 0 auto; width: 100%; }
+
+/* presence discs animated over the panel and board pictures */
+figure { position: relative; }
+.disc-layer { position: absolute; pointer-events: none; }
+.disc { position: absolute; height: 0; box-sizing: content-box; border-radius: 50%; transform: translate(-50%, -50%);
+  box-shadow: inset 0 -0.25em 0.4em rgba(0,0,0,.35), 0 0.2em 0.5em rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.85);
+  opacity: 0; animation: disc-drop 9s ease-out infinite; }
+.disc.on-land { animation-name: disc-land; }
+@keyframes disc-drop {
+  0% { opacity: 0; transform: translate(-50%, -160%) scale(1.5); }
+  5% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  92%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes disc-land {
+  0% { opacity: 0; transform: translate(-50%, -260%) scale(1.8); }
+  6% { opacity: 1; transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,.9); }
+  20% { box-shadow: 0 0 0 1.2em rgba(255,255,255,0); }
+  45% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  55%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* the numbered item Next is on */
+#n-do li { transition: opacity .3s; }
+#n-do li.done, #n-do li:not(.now) { opacity: .4; }
+#n-do li.now { opacity: 1; }
+#n-do li.now::marker { color: var(--warn); }
+
+/* animated setup scenes (anim.js) */
+svg.scene { display: block; width: 100%; height: auto; }
+.a-drop, .a-fade, .a-remove { opacity: 0; transform-box: fill-box; transform-origin: center;
+  animation: a-drop 10s ease-out infinite; }
+.a-fade { animation-name: a-fade; }
+.a-remove { animation-name: a-remove; }
+@keyframes a-drop {
+  0% { opacity: 0; transform: translateY(-140px); }
+  5% { opacity: 1; transform: none; }
+  88% { opacity: 1; transform: none; }
+  96%, 100% { opacity: 0; transform: none; }
+}
+@keyframes a-fade { 0% { opacity: 0; } 5%, 88% { opacity: 1; } 96%, 100% { opacity: 0; } }
+@keyframes a-remove {
+  0% { opacity: 0; transform: none; }
+  4% { opacity: 1; transform: none; }
+  16% { opacity: 1; transform: none; }
+  28%, 100% { opacity: 0; transform: translateX(160px); }
+}
+
+#gallery figure.anim { width: 100%; height: 100%; display: flex; flex-direction: column; min-height: 0; }
+#gallery figure.anim svg.scene { flex: 1 1 auto; min-height: 0; height: 100%; }
+
+.a-spot { opacity: 0; animation: a-spot 16s linear infinite; }
+@keyframes a-spot { 0% { opacity: 0; } 2% { opacity: 1; } 9% { opacity: 1; } 11%, 100% { opacity: 0; } }
+body.gallery #n-do li:not(.now) { font-size: 1.9vh; }
+
+/* play once and hold (current step of the invader board build-up) */
+.a-drop1, .a-fade1, .a-remove1 { opacity: 0; transform-box: fill-box; transform-origin: center;
+  animation: a-drop1 .6s ease-out forwards; }
+.a-fade1 { animation-name: a-fade1; }
+.a-remove1 { animation: a-remove1 1.6s ease-in forwards; }
+@keyframes a-drop1 { from { opacity: 0; transform: translateY(-140px); } to { opacity: 1; transform: none; } }
+@keyframes a-fade1 { from { opacity: 0; } to { opacity: 1; } }
+@keyframes a-remove1 { 0% { opacity: 0; } 20% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(160px); } }
+
+/* starting-piece check */
+.check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6vh .6vw; width: 100%; margin-top: .6vh; }
+.check { background: var(--panel2); border-radius: 1vh; padding: .5vh .7vw; font-size: 1.8vh; border-left: .6vh solid var(--accent); }
+.check.bad { border-left-color: var(--bad); }
+.check b { font-size: 2.2vh; margin-right: .5vw; }
+
+.check-tag { position: absolute; transform: translate(-50%, -50%); border-radius: 1vh; font-weight: 700;
+  box-shadow: 0 .3vh 1vh rgba(0,0,0,.6); white-space: nowrap; }
+.check-tag.ok { background: #2f8a45; color: #fff; font-size: 3.4vh; width: 5vh; height: 5vh; display: grid; place-items: center; border-radius: 50%; }
+.check-tag.bad { background: rgba(160, 40, 30, .93); color: #fff; font-size: 1.55vh; font-weight: 500; padding: .4vh .6vw; line-height: 1.25; }
+.check-tag.bad b { font-weight: 800; }
+
+#gallery figure.scanfig { width: 100%; height: 100%; display: flex; flex-direction: column; min-height: 0; }
+#gallery figure.scanfig img { flex: 1 1 auto; min-height: 0; object-fit: contain; width: 100%; border-radius: 1.2vh; }
+#gallery figure.scanfig figcaption { font-size: 3.2vh; color: var(--text); white-space: normal; }
+#gallery figure.scanfig figcaption.ok { color: var(--accent); font-weight: 800; }
+
+/* explore steps: the camera's view of the invader board between the steps and the side panel */
+body.watch main { grid-template-columns: .8fr 1.2fr 1fr; }
+body.gallery.watch #side { display: grid; }
+
+/* power cards the camera sees */
+.cards-seen { display: flex; gap: .8vw; flex-wrap: wrap; width: 100%; }
+.cards-seen .cs { display: flex; flex-direction: column; align-items: center; width: 9vw; }
+.cards-seen img { width: 100%; border-radius: .8vh; }
+.cards-seen span { font-size: 1.5vh; color: var(--muted); text-align: center; margin-top: .3vh; }
+
+/* camera readout (replaces the land tiles) */
+#reads { display: grid; gap: .6vh; }
+#reads .read { background: var(--panel); border: 1px solid var(--line); border-radius: 1.2vh; padding: .8vh 1vw; font-size: 2vh; }
+#reads .read b { display: block; font-size: 1.6vh; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+#reads .read.warn { border-color: var(--warn); }
+
+/* colour-coded card choices, matching the board */
+#n-do li.opt { list-style: none; margin-left: -1.4em; border-left: 1vh solid var(--opt); padding-left: 1vw; color: var(--opt); font-weight: 700; }
+
+#reads .ev { color: var(--accent); font-size: 1.8vh; }
+
+/* advance invader cards: hold, slide one space left, hold */
+.a-advance { animation: a-advance 5s ease-in-out infinite; }
+.a-advance.out { animation-name: a-advance-out; }
+@keyframes a-advance { 0%, 30% { transform: translateX(0); } 60%, 100% { transform: translateX(var(--dx)); } }
+@keyframes a-advance-out { 0%, 30% { transform: translateX(0); opacity: 1; } 60%, 100% { transform: translateX(var(--dx)); opacity: .45; } }

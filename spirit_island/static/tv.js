@@ -19,6 +19,23 @@ const PIECES = ["explorers", "towns", "cities", "dahan", "blight", "presence"];
 const SHORT = { explorers: "explorer", towns: "town", cities: "city", dahan: "Dahan", blight: "blight", presence: "presence" };
 const TERRAIN_VAR = { J: "var(--J)", W: "var(--W)", S: "var(--S)", M: "var(--M)", C: "var(--C)" };
 
+// Starting-piece check: each land the camera covers, what should be there vs what it sees.
+function pieceCheck() {
+  const v = S.vision || {}, h = S.guide.helper || {};
+  // Live: the newest photo against the printed starting pieces, from the moment the step opens.
+  const seen = v.latest || v.seen, lands = h.expected || S.state.lands;
+  if (!seen) return { ok: null, rows: [], note: v.connected ? "The camera can't line up the board yet." : "The camera isn't connected." };
+  const P = ["explorers", "towns", "cities", "dahan", "blight", "presence"];
+  const word = { explorers: "explorer", towns: "town", cities: "city", dahan: "Dahan", blight: "blight", presence: "presence" };
+  const txt = (c) => P.filter((p) => c[p]).map((p) => `${c[p]} ${word[p]}`).join(", ") || "empty";
+  const rows = Object.keys(seen).sort().map((lid) => {
+    const want = lands[lid] || {}, got = seen[lid];
+    const ok = P.every((p) => (want[p] || 0) === (got[p] || 0));
+    return { lid, ok, want: txt(want), got: txt(got) };
+  });
+  return { ok: rows.every((r) => r.ok), rows, board: v.board, settled: v.settled };
+}
+
 function el(tag, attrs = {}, ...kids) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -56,7 +73,40 @@ function hitLands() {
 }
 
 // ---------- pieces ----------
+function renderSpiritStat() {
+  const st = (S.derived.spirits || [])[0];
+  let box = $("s-spirit");
+  if (!box) {
+    box = el("div", { class: "stat", id: "s-spirit" }, el("b", {}, "Energy · card plays"), el("span", {}, "-"));
+    $("status").append(box);
+    $("status").style.gridTemplateColumns = "1fr 1.1fr 2fr 2fr 1.2fr 1.4fr";
+  }
+  box.querySelector("span").textContent = st ? `⚡${st.energy} · ${st.card_plays} card${st.card_plays !== 1 ? "s" : ""}` : "-";
+  box.title = st ? `+${st.energy_per_turn} energy a turn` : "";
+}
+
+// What the camera reads right now, in one place: invader board, cards, island.
+function renderReads() {
+  let box = $("reads");
+  if (!box) {
+    box = el("div", { id: "reads" });
+    $("lands").replaceWith(box);
+  }
+  const sw = S.slot_watch || {}, pw = S.power_watch || {}, v = S.vision || {};
+  const slotTxt = (k) => { const c = (sw.slots || {})[k]; return !c ? "?" : c === "empty" ? "empty" : c === "back" ? "deck (face down)" : label(c); };
+  const rows = [];
+  if (S.paused) rows.push(el("div", { class: "read warn" }, el("b", {}, "Game paused"), "The camera is not changing the game (teaching it your pieces)."));
+  const ch = S.changes || {};
+  rows.push(el("div", { class: "read" + (ch.status && ch.status !== "watching" ? " warn" : "") }, el("b", {}, "Island camera"),
+    ch.status || "off", ...(ch.recent || []).slice(0, 3).map((e) => el("div", { class: "ev" }, "Saw: " + (e.did || "a change")))));
+  if (pw.active) rows.push(el("div", { class: "read" }, el("b", {}, "Power cards in view"),
+    (pw.cards || []).length ? pw.cards.map((c) => c.name).join(", ") : "none"));
+  box.replaceChildren(...rows);
+}
+
 function renderStatus() {
+  renderSpiritStat();
+  renderReads();
   const s = S.state, d = S.derived;
   const r = $("s-round").querySelector("span");
   r.textContent = s.status === "setup" ? "Setup" : s.status === "playing" ? s.round : s.status === "won" ? "Won!" : "Lost";
@@ -103,15 +153,128 @@ function focusRows(h) {
   });
   if (h.kind === "build") return h.rows.map((r) => el("div", { class: "focus" }, el("b", {}, r.land), `builds a ${r.adds === "cities" ? "city" : "town"}`));
   if (h.kind === "reveal") return h.rows.map((r) => el("div", { class: "focus" }, el("b", {}, r.land),
-    r.explore === "yes" ? "gets an explorer" : "explorer if a neighbour has a town/city or is ocean"));
+    r.explore === "yes" ? "gets an explorer" : r.explore === "no" ? "no explorer (no ocean, town or city next to it)"
+      : "explorer if a neighbour has a town/city or is ocean"));
   return [];
 }
 
 function words(g) {
   if (!REF) return [];
-  const text = [g.title, ...(g.do || []), g.why || ""].join(" ").toLowerCase();
+  const text = [g.title, ...(g.do || []).map((t) => t.text || t), g.why || ""].join(" ").toLowerCase();
   return REF.glossary.filter(([k]) => text.includes(k.toLowerCase().split(/[ (]/)[0])).slice(0, 3)
     .map(([k, v]) => el("div", {}, el("b", {}, k + ": "), v));
+}
+
+// Presence discs drawn over a picture: they drop onto the panel's track circles one by
+// one, then onto the starting land on the board, and the whole thing replays. The discs
+// sit in a layer laid exactly over the picture (kept in step as the picture resizes).
+function addDiscs(fig, img, p) {
+  if (!p.discs || !p.discs.length) return;
+  const layer = el("div", { class: "disc-layer" });
+  const start = p.discs[0].land ? 3.2 : 0;  // board discs land after the panel ones
+  p.discs.forEach((d, i) => {
+    const disc = el("span", { class: "disc" + (d.land ? " on-land" : "") });
+    const size = (p.disc_size || 0.05) * 100;
+    disc.style.cssText = `left:${d.x * 100}%;top:${d.y * 100}%;width:${size}%;padding-bottom:${size}%;` +
+      `background:${p.disc_colour || "#3fa8ff"};animation-delay:${start + i * 0.25}s`;
+    layer.append(disc);
+  });
+  const place = () => {
+    Object.assign(layer.style, { left: img.offsetLeft + "px", top: img.offsetTop + "px",
+                                 width: img.offsetWidth + "px", height: img.offsetHeight + "px" });
+  };
+  img.addEventListener("load", place);
+  window.addEventListener("resize", place);
+  requestAnimationFrame(place);
+  fig.append(layer);
+}
+function figure(p, cls) {
+  if (p.scan) {
+    return el("figure", { class: "wide scanfig" }, el("img", { src: (p.src || "/api/card_scan.jpg") + "?t=" + (p.stamp || 0), alt: "card camera" }),
+      el("figcaption", { class: p.card ? "ok" : "" }, p.caption));
+  }
+  if (p.anim) return el("figure", { class: (cls || "") + " anim" }, animScene(p), el("figcaption", {}, p.caption.split(":")[0]));
+  const img = el("img", { src: "/assets/" + p.src, alt: p.caption });
+  const fig = el("figure", { class: (cls || "") + (p.mark ? " mark" : "") }, img, el("figcaption", {}, p.caption.split(":")[0].split(" (")[0]));
+  img.onerror = () => fig.remove();
+  addDiscs(fig, img, p);
+  return fig;
+}
+
+// Setup steps with pictures hand most of the screen to a gallery: the first wide picture
+// (a spirit panel or board) big on top, the cards in a row underneath.
+function renderGallery(pics, setup) {
+  const on = pics.length > 0;
+  document.body.classList.toggle("withmap", !!(S.state && S.state.step === "spirit.growth"));
+  document.body.classList.toggle("setup", setup);
+  document.body.classList.toggle("gallery", on);
+  const gal = $("gallery");
+  gal.classList.toggle("hidden", !on);
+  // One section per player (pictures carry a group); with several players they share the
+  // space equally, each with its panel on the left and its cards beside it.
+  const groups = [];
+  for (const p of pics) {
+    const k = p.group || 0;
+    (groups.find((g) => g.k === k) || groups[groups.push({ k, pics: [] }) - 1]).pics.push(p);
+  }
+  const multi = groups.length > 1;
+  gal.classList.toggle("multi", multi);
+  gal.replaceChildren(...groups.map(({ pics: gp }) => {
+    const heroIdx = gp.findIndex((p) => p.wide);
+    const hero = heroIdx >= 0 ? gp[heroIdx] : null;
+    const rest = gp.filter((_, i) => i !== heroIdx);
+    const sec = el("div", { class: "gsec" });
+    if (hero) sec.append(el("div", { class: "g-hero" }, figure(hero, "hero")));
+    if (rest.length) {
+      const r = el("div", { class: "g-rest" }, ...rest.map((p) => figure(p)));
+      // Under a hero (one player), one row whose column widths follow each picture's shape
+      // (panels ~1.5:1, cards ~0.7:1) so everything shares one height.
+      if (hero && !multi && rest.length >= 3) {
+        r.classList.add("row");
+        r.style.gridTemplateColumns = rest.map((p) => (p.wide ? "2.1fr" : "1fr")).join(" ");
+      }
+      r.style.setProperty("--h", (hero && rest.length < 3 ? 38 : multi ? 15.5 : rest.length <= 3 ? 50 : rest.length === 4 ? 38 : rest.length === 5 ? 31 : 34) + "vh");
+      sec.append(r);
+    }
+    return sec;
+  }));
+}
+
+function forItem(pics, sub) {
+  return (pics || []).filter((p) => !p.items || p.items.includes(sub));
+}
+
+// Mark the starting-piece check on the board picture: a tick or the mismatch at each land.
+function markCheck(c, h) {
+  if (!c || !c.rows.length || !h || !h.points) return;
+  const fig = document.querySelector("#gallery figure");
+  const img = fig && fig.querySelector("img");
+  if (!img) return;
+  const layer = el("div", { class: "disc-layer check-layer" });
+  for (const r of c.rows) {
+    const pt = h.points[r.lid];
+    if (!pt) continue;
+    const tag = el("div", { class: "check-tag " + (r.ok ? "ok" : "bad") },
+      r.ok ? "✓" : el("span", {}, el("b", {}, "needs "), r.want, el("br"), el("b", {}, "sees "), r.got));
+    tag.style.left = pt[0] * 100 + "%"; tag.style.top = pt[1] * 100 + "%";
+    layer.append(tag);
+  }
+  const place = () => Object.assign(layer.style, { left: img.offsetLeft + "px", top: img.offsetTop + "px",
+    width: img.offsetWidth + "px", height: img.offsetHeight + "px" });
+  img.addEventListener("load", place); requestAnimationFrame(place);
+  fig.append(layer);
+}
+
+function cardSrc(name) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const river = ["boon_of_vigor", "flash_floods", "river_s_bounty", "wash_away"];
+  return river.includes(slug) ? `spirits/river/${slug}.jpg` : `powers/${slug}.jpg`;
+}
+
+function finishNow(g) {
+  $("n-why").textContent = g.why || "";
+  $("n-why").classList.toggle("hidden", !g.why);
+  $("n-words").replaceChildren(...words(g));
 }
 
 function renderNow() {
@@ -120,14 +283,69 @@ function renderNow() {
   document.body.classList.toggle("lost", s.status === "lost");
   $("n-phase").textContent = g.phase;
   $("n-title").textContent = g.title;
-  $("n-do").replaceChildren(...g.do.map((t) => el("li", {}, t)));
+  // Next walks the numbered items one at a time: the current one is lit, and only its
+  // pictures are shown.
+  const sub = g.sub || 0;
+  $("n-do").replaceChildren(...g.do.map((t, i) => {
+    // An item can be {text, colour}: a colour-coded choice (matching the board).
+    const li = el("li", { class: (g.single || i === sub ? "now" : i < sub ? "done" : "") + (t.colour ? " opt" : "") }, t.text || t);
+    if (t.colour) li.style.setProperty("--opt", t.colour);
+    return li;
+  }));
   const focus = focusRows(g.helper);
-  if (g.helper && g.helper.kind === "configure") focus.push(el("div", { class: "focus" }, "Pick players and spirits on the phone."));
+  const c = g.helper && g.helper.kind === "verify" ? pieceCheck() : null;
+  if (c) {
+    if (c.note) focus.push(el("div", { class: "focus bad" }, c.note));
+    else {
+      const bad = c.rows.filter((r) => !r.ok).length;
+      focus.push(el("div", { class: "focus" + (c.ok ? "" : " bad") }, el("b", {}, c.ok ? "✓ All good" : `${bad} land${bad > 1 ? "s" : ""} to check`),
+        `camera on board ${c.board}${c.settled ? "" : ", still settling"}`));
+    }
+  }
+  if (g.helper && g.helper.kind === "configure") {
+    const roster = g.helper.roster || [];
+    if (!roster.length) focus.push(el("div", { class: "focus" }, "Add players on the phone."));
+    roster.forEach((p, i) => focus.push(el("div", { class: "player-card" },
+      el("div", { class: "pc-name" }, p.name, el("span", { class: "pc-board" }, p.board ? `Board ${p.board}` : "")),
+      el("div", { class: "pc-spirit" }, p.spirit, p.complexity ? el("span", { class: "tag" }, p.complexity) : null),
+      el("div", { class: "pc-style" }, p.style))));
+  }
   if (g.helper && g.helper.kind === "fear_cards") focus.push(el("div", { class: "focus" }, el("b", {}, g.helper.left), "fear card(s) to read and resolve"));
+  // Power cards the camera sees lying face up (spirit phase): what's played and its cost.
+  const pw = S.power_watch || {};
+  if (pw.active && (pw.cards || []).length && s.step.startsWith("spirit.")) {
+    const powers = s.step === "spirit.powers";
+    focus.push(el("div", { class: "focus" }, el("b", {}, powers ? "Played (camera):" : "Power cards in view:"),
+      powers ? `total cost ${pw.cost} energy` : ""));
+    focus.push(el("div", { class: "cards-seen" }, ...pw.cards.map((c) => el("div", { class: "cs" },
+      el("img", { src: "/assets/" + cardSrc(c.name) }), el("span", {}, `${c.name} · ${c.cost} · ${c.speed}`)))));
+  }
   $("n-focus").replaceChildren(...focus);
-  $("n-why").textContent = g.why || "";
-  $("n-why").classList.toggle("hidden", !g.why);
-  $("n-words").replaceChildren(...words(g));
+  // While a card is being read, the TV shows what the camera sees, outlined when found.
+  const scan = S.card_scan || {};
+  const scanning = scan.active && !s.invaders.slots.explore && g.helper && g.helper.kind === "reveal";
+  // On the explore steps the camera watches the invader board by itself; its view shows
+  // here (C on the remote hides or shows it).
+  const sw = S.slot_watch || {};
+  const watching = !scanning && sw.active && sw.found && !s.hide_slot_camera;
+  document.body.classList.toggle("watch", watching);
+  if (watching) {
+    document.body.classList.remove("bare");
+    const ex = s.invaders.slots.explore;
+    renderGallery([{ scan: true, wide: true, src: "/api/slot_watch.jpg", stamp: sw.stamp, card: ex,
+      caption: ex ? `Explore: ${label(ex)}` : sw.explore_seen ? `Reading Explore: ${label(sw.explore_seen)}...` :
+        "Turn over the top invader card on the Explore space" }], s.status === "setup");
+    return finishNow(g);
+  }
+  renderGallery(scanning ? [{ scan: true, wide: true, stamp: scan.stamp, card: scan.card,
+    caption: scan.card ? `I see: ${label(scan.card)}. Confirm on the phone.` :
+      scan.seen ? "Hold still..." : "Hold the invader card face up under the camera" }] : forItem(g.pictures, sub),
+    s.status === "setup" || scanning);
+  markCheck(c, g.helper);
+  // Build the screen up as the game goes: setup shows only the step itself; the invader
+  // cards, lands and camera join at the first explore, the status bar once play starts.
+  document.body.classList.toggle("bare", s.status === "setup" && s.step !== "setup.first_explore");
+  finishNow(g);
 }
 
 function renderInvaders() {
@@ -142,7 +360,9 @@ function renderInvaders() {
 }
 
 function renderLands() {
-  const s = S.state, box = $("lands"); box.replaceChildren();
+  const s = S.state, box = $("lands");
+  if (!box) return;  // replaced by the camera readout
+  box.replaceChildren();
   const ids = Object.keys(s.lands);
   if (!ids.length) { box.append(el("div", { class: "board-label" }, "Lands appear once players are chosen")); return; }
   const hits = hitLands();
@@ -166,27 +386,70 @@ function renderLands() {
   }
 }
 
-let mapView = null, mapLoaded = false;
-async function loadMap() {
-  if (mapLoaded) return; mapLoaded = true;
+// The drawn board is fetched again whenever the camera reports a different board
+// (it can start on another one right after a restart).
+let mapView = null, mapLoaded = null;
+async function loadMap(letter) {
+  if (mapLoaded === (letter || "?")) return; mapLoaded = letter || "?";
   try {
     const r = await fetch("/api/vision/map");
     if (!r.ok) return;
+    $("cam-map").replaceChildren();
     mapView = BoardMap.create($("cam-map"));
     BoardMap.setMap(mapView, await r.json());
     if (S) renderCamera();
-  } catch (e) { mapLoaded = false; }
+  } catch (e) { mapLoaded = null; }
+}
+
+function trackedPieces(map, v) {
+  const out = [], colour = ((v.presence_colours || [])[0]) || "blue";
+  const order = [["cities", "city"], ["towns", "town"], ["explorers", "explorer"], ["dahan", "dahan"], ["blight", "blight"], ["presence", "presence"]];
+  for (const l of map.lands) {
+    const land = S.state.lands[(v.board || "") + l.name];
+    if (!land) continue;
+    const list = [];
+    for (const [k, type] of order) for (let i = 0; i < (land[k] || 0); i++) list.push(type);
+    const per = Math.min(3, Math.max(1, list.length)), gap = 60, rows = Math.ceil(list.length / per);
+    list.forEach((type, i) => {
+      const r = Math.floor(i / per), c = i % per, inRow = Math.min(per, list.length - r * per);
+      out.push({ type, colour: type === "presence" ? colour : undefined,
+        x: l.centre[0] + (c - (inRow - 1) / 2) * gap, y: l.centre[1] + (r - (rows - 1) / 2) * gap });
+    });
+  }
+  return out;
 }
 
 function drawMap(v) {
   if (!mapView) return;
+  if (mapView.rot !== (S.state.board_rotation || 0)) BoardMap.setRotation(mapView, S.state.board_rotation || 0);
   const hits = hitLands(), info = {};
   for (const l of mapView.map.lands) {
     const lid = (v.board || "") + l.name, land = S.state.lands[lid];
     info[l.name] = { terrain: land && land.terrain, hit: hits.has(lid) };
   }
+  // A power card in view: light up the lands it can target, with what it would do there.
+  const focus = S.card_focus || [], tags = {};
+  // Steps that mark lands (e.g. Build: what each land adds), in the step's colours.
+  for (const [lid, m] of Object.entries(S.guide.marks || {})) {
+    const name = lid.slice((v.board || "").length);
+    info[name] = { ...(info[name] || {}), hit: m.text !== "nothing", colour: m.colour };
+    tags[name] = { text: m.text, colour: m.colour };
+  }
+  for (const c of focus) {
+    if (c.resolved) continue;
+    for (const o of c.options) {
+      const name = o.land.slice((v.board || "").length);
+      info[name] = info[name] || {};
+      info[name].hit = true;
+      info[name].colour = o.colour;
+      tags[name] = { text: `${o.key}. ` + (focus.length > 1 ? c.name.split(" ")[0] + ": " : "") + o.text, colour: o.colour };
+    }
+  }
   BoardMap.setLands(mapView, info);
-  BoardMap.setPieces(mapView, v.pieces || []);
+  BoardMap.setTags(mapView, tags);
+  // The drawn board shows the tracked game (the truth), laid out neatly in each land,
+  // not the camera's guess at every piece.
+  BoardMap.setPieces(mapView, trackedPieces(mapView.map, v));
 }
 
 function renderCamera() {
@@ -194,7 +457,7 @@ function renderCamera() {
   if (!v) { $("camera").classList.add("hidden"); return; }
   $("camera").classList.remove("hidden");
   const board = v.view === "board" && v.has_map;
-  if (v.has_map) loadMap();
+  if (v.has_map) loadMap(v.detected_board);
   $("cam-map").classList.toggle("hidden", !board);
   $("cam-view").replaceChildren(...(v.has_map ? [el("span", { class: board ? "" : "on" }, "Photo"), el("span", { class: board ? "on" : "" }, "Drawn board")] : []));
   if (board) drawMap(v);
@@ -211,13 +474,13 @@ function renderCamera() {
       "· keeping the tracked board as it is");
     return;
   }
-  st.replaceChildren(
-    el("span", { class: v.settled ? "ok" : "warn" }, v.settled ? "Camera: settled" : "Camera: " + (v.status || "waiting")),
-    ` · ${v.stamp || ""} · board ${v.board || "?"}`,
-    n ? el("span", { class: "warn" }, ` · ${n} land${n > 1 ? "s" : ""} differ from the tracker${v.auto ? " (auto-sync on)" : ""}`) : " · matches the tracker");
+  const ch = S.changes || {};
+  st.replaceChildren(el("span", { class: ch.status === "watching" ? "ok" : "warn" }, "Camera: " + (ch.status || v.status || "waiting")),
+    ` · board ${v.board || "?"} · showing the tracked game`);
 }
 
 function render(snap) {
+  if (S && S.boot && snap.boot && S.boot !== snap.boot) { location.reload(); return; }
   S = snap;
   renderStatus(); renderTrack(); renderNow(); renderInvaders(); renderLands(); renderCamera();
 }
@@ -236,8 +499,19 @@ async function act(action, msg) {
 document.addEventListener("keydown", (e) => {
   if (!S) return;
   const k = e.key;
+  if ((k === "e" || k === "E") && S.state.status === "playing") { e.preventDefault(); act({ type: "take_presence", track: "energy" }, "Disc from the energy track"); return; }
+  if (/^[1-9]$/.test(k) && (S.state.step === "fast" || S.state.step === "slow") && (S.card_focus || []).length) {
+    const c = S.card_focus.find((x) => x.now && !x.resolved);
+    const o = c && c.options.find((x) => x.key === +k);
+    if (o) { e.preventDefault(); act({ type: "card_resolved", card: c.name, land: o.land, fear: o.fear }, `${c.name}: land ${o.land.slice(1)}`); return; }
+  }
+  if (/^[1-3]$/.test(k) && S.state.step === "spirit.growth") { e.preventDefault(); act({ type: "growth_choice", option: +k }, "Growth option " + k); return; }
+  const st0 = (S.derived.spirits || [])[0];
+  if ((k === "c" || k === "C") && st0 && st0.unassigned) { e.preventDefault(); act({ type: "take_presence", track: "cards" }, "Disc from the card plays track"); return; }
+  if (k === "c" || k === "C") { e.preventDefault(); act({ type: "toggle_camera_view" }); return; }
+  if (k === "r" || k === "R") { e.preventDefault(); act({ type: "turn_board" }, "Board turned"); return; }
   if (k === "ArrowRight" || k === "Enter" || k === " " || k === "MediaTrackNext") { e.preventDefault(); act({ type: "next" }, "Next step"); }
-  else if (k === "ArrowLeft" || k === "Backspace" || k === "MediaTrackPrevious") { e.preventDefault(); if (S.can_undo) act({ type: "undo" }, "Undone"); }
+  else if (k === "ArrowLeft" || k === "Backspace" || k === "MediaTrackPrevious") { e.preventDefault(); if (S.state.status === "setup") act({ type: "back" }, "Back"); else if (S.can_undo) act({ type: "undo" }, "Undone"); }
   else if (k === "f" || k === "F") { if (S.state.status === "playing") act({ type: "fear", amount: 1 }, "+1 fear"); }
   else if ((k === "v" || k === "V") && S.vision && S.vision.has_map) {
     fetch("/api/vision", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -263,3 +537,12 @@ function connect() {
     $("f-links").textContent = "Phone controls: " + links.phone.join("  or  ");
   } catch (e) { /* footer link is a nicety */ }
 })();
+
+// Keep the TV from dimming or sleeping while this page is up. The lock drops whenever the
+// page is hidden, so take it again when it comes back.
+async function keepAwake() {
+  try { if (navigator.wakeLock && document.visibilityState === "visible") await navigator.wakeLock.request("screen"); }
+  catch (e) { console.warn("wake lock:", e); }
+}
+document.addEventListener("visibilitychange", keepAwake);
+keepAwake();

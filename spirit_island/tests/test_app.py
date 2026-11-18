@@ -22,12 +22,12 @@ def test_state_and_actions_round_trip(client, tmp_path):
     assert '"A4": "S"' in (tmp_path / "board_terrains.json").read_text()
 
 
-def test_terrain_tags_carry_into_next_game(client):
+def test_printed_terrains_win_over_old_hand_tags(client):
     client.post("/api/action", json={"type": "configure", "players": [{}]})
     client.post("/api/action", json={"type": "land_info", "land": "A7", "terrain": "W"})
     client.post("/api/action", json={"type": "new_game"})
     r = client.post("/api/action", json={"type": "configure", "players": [{}]})
-    assert r.json["state"]["lands"]["A7"]["terrain"] == "W"
+    assert r.json["state"]["lands"]["A7"]["terrain"] == "S"  # as printed on board A
 
 
 def test_errors_are_400(client):
@@ -48,7 +48,7 @@ def test_tv_and_phone_pages(client):
 
 
 def test_camera_counts_can_be_copied_in(tmp_path):
-    app = create_app(str(tmp_path), vision_url="http://camera.invalid", start_vision=False)
+    app = create_app(str(tmp_path), vision_url="http://camera.invalid", start_vision=False, camera_tracking=True)
     c = app.test_client()
     v = app.config["STORE"].vision
     c.post("/api/action", json={"type": "configure", "players": [{}], "boards": ["C"]})
@@ -63,3 +63,19 @@ def test_camera_counts_can_be_copied_in(tmp_path):
     assert r.json["state"]["lands"]["C2"]["cities"] == 1 and r.json["state"]["lands"]["C2"]["presence"] == 1
     assert r.json["vision"]["diffs"] == []
     assert r.json["state"]["log"][-1]["source"] == "camera"
+
+
+def test_camera_cannot_change_the_board_by_default(tmp_path):
+    app = create_app(str(tmp_path), vision_url="", start_vision=False)
+    store = app.config["STORE"]
+    assert store.camera_tracking is False
+    c = app.test_client()
+    c.post("/api/action", json={"type": "configure", "players": [{}], "boards": ["C"]})
+    before = c.get("/api/state").json["state"]
+    store.dispatch({"type": "land", "land": "C2", "piece": "cities", "delta": 1}, "camera")
+    store.dispatch({"type": "next"}, "camera")
+    after = c.get("/api/state").json["state"]
+    assert after["lands"]["C2"] == before["lands"]["C2"]
+    assert after["step"] == before["step"]
+    # A card the camera read is still accepted.
+    store.dispatch({"type": "set_slot", "slot": "build", "card": None}, "camera")

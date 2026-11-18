@@ -94,3 +94,86 @@ pre.cmd { white-space: pre-wrap; background: var(--panel2); padding: 8px; border
 .links a { color: var(--accent); word-break: break-all; }
 .phonemap { width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; margin-top: 6px; }
 .seg { display: flex; gap: 4px; } .seg button { padding: 6px 10px; }
+
+/* component pictures on setup steps */
+.pics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 12px; }
+.pics:empty { display: none; }
+.pics figure { margin: 0; }
+.pics figure.wide { grid-column: 1 / -1; }
+.pics img { width: 100%; border-radius: 8px; display: block; }
+.pics figcaption { font-size: 13px; opacity: .8; margin-top: 3px; }
+.pics figure.mark img { outline: 3px solid #86dc93; outline-offset: 2px; }
+.pics figure.mark figcaption { color: #86dc93; font-weight: 700; opacity: 1; }
+
+.player-head { display: flex; justify-content: space-between; align-items: center; }
+.remove-player { padding: 4px 10px; font-size: 13px; }
+.add-player { width: 100%; margin: 8px 0 14px; }
+
+/* presence discs animated over the panel and board pictures */
+figure { position: relative; }
+.disc-layer { position: absolute; pointer-events: none; }
+.disc { position: absolute; height: 0; box-sizing: content-box; border-radius: 50%; transform: translate(-50%, -50%);
+  box-shadow: inset 0 -0.25em 0.4em rgba(0,0,0,.35), 0 0.2em 0.5em rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.85);
+  opacity: 0; animation: disc-drop 9s ease-out infinite; }
+.disc.on-land { animation-name: disc-land; }
+@keyframes disc-drop {
+  0% { opacity: 0; transform: translate(-50%, -160%) scale(1.5); }
+  5% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  92%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes disc-land {
+  0% { opacity: 0; transform: translate(-50%, -260%) scale(1.8); }
+  6% { opacity: 1; transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,.9); }
+  20% { box-shadow: 0 0 0 1.2em rgba(255,255,255,0); }
+  45% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  55%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+#g-do li:not(.now) { opacity: .5; }
+#g-do li.now { font-weight: 600; }
+
+/* animated setup scenes (anim.js) */
+svg.scene { display: block; width: 100%; height: auto; }
+.a-drop, .a-fade, .a-remove { opacity: 0; transform-box: fill-box; transform-origin: center;
+  animation: a-drop 10s ease-out infinite; }
+.a-fade { animation-name: a-fade; }
+.a-remove { animation-name: a-remove; }
+@keyframes a-drop {
+  0% { opacity: 0; transform: translateY(-140px); }
+  5% { opacity: 1; transform: none; }
+  88% { opacity: 1; transform: none; }
+  96%, 100% { opacity: 0; transform: none; }
+}
+@keyframes a-fade { 0% { opacity: 0; } 5%, 88% { opacity: 1; } 96%, 100% { opacity: 0; } }
+@keyframes a-remove {
+  0% { opacity: 0; transform: none; }
+  4% { opacity: 1; transform: none; }
+  16% { opacity: 1; transform: none; }
+  28%, 100% { opacity: 0; transform: translateX(160px); }
+}
+
+.a-spot { opacity: 0; animation: a-spot 16s linear infinite; }
+@keyframes a-spot { 0% { opacity: 0; } 2% { opacity: 1; } 9% { opacity: 1; } 11%, 100% { opacity: 0; } }
+
+/* play once and hold (current step of the invader board build-up) */
+.a-drop1, .a-fade1, .a-remove1 { opacity: 0; transform-box: fill-box; transform-origin: center;
+  animation: a-drop1 .6s ease-out forwards; }
+.a-fade1 { animation-name: a-fade1; }
+.a-remove1 { animation: a-remove1 1.6s ease-in forwards; }
+@keyframes a-drop1 { from { opacity: 0; transform: translateY(-140px); } to { opacity: 1; transform: none; } }
+@keyframes a-fade1 { from { opacity: 0; } to { opacity: 1; } }
+@keyframes a-remove1 { 0% { opacity: 0; } 20% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(160px); } }
+
+.scan img { width: 100%; border-radius: 8px; display: block; margin-bottom: 6px; }
+.scan p.ok { color: #86dc93; font-weight: 700; font-size: 18px; }
+
+.readslots { font-size: 18px; padding: 0 8px; cursor: pointer; }
+
+#g-do li.opt { list-style: none; margin-left: -22px; border-left: 6px solid var(--opt); padding-left: 8px; color: var(--opt); font-weight: 700; }
+
+/* advance invader cards: hold, slide one space left, hold */
+.a-advance { animation: a-advance 5s ease-in-out infinite; }
+.a-advance.out { animation-name: a-advance-out; }
+@keyframes a-advance { 0%, 30% { transform: translateX(0); } 60%, 100% { transform: translateX(var(--dx)); } }
+@keyframes a-advance-out { 0%, 30% { transform: translateX(0); opacity: 1; } 60%, 100% { transform: translateX(var(--dx)); opacity: .45; } }

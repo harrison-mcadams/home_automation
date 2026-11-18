@@ -12,6 +12,8 @@ import uuid
 
 from . import rules
 
+QUIET = "_quiet"  # an action summary that is not written to the log
+
 SETUP_STEPS = [
     "setup.welcome",
     "setup.players",
@@ -109,6 +111,21 @@ def invader_cards_left(state):
     return len(inv["deck_stages"]) - len(inv["drawn"])
 
 
+def spirit_stats(state, i):
+    """Energy per turn and card plays from the discs taken off each track, or None."""
+    p = state["players"][i] if i < len(state["players"]) else None
+    vals = rules.TRACK_VALUES.get(p["spirit"]) if p else None
+    if not vals:
+        return None
+    sp = state.get("spirits", {}).get(str(i), {"taken": {"energy": 0, "cards": 0}, "energy": 0})
+    te, tc = sp["taken"]["energy"], sp["taken"]["cards"]
+    start = sum(n for _, n in rules.START_PRESENCE.get(p["spirit"], []))
+    on_island = sum(l["presence"] for l in state["lands"].values())
+    return {"energy_per_turn": vals["energy"][min(te, len(vals["energy"]) - 1)],
+            "card_plays": vals["cards"][min(tc, len(vals["cards"]) - 1)],
+            "energy": sp["energy"], "unassigned": max(0, on_island - start - te - tc) if len(state["players"]) == 1 else 0}
+
+
 def next_invader_stage(state):
     inv = state["invaders"]
     i = len(inv["drawn"])
@@ -184,10 +201,23 @@ def build_preview(land):
     return "cities" if land["towns"] > land["cities"] else "towns"
 
 
-def explore_preview(land):
-    """'yes' if it surely gets an explorer, 'check' if it depends on neighbours."""
+def explore_preview(land, state=None, lid=None):
+    """'yes' if it gets an explorer: it touches the ocean, or it or a neighbouring land has a
+    town or city. 'no' when the board's map says no neighbour does; 'check' without a map."""
     if land["coastal"] or land["towns"] or land["cities"]:
         return "yes"
+    if state is not None and lid:
+        from .targets import adjacency
+        for b in state.get("boards", []):
+            if lid.startswith(b):
+                near = adjacency(b).get(lid[len(b):])
+                if near is None:
+                    break
+                for n in near:
+                    other = state["lands"].get(f"{b}{n}")
+                    if other and (other.get("towns") or other.get("cities")):
+                        return "yes"
+                return "no"
     return "check"
 
 
@@ -225,7 +255,8 @@ class Game:
             raise
         self.history.append(before)
         del self.history[:-HISTORY_LIMIT]
-        self._log(summary or kind, source)
+        if summary != QUIET:
+            self._log(summary or kind, source)
         self._check_end()
         return self.state
 
@@ -264,6 +295,46 @@ class Game:
         self.state = self.history.pop()
         return self.state
 
+    def _do_place_start(self, action):
+        """Put the printed starting pieces (and each spirit's starting presence) into the
+        tracked game, so the camera can be checked against them."""
+        from .guide import start_presence
+        s = self.state
+        for b in s["boards"]:
+            for n in range(1, rules.LANDS_PER_BOARD + 1):
+                land = s["lands"].get(f"{b}{n}")
+                if land is None:
+                    continue
+                want = rules.START_PIECES.get(b, {}).get(n, {})
+                for p in rules.LAND_PIECES:
+                    land[p] = want.get(p, 0)
+        for lid, n in start_presence(s).items():
+            if lid in s["lands"]:
+                s["lands"][lid]["presence"] += n
+        s["start_placed"] = True
+        return "Starting pieces placed"
+
+    def _do_gain_power(self, action):
+        """With power progression: a player takes the next card on their list."""
+        s = self.state
+        i = int(action.get("player", 0))
+        nxt = s.setdefault("progression_next", {})
+        nxt[str(i)] = max(0, nxt.get(str(i), 0) + int(action.get("delta", 1)))
+        return f"{s['players'][i]['name']} gained a power card"
+
+    def _do_back(self, action):
+        """Go back one item, or to the last item of the previous setup screen, keeping
+        everything already chosen."""
+        s = self.state
+        if s.get("sub", 0) > 0:
+            s["sub"] -= 1
+            return QUIET
+        if s["status"] != "setup" or s["step"] not in SETUP_STEPS or s["step"] == SETUP_STEPS[0]:
+            raise ActionError("already at the first setup step")
+        s["step"] = SETUP_STEPS[SETUP_STEPS.index(s["step"]) - 1]
+        s["sub"] = max(0, self._items() - 1)
+        return f"Back to {s['step']}"
+
     def _do_new_game(self, action):
         self.state = new_state()
         return "Started a new game"
@@ -282,6 +353,8 @@ class Game:
                          "spirit": p.get("spirit") or ""} for i, p in enumerate(players)]
         s["boards"] = list(boards)
         adv = action.get("adversary") or {}
+        # Learning games default to each spirit's recommended power progression.
+        s["progression"] = bool(action.get("progression", s.get("progression", True)))
         s["adversary"] = {"name": adv.get("name", "None"),
                           "level": int(adv.get("level", 0)),
                           "difficulty": int(adv.get("difficulty", 0))}
@@ -292,7 +365,8 @@ class Game:
         s["blight"] = {"pool": blight, "start": blight, "card_flipped": False}
         if action.get("deck_stages"):
             s["invaders"]["deck_stages"] = [int(x) for x in action["deck_stages"]]
-        terrains = action.get("terrains") or {}
+        # Printed board layouts first, then anything tagged by hand (saved or sent).
+        terrains = {**rules.default_terrains(boards), **(action.get("terrains") or {})}
         old = s["lands"]
         s["lands"] = {}
         for lid in rules.land_ids(boards):
@@ -305,11 +379,45 @@ class Game:
         names = ", ".join(f"{p['name']} ({p['spirit'] or 'spirit not chosen'})" for p in s["players"])
         return f"Set up {n} player(s): {names}; boards {', '.join(boards)}"
 
+    def _items(self):
+        from .guide import describe  # the screen's numbered items; imported here to avoid a cycle
+        d = describe(self.state)
+        return 1 if d.get("single") else len(d["do"])
+
     def _do_next(self, action):
         s = self.state
         if s["status"] in ("won", "lost"):
             raise ActionError("the game is over")
+        # Walk the screen's numbered items one at a time before moving to the next screen.
+        if not action.get("screen") and s.get("sub", 0) < self._items() - 1:
+            s["sub"] = s.get("sub", 0) + 1
+            return QUIET
+        s["sub"] = 0
         step = s["step"]
+        if step == "spirit.energy" and not s.get("energy_from_camera"):
+            for i, p in enumerate(s["players"]):
+                st = spirit_stats(s, i)
+                if st:
+                    self._spirit(i)["energy"] += st["energy_per_turn"]
+        if step == "spirit.growth":
+            # Next confirms the camera's suggestion when nothing was picked by hand.
+            for i, n in list(s.get("growth_suggest", {}).items()):
+                if not s.get("growth_choice", {}).get(i):
+                    self._do_growth_choice({"player": int(i), "option": n})
+            s["growth_suggest"] = {}
+            s["growth_done"] = dict(s.get("growth_choice", {}))
+            for i, n in s["growth_done"].items():
+                bonus = rules.GROWTH_ENERGY.get(s["players"][int(i)]["spirit"], {}).get(n, 0)
+                if bonus:
+                    self._spirit(int(i))["energy"] += bonus
+            s["growth_choice"] = {}
+        if step == "time_passes":
+            s["resolved"] = {}
+            s["played"] = []
+        if step == "time_passes" or step == "setup.first_explore":
+            # Entering Growth next: note the presence on the island, to tell the option later.
+            s["presence_at_growth"] = sum(l["presence"] for l in s["lands"].values())
+            s["presence_lands_at_growth"] = {lid: l["presence"] for lid, l in s["lands"].items()}
         if step == "setup.players" and not s["players"]:
             raise ActionError("choose players and spirits first")
         if step == "setup.first_explore":
@@ -347,6 +455,8 @@ class Game:
                 self._end("lost", "The invader deck ran out: time is up and the invaders hold the island.")
                 return "Invader deck empty at Explore"
             s["step"] = nxt
+            if nxt in ("spirit.energy", "spirit.powers"):
+                s["energy_at_step"] = s.get("spirits", {}).get("0", {}).get("energy", 0)
             return f"Next: {nxt}"
 
     def _advance_cards(self):
@@ -369,6 +479,118 @@ class Game:
         inv["drawn"].append(card)
         inv["slots"]["explore"] = card
         return f"Revealed invader card: {rules.card_label(card)}"
+
+    def _do_growth_choice(self, action):
+        """A spirit picks a growth option (by its number on the panel). Options that gain a
+        power card move the progression on, so the next card shown is right."""
+        from .guide import GROWTH_GAINS_CARD
+        s = self.state
+        i, n = int(action.get("player", 0)), int(action.get("option", 0))
+        spirit = s["players"][i]["spirit"]
+        choices = s.setdefault("growth_choice", {})
+        prev = choices.get(str(i))
+        if prev == n:
+            return QUIET
+        nxt = s.setdefault("progression_next", {})
+        gains = GROWTH_GAINS_CARD.get(spirit, set())
+        if prev in gains:
+            nxt[str(i)] = max(0, nxt.get(str(i), 0) - 1)
+        if n in gains:
+            nxt[str(i)] = nxt.get(str(i), 0) + 1
+        if n:
+            choices[str(i)] = n
+        else:
+            choices.pop(str(i), None)
+        s.setdefault("growth_suggest", {}).pop(str(i), None)
+        return f"{s['players'][i]['name']} chose growth option {n}" if n else "Growth choice cleared"
+
+    def _spirit(self, i):
+        sp = self.state.setdefault("spirits", {})
+        return sp.setdefault(str(i), {"taken": {"energy": 0, "cards": 0}, "energy": 0})
+
+    def _do_take_presence(self, action):
+        """A presence disc left a track (E/C after placing it); delta -1 undoes."""
+        i = int(action.get("player", 0))
+        track = action.get("track")
+        if track not in ("energy", "cards"):
+            raise ActionError("track must be energy or cards")
+        t = self._spirit(i)["taken"]
+        t[track] = max(0, t[track] + int(action.get("delta", 1)))
+        return f"Presence taken from the {track} track"
+
+    def _do_note(self, action):
+        """Remember a small fact for the step (e.g. which lands have built this round)."""
+        lst = self.state.setdefault(action["key"], [])
+        if action["add"] not in lst:
+            lst.append(action["add"])
+        return QUIET
+
+    def _do_mark_energy_start(self, action):
+        self.state["energy_at_step"] = int(action["value"])
+        return QUIET
+
+    def _do_panel_seen(self, action):
+        """The camera's reading of the spirit panel: discs gone from each track, and energy
+        tokens on it. From then on energy follows the tokens on the table."""
+        s = self.state
+        sp = self._spirit(int(action.get("player", 0)))
+        if "taken" in action:
+            sp["taken"] = {"energy": int(action["taken"]["energy"]), "cards": int(action["taken"]["cards"])}
+        if "tokens" in action:
+            sp["energy"] = int(action["tokens"])
+            s["energy_from_camera"] = True
+        return QUIET
+
+    def _do_energy(self, action):
+        """Adjust a spirit's energy (gain, pay, or a correction)."""
+        sp = self._spirit(int(action.get("player", 0)))
+        sp["energy"] = max(0, sp["energy"] + int(action.get("delta", 0)))
+        return f"Energy {'+' if int(action.get('delta', 0)) >= 0 else ''}{int(action.get('delta', 0))} (now {sp['energy']})"
+
+    def _do_card_resolved(self, action):
+        """A played power card was carried out (by a number key, or seen by the camera)."""
+        s = self.state
+        card = action.get("card")
+        s.setdefault("resolved", {})[card] = action.get("land")
+        fear = int(action.get("fear", 0))
+        if fear:
+            self._do_fear({"amount": fear})
+        return f"{card} resolved" + (f" on {action.get('land')}" if action.get("land") else "") + (f", {fear} fear" if fear else "")
+
+    def _do_growth_base(self, action):
+        """How many presence were on the island when Growth began (to count new discs)."""
+        self.state["presence_at_growth"] = int(action["value"])
+        if action.get("lands") is not None:
+            self.state["presence_lands_at_growth"] = dict(action["lands"])
+        return QUIET
+
+    def _do_growth_suggest(self, action):
+        """The camera's guess at a growth option; the player confirms it (Next, or 1/2/3)."""
+        s = self.state
+        i, n = str(int(action.get("player", 0))), int(action.get("option", 0))
+        if s.get("growth_choice", {}).get(i):
+            return QUIET
+        s.setdefault("growth_suggest", {})[i] = n
+        return QUIET
+
+    def _do_toggle_camera_view(self, action):
+        """Show or hide the camera's view of the invader board on the TV."""
+        s = self.state
+        s["hide_slot_camera"] = not s.get("hide_slot_camera", False)
+        return QUIET
+
+    def _do_turn_board(self, action):
+        """Turn the drawn board on the screens a quarter turn (to match where you sit)."""
+        s = self.state
+        s["board_rotation"] = (int(s.get("board_rotation", 0)) + int(action.get("by", 90))) % 360
+        return QUIET
+
+    def _do_reset_slots(self, action):
+        """Clear the Ravage, Build and Explore spaces (e.g. to redo the first explore)."""
+        if self.state["status"] != "setup":
+            raise ActionError("only during setup; use the slot corrections once playing")
+        self.state["invaders"]["slots"] = {"ravage": None, "build": None, "explore": None}
+        return "Invader card spaces cleared"
 
     def _do_set_slot(self, action):
         """Correction or camera input: set what card sits in a slot."""

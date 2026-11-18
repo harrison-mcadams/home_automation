@@ -6,7 +6,7 @@ wins (that is also how the real game works).
 """
 
 from . import game as g
-from . import rules
+from . import innate, rules
 
 
 def _lands_for(state, card):
@@ -31,9 +31,10 @@ def describe(state):
     step = state["step"]
     fn = _STEPS.get(step)
     out = {"step": step, "phase": g.PHASES[g.phase_of(step)], "title": step, "do": [],
-           "why": "", "tips": [], "helper": None}
+           "why": "", "tips": [], "helper": None, "pictures": []}
     if fn:
         out.update(fn(state))
+    out["sub"] = 0 if out.get("single") else max(0, min(state.get("sub", 0), len(out["do"]) - 1))
     if state["status"] in ("won", "lost"):
         r = state["result"]
         out.update({
@@ -69,6 +70,15 @@ def _welcome(s):
     }
 
 
+def _roster(s):
+    info = {x["name"]: x for x in rules.SPIRITS}
+    return [{"name": p["name"], "spirit": p["spirit"] or "not chosen yet",
+             "board": s["boards"][i] if i < len(s["boards"]) else "",
+             "complexity": info.get(p["spirit"], {}).get("complexity", ""),
+             "style": info.get(p["spirit"], {}).get("style", "")}
+            for i, p in enumerate(s["players"])]
+
+
 def _players(s):
     return {
         "title": "Choose players and spirits",
@@ -76,11 +86,16 @@ def _players(s):
             "Pick how many players (1 or 2 is a great start) and give each a spirit.",
             "For a first game choose Low complexity spirits. River Surges in Sunlight and Vital "
             "Strength of the Earth are friendly to learn.",
+            "Island boards are dealt at random, one per player. Tap Re-deal on the phone for a "
+            "different draw, or pick a board by hand.",
             "Skip the adversary for your first games; it is an optional extra challenge.",
         ],
         "why": "Each spirit plays very differently. The complexity is printed on the back of its panel.",
         "tips": [],
-        "helper": {"kind": "configure"},
+        "helper": {"kind": "configure", "roster": _roster(s)},
+        "pictures": [{"src": f"spirits/{rules.SPIRIT_ART[p['spirit']][0]}/panel_front.jpg", "wide": True,
+                      "group": i, "caption": f"{p['name']} · {p['spirit']}"}
+                     for i, p in enumerate(s["players"]) if p["spirit"] in rules.SPIRIT_ART],
     }
 
 
@@ -91,32 +106,152 @@ def _island(s):
         "do": [
             f"Take {n} island board{'s' if n > 1 else ''} ({', '.join(s['boards'])}), one per player.",
             "Use the side with the lettered lands (the standard, balanced side).",
-            "With two boards, put them edge to edge so the ocean edges face away from each other; "
-            "the rulebook shows the suggested layouts.",
+        ] + ([
+            "Two boards: turn the second board upside down and push its inland edge against the "
+            "first board's inland edge, so the oceans are on the outside (like the picture). The "
+            "edges are shaped to fit together.",
+        ] if n > 1 else []) + [
             "Each board has 8 numbered lands plus an ocean. Lands are Jungle, Mountain, Sands or Wetland.",
         ],
         "why": "Invader cards name a terrain, and every land of that terrain is affected.",
-        "tips": ["Optional but useful: open Island and tap each land's terrain once. The app remembers "
-                 "it for future games and can then tell you exactly which lands ravage, build and explore."],
+        "tips": [],
+        "pictures": ([{"src": f"layout/{s['boards'][0]}-{s['boards'][1]}.jpg", "wide": True,
+                       "caption": f"Boards {s['boards'][0]} and {s['boards'][1]} joined, oceans on the outside"}]
+                     if n == 2 else [_comp(f"board_{b}", f"Board {b}", True) for b in s["boards"]]),
     }
+
+
+def _highest_id(s, terrain, b):
+    """Land id (e.g. 'C8') of the highest-numbered land of a terrain on board b."""
+    if not b:
+        return None
+    terrains = rules.default_terrains([b])
+    for lid, info in s.get("lands", {}).items():  # a terrain set on the Island panel wins
+        if lid in terrains and info.get("terrain"):
+            terrains[lid] = info["terrain"]
+    lands = [lid for lid, t in terrains.items() if t == terrain]
+    return max(lands, key=lambda l: int(l[len(b):])) if lands else None
+
+
+def _highest(s, terrain, b):
+    """'land 8 on board C' for the highest-numbered land of a terrain on board b."""
+    lid = _highest_id(s, terrain, b)
+    return f"land {lid[len(b):]} on board {b}" if lid else None
+
+
+def _start_text(s, spirit, b):
+    places = rules.START_PRESENCE.get(spirit)
+    if not places or not all(_highest_id(s, t, b) for t, _ in places):
+        return None
+    parts = [f"{n} disc{'s' if n > 1 else ''} on {_highest(s, t, b)} (the highest-numbered "
+             f"{rules.TERRAINS[t]})" for t, n in places]
+    return "Starting presence: " + " and ".join(parts) + ". These come from your supply, not the tracks."
+
+
+_SEEDS = None
+
+
+def _land_point(lid, b):
+    """Where a land sits on its board picture, as fractions of the picture's width and height."""
+    global _SEEDS
+    if _SEEDS is None:
+        import json
+        import os
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "board_seeds.json")
+        try:
+            with open(path, encoding="utf-8") as f:
+                _SEEDS = json.load(f)["boards"]
+        except OSError:
+            _SEEDS = {}
+    pt = _SEEDS.get(b, {}).get(lid[len(b):])
+    return (pt[0] / rules.SCAN_SIZE[0], pt[1] / rules.SCAN_SIZE[1]) if pt else None
+
+
+DISC_COLOURS = ["#3fa8ff", "#ff5ab0", "#ffd23a", "#9b6bff"]
+
+
+def _track_discs(spirit):
+    """Every presence-track circle except the first of each row, as picture fractions."""
+    t = rules.PRESENCE_TRACKS.get(spirit)
+    if not t:
+        return []
+    w, h = rules.PANEL_SIZE
+    return [{"x": round((t["x0"] + i * t["dx"]) / w, 4), "y": round(y / h, 4)}
+            for y, n in ((t["energy_y"], t["energy"]), (t["cards_y"], t["cards"])) for i in range(1, n)]
+
+
+def spirit_pictures(state, start_item=3):
+    """Pictures for the spirit step, each tagged with the numbered item it illustrates:
+    0 the panel, 1 the starting cards, 2 presence on the tracks, 3+ starting presence."""
+    pics = []
+    for group, p in enumerate(state["players"]):
+        art = rules.SPIRIT_ART.get(p["spirit"])
+        if not art:
+            continue
+        folder, cards = art
+        colour = DISC_COLOURS[group % len(DISC_COLOURS)]
+        who = f"{p['name']}'s spirit panel" if len(state["players"]) > 1 else "Spirit panel"
+        pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True, "group": group, "items": [0],
+                     "caption": f"{who} (front) for {p['spirit']}"})
+        pics.append({"src": f"spirits/{folder}/card_back.jpg", "mark": True, "group": group, "items": [1],
+                     "caption": "Back of your 4 starting cards: your spirit's art"})
+        for c in cards:
+            pics.append({"src": f"spirits/{folder}/{rules.picture_slug(c)}.jpg", "group": group, "items": [1],
+                         "caption": f"{c} (starting power card)"})
+        pics.append({"src": f"spirits/{folder}/panel_front.jpg", "wide": True, "group": group, "items": [2],
+                     "discs": _track_discs(p["spirit"]), "disc_colour": colour, "disc_size": 0.052,
+                     "caption": f"{who}: a disc on every track circle but the first"})
+        b = state["boards"][group] if group < len(state["boards"]) else None
+        discs = []
+        for t, n in rules.START_PRESENCE.get(p["spirit"], []):
+            lid = _highest_id(state, t, b)
+            pt = _land_point(lid, b) if lid else None
+            if pt:
+                discs += [{"x": round(pt[0] + 0.03 * k, 4), "y": round(pt[1], 4), "land": True} for k in range(n)]
+        if discs:
+            pics.append({"src": f"components/board_{b}.jpg", "wide": True, "group": group,
+                         "items": [start_item + group], "discs": discs, "disc_colour": colour,
+                         "disc_size": 0.06, "caption": f"Board {b}: starting presence"})
+    return pics
 
 
 def _spirits(s):
+    starts, unknown, start_groups = [], False, []
+    for i, p in enumerate(s["players"]):
+        board = s["boards"][i] if i < len(s["boards"]) else None
+        t = _start_text(s, p["spirit"], board)
+        if t and len(s["players"]) > 1:
+            t = f"{p['name']}: " + t[0].lower() + t[1:]
+        if t:
+            starts.append(t)
+            start_groups.append(i)
+        else:
+            unknown = True
     return {
         "title": "Set up each spirit",
         "do": [
-            "Each player takes their spirit panel and its 4 unique power cards (the ones with the "
-            "spirit's name). Those are your starting hand.",
-            "Fill every empty circle on the panel's two presence tracks (energy and card plays) with "
-            "presence discs in your colour.",
-            "The back of the panel shows where your starting presence goes on the island (often "
-            "in a specific terrain). Place those discs now.",
-            "Take any special pieces your panel mentions.",
-        ],
-        "why": "Presence on the tracks is what you will move onto the island as you grow; uncovering "
-               "track spaces gives you more energy and more card plays.",
+            "Spirit panel: the big double-sided card (large picture). Lay it front side up.",
+            "Starting hand: the 4 power cards whose BACK shows your spirit's art (the highlighted "
+            "picture). Their fronts don't name the spirit. Every spirit starts with its own 4.",
+            "Presence: in the middle of the panel are two rows of circles. Put a disc of your colour "
+            "on every circle except the first one in each row.",
+        ] + starts + (["Starting presence: the SETUP box on the back of each panel says where "
+                       "the first discs go on the island. Place them now."] if unknown else []),
+        "why": "Each disc you later move from a track onto the island uncovers a bigger number, so "
+               "you gain more energy or more card plays as you spread.",
         "tips": ["Tap the Presence counts in the Island panel if you want the app to track them."],
+        "pictures": [dict(p, items=[3 + start_groups.index(p["group"])]) if p["items"][0] >= 3 else p
+                     for p in spirit_pictures(s) if p["items"][0] < 3 or p["group"] in start_groups],
     }
+
+
+def _comp(name, caption, wide=False, items=None):
+    pic = {"src": f"components/{name}.jpg", "caption": caption}
+    if items is not None:
+        pic["items"] = items
+    if wide:
+        pic["wide"] = True
+    return pic
 
 
 def _invader_board(s):
@@ -124,46 +259,142 @@ def _invader_board(s):
     return {
         "title": "Set up the invader board",
         "do": [
-            f"Fear pool: put {f['pool_size']} fear markers in the fear pool (4 per player).",
-            f"Fear deck: shuffle the fear cards and build a deck of {sum(f['deck'])}: "
-            f"{f['deck'][0]} cards, the Terror Level II divider, {f['deck'][1]} cards, the Terror "
-            f"Level III divider, then {f['deck'][2]} cards at the bottom.",
-            f"Blight: put the blight card healthy-side up with {s['blight']['pool']} blight on it "
-            "(2 per player plus 1).",
-            "Invader deck: sort invader cards by stage (the I, II, III on the back). Remove one "
-            "random card of each stage without looking. Shuffle each stage and stack them with "
-            "Stage III at the bottom, Stage II in the middle, Stage I on top: 3 + 4 + 5 = 12 cards.",
+            "Invader board: unfold it beside the island. It has spaces for the fear pool and fear "
+            "cards, the terror level, the blight card, and the invader cards (Ravage, Build, and the "
+            "invader deck on the Explore space).",
+            f"Fear pool: {f['pool_size']} fear markers (4 per player).",
+            f"Fear deck: shuffle the fear cards and deal {sum(f['deck'])} face down, building from the "
+            f"bottom up: {f['deck'][2]} cards, the Terror III divider, {f['deck'][1]} cards, the "
+            f"Terror II divider, {f['deck'][0]} cards on top. The rest go back in the box.",
+            f"Blight card: Healthy Island side up, with {s['blight']['pool']} blight on it.",
+            "Invader deck: sort the invader cards by the I, II, III on their backs and shuffle each "
+            "pile. Take 1 card from each pile without looking and put it back in the box. Stack them "
+            "face down: Stage III at the bottom, Stage II on it, Stage I on top (12 cards).",
         ],
         "why": "The fear deck is your victory clock; the invader deck is your defeat clock.",
         "tips": ["An adversary changes these numbers. If you use one, follow its setup and correct the "
                  "pools in Settings."] if s["adversary"]["name"] != "None" else [],
+        "pictures": [
+            {"anim": "photo", "src": "components/invader_board_art.jpg", "aspect": 0.907, "wide": True, "items": [0],
+             "caption": "Invader board: where everything goes",
+             "zones": [{"x": .41, "y": .015, "w": .2, "h": .085, "label": "Fear pool"},
+                       {"x": .38, "y": .25, "w": .24, "h": .28, "label": "Generated fear"},
+                       {"x": .017, "y": .019, "w": .205, "h": .315, "label": "Fear deck"},
+                       {"x": .017, "y": .35, "w": .205, "h": .305, "label": "Earned fear"},
+                       {"x": .017, "y": .674, "w": .205, "h": .305, "label": "Fear discard"},
+                       {"x": .783, "y": .019, "w": .2, "h": .31, "label": "Terror level"},
+                       {"x": .783, "y": .35, "w": .2, "h": .31, "label": "Blight card"},
+                       {"x": .843, "y": .716, "w": .14, "h": .232, "label": "Invader deck"},
+                       {"x": .671, "y": .716, "w": .136, "h": .232, "label": "Build"},
+                       {"x": .5, "y": .716, "w": .139, "h": .232, "label": "Ravage"},
+                       {"x": .257, "y": .716, "w": .21, "h": .15, "label": "Discard"}]},
+            {"anim": "setup", "step": 1, "fear": f["pool_size"], "deck": f["deck"], "blight": s["blight"]["pool"], "wide": True, "items": [1], "caption": "Fear markers into the fear pool"},
+            {"anim": "setup", "step": 2, "fear": f["pool_size"], "deck": f["deck"], "blight": s["blight"]["pool"], "wide": True, "items": [2], "caption": "The fear deck, built from the bottom up"},
+            {"anim": "setup", "step": 3, "fear": f["pool_size"], "deck": f["deck"], "blight": s["blight"]["pool"], "wide": True, "items": [3], "caption": "Blight card, Healthy Island side up"},
+            {"anim": "setup", "step": 4, "fear": f["pool_size"], "deck": f["deck"], "blight": s["blight"]["pool"], "wide": True, "items": [4], "caption": "Invader deck on the Explore space"},
+        ],
     }
+
+
+_PIECE_WORDS = {"dahan": ("Dahan", "Dahan"), "cities": ("city", "cities"), "towns": ("town", "towns"),
+                "blight": ("blight", "blight"), "explorers": ("explorer", "explorers"), "presence": ("presence", "presence")}
+
+
+def piece_text(counts):
+    return ", ".join(f"{n} {_PIECE_WORDS[p][n != 1]}" for p, n in counts.items() if n) or "nothing"
+
+
+def start_presence(s):
+    """{land id: discs} for every player's starting presence."""
+    out = {}
+    for i, p in enumerate(s["players"]):
+        b = s["boards"][i] if i < len(s["boards"]) else None
+        for t, n in rules.START_PRESENCE.get(p["spirit"], []):
+            lid = _highest_id(s, t, b)
+            if lid:
+                out[lid] = out.get(lid, 0) + n
+    return out
+
+
+def _expected_start(s):
+    out = {}
+    for b in s["boards"]:
+        for n in range(1, 9):
+            out[f"{b}{n}"] = dict(rules.START_PIECES.get(b, {}).get(n, {}))
+    for lid, n in start_presence(s).items():
+        if lid in out:
+            out[lid]["presence"] = out[lid].get("presence", 0) + n
+    return out
 
 
 def _pieces(s):
+    rows = []
+    for b in s["boards"]:
+        if b in rules.START_PIECES:
+            rows.append(f"Board {b}: " + "; ".join(f"land {n}: {piece_text(c)}" for n, c in
+                                                    sorted(rules.START_PIECES[b].items())) + ". The rest start empty.")
     return {
         "title": "Place the starting pieces",
+        "single": True,
         "do": [
-            "Each land shows small icons for its starting pieces: Dahan, towns, cities and sometimes "
-            "blight. Put those pieces on each land now.",
-            "Blight placed during setup comes from the box, not from the blight card.",
-            "Put the rest of the pieces in easy reach.",
+            "The small black icons by each land number are its starting pieces.",
+        ] + rows + [
+            "Dahan: round wooden pieces. Town: small white house. City: tall white tower. "
+            "Blight: grey-blue bumpy piece (from the box, not the blight card).",
+            "Ignore the paw and spiral icons; they're for an expansion.",
+            "The TV marks each land live as the camera spots its pieces. When every land shows a tick "
+            "you're done; tap Verify on the phone to record them.",
         ],
         "why": "This is the island as the invaders first find it.",
-        "tips": ["To have the app track the board, enter each land's pieces in the Island panel. "
-                 "It is optional: the step-by-step guide works without it."],
+        "tips": [],
+        "helper": {"kind": "verify", "placed": bool(s.get("start_placed")), "expected": _expected_start(s),
+                   # where each land sits on the single-board picture, for marking the check on it
+                   "points": ({f"{s['boards'][0]}{n}": _land_point(f"{s['boards'][0]}{n}", s["boards"][0])
+                               for n in range(1, 9)} if len(s["boards"]) == 1 else {})},
+        "pictures": ([{"src": f"layout/{s['boards'][0]}-{s['boards'][1]}.jpg", "wide": True,
+                       "caption": f"Boards {s['boards'][0]} and {s['boards'][1]}: starting-piece icons by each land number"}]
+                     if len(s["boards"]) == 2 else
+                     [_comp(f"board_{b}", f"Board {b}: starting-piece icons by each land number", True)
+                      for b in s["boards"]]),
     }
 
 
+def _progression_list(cards):
+    return ", ".join(f"{i}. {c}{' (Major)' if kind == 'Major' else ''}" for i, (c, kind) in enumerate(cards, 1))
+
+
 def _cards(s):
+    prog = s.get("progression") and any(p["spirit"] in rules.PROGRESSION for p in s["players"])
+    if prog:
+        do = [f"{p['name']}: pull these cards out of the Minor and Major decks (as on {p['spirit']}'s "
+              f"Power Progression card) and stack them face down in this order: "
+              f"{_progression_list(rules.PROGRESSION[p['spirit']])}."
+              for p in s["players"] if p["spirit"] in rules.PROGRESSION]
+        do += ["Whenever growth says gain a power card, take the next card from your stack instead of "
+               "drawing. After taking a Major, forget (remove) one power card of your choice.",
+               "Shuffle the rest of the Minor and Major decks and set them nearby; some powers draw from them."]
+        pics = [{"src": f"spirits/{rules.SPIRIT_ART[p['spirit']][0]}/progression.jpg",
+                 "caption": f"{p['name']}'s power progression"}
+                for p in s["players"] if p["spirit"] in rules.PROGRESSION]
+        return {"title": "Power cards: your progression", "single": True, "do": do,
+                "why": "A fixed, good order of new powers, so a first game is about learning, not choosing.",
+                "tips": ["Turn the progression off on the Players step to draw powers normally."],
+                "pictures": pics}
     return {
         "title": "Power card decks",
         "do": [
-            "Shuffle the Minor Power deck and the Major Power deck separately and set them nearby.",
-            "Leave room for each player's discard pile next to their panel.",
+            "Shuffle the Minor Power deck (gold-brown backs) and the Major Power deck (blue lightning "
+            "backs) separately and set them nearby.",
+            "Leave room for your discard pile next to your panel.",
         ],
         "why": "As you grow you draw new powers from these decks.",
         "tips": [],
+        "pictures": [
+            _comp("minor_back", "Minor Power (back)"),
+            _comp("minor_card", "Minor Power (front)"),
+            _comp("major_back", "Major Power (back)"),
+            _comp("major_card", "Major Power (front)"),
+        ],
     }
 
 
@@ -178,8 +409,10 @@ def _first_explore(s):
         hit, unknown = _lands_for(s, slot)
         do = [f"Revealed: {rules.card_label(slot)}.",
               "Add 1 explorer to each land of that terrain that is coastal, has a town or city, "
-              "or is next to a land with a town or city."] + _unknown_note(unknown)
-        helper["rows"] = [{"land": lid, "explore": g.explore_preview(s["lands"][lid])} for lid in hit]
+              "or is next to a land with a town or city."] + _unknown_note(unknown) + [
+              f"Then slide the {rules.card_label(slot)} card one space left, from Explore to Build. "
+              "Those lands will build in round 1. Tap Next and the app moves it too."]
+        helper["rows"] = [{"land": lid, "explore": g.explore_preview(s["lands"][lid], s, lid)} for lid in hit]
     return {
         "title": "First explore",
         "do": do,
@@ -192,24 +425,143 @@ def _first_explore(s):
 
 # --- round --------------------------------------------------------------------
 
+def _next_powers(s):
+    if not s.get("progression"):
+        return []
+    out = []
+    for i, p in enumerate(s["players"]):
+        lst = rules.PROGRESSION.get(p["spirit"])
+        k = s.get("progression_next", {}).get(str(i), 0)
+        if lst and k < len(lst):
+            c, kind = lst[k]
+            out.append(f"{p['name']}'s next power card, if you gain one: {c}"
+                       + (" (a Major: then forget a power)." if kind == "Major" else "."))
+    return out
+
+
+# Each spirit's growth options, with a picture cut from the panel (growth_<n>.jpg).
+GROWTH = {
+    "River Surges in Sunlight": [
+        ("Reclaim + power card + energy",
+         "Take every power card from your discard pile back into your hand, gain 1 new power card{nextcard}, "
+         "and gain 1 energy now. Pick this when your hand is running low."),
+        ("Two presence",
+         "Add 2 presence to the island: take discs from either track (leftmost first) and put each in a land "
+         "within 1 of your presence. Spreads you fast and uncovers bigger numbers on your tracks."),
+        ("Power card + presence at range 2",
+         "Gain 1 new power card{nextcard}, and add 1 presence to a land within 2 of your presence. "
+         "A balance of a new power and reach."),
+    ],
+}
+
+
+GROWTH_GAINS_CARD = {"River Surges in Sunlight": {1, 3}}
+# New presence discs -> growth option, where that tells them apart.
+GROWTH_BY_PRESENCE = {"River Surges in Sunlight": {0: 1, 1: 3, 2: 2}}
+
+
 def _growth(s):
-    return {
-        "title": "Growth",
-        "do": [
+    g = _growth_base(s)
+    before = s.get("presence_lands_at_growth") or {}
+    marks = {}
+    for lid, land in s["lands"].items():
+        n = land.get("presence", 0) - before.get(lid, land.get("presence", 0))
+        if n > 0:
+            marks[lid] = {"text": f"+{n} presence (new)", "colour": "#5fd0e8"}
+    return {**g, "marks": marks} if marks else g
+
+
+def _growth_base(s):
+    pics, items = [], []
+    chosen = s.get("growth_choice", {}).get("0")
+    suggested = s.get("growth_suggest", {}).get("0")
+    single = len(s["players"]) == 1
+    p = s["players"][0] if s["players"] else None
+    if single and p and p["spirit"] in GROWTH:
+        folder = rules.SPIRIT_ART[p["spirit"]][0]
+        nxt, card = "", None
+        if s.get("progression") and p["spirit"] in rules.PROGRESSION:
+            k = s.get("progression_next", {}).get("0", 0)
+            if chosen in GROWTH_GAINS_CARD.get(p["spirit"], set()):
+                k -= 1  # the choice already counted its card
+            lst = rules.PROGRESSION[p["spirit"]]
+            if 0 <= k < len(lst):
+                card = lst[k]
+                nxt = f" (the next on your progression: {card[0]}" + (", a Major: then forget a power)" if card[1] == "Major" else ")")
+        items = ["Pick ONE of the three growth options at the top of your panel and do everything in it. "
+                 "Here they are, one at a time:"]
+        pics.append({"src": f"spirits/{folder}/growth.jpg", "wide": True, "items": [0],
+                     "caption": "Growth (pick one): three options, separated by the lines"})
+        for n, (title, text) in enumerate(GROWTH[p["spirit"]], 1):
+            items.append(f"Option {n}, {title}: " + text.format(nextcard=nxt))
+            pics.append({"src": f"spirits/{folder}/growth_{n}.jpg", "wide": True, "items": [n],
+                         "caption": f"Option {n}: {title}"})
+            if card and n in GROWTH_GAINS_CARD.get(p["spirit"], set()):
+                pics.append({"src": f"powers/{rules.picture_slug(card[0])}.jpg", "items": [n],
+                             "caption": f"You'd take: {card[0]}"})
+        st = g.spirit_stats(s, 0)
+        track_q = ([f"Which track did your new disc{'s' if st['unassigned'] > 1 else ''} come from? "
+                    "Press E (energy, top) or C (card plays, bottom)" + (f", {st['unassigned']} to go." if st['unassigned'] > 1 else ".")]
+                   if st and st["unassigned"] else [])
+        if chosen or suggested:
+            # Picked with a key, or suggested by the camera: show just that option, big.
+            # A suggestion is only taken when you press → (or a number key).
+            n = chosen or suggested
+            title, text = GROWTH[p["spirit"]][n - 1]
+            return {
+                "title": f"Growth: option {n} ✓" if chosen else f"Growth: option {n}?",
+                "single": True,
+                "do": ([f"Chosen: option {n}, {title}. " + text.format(nextcard=nxt),
+                        "Press 1, 2 or 3 to change it, or → for Gain energy."] if chosen else
+                       [f"The camera thinks you took option {n}, {title}: " + text.format(nextcard=nxt),
+                        f"Right? Press → to confirm it and go on to Gain energy. Otherwise press 1, 2 or 3."]) + track_q,
+                "pictures": [dict(pp, items=[0]) for pp in pics if pp.get("items") == [n]],
+                "why": "Worked out from your new presence discs." if not chosen else "",
+                "helper": {"kind": "growth", "options": len(GROWTH[p["spirit"]]), "chosen": chosen},
+                "tips": [],
+            }
+        items.append((f"You chose option {chosen}. " if chosen else
+                      "Choose with the number keys 1, 2, 3 on the remote/keyboard (or on the phone). ")
+                     + "Do it at the table: the camera adds new presence discs by itself. Then Next.")
+    else:
+        items = [
             "Each spirit picks ONE growth option on the top of their panel and does everything in it.",
             "Common pieces of growth: reclaim (take your discarded power cards back into hand), "
-            "gain a power card (draw 4 minor or major, keep 1), add presence (move a disc from a "
-            "track onto a land within the range shown), gain energy.",
+            + ("gain a power card (take the next card from your progression stack), " if s.get("progression")
+               else "gain a power card (draw 4 minor or major, keep 1), ")
+            + "add presence (move a disc from a track onto a land within the range shown), gain energy.",
+        ] + _next_powers(s) + [
             "Moving presence off a track uncovers a bigger number or a new symbol. That is how a "
             "spirit gets stronger.",
-        ],
+        ]
+    return {
+        "title": "Growth",
+        "do": items,
+        "pictures": pics,
         "why": "Everyone does this at the same time; it does not matter who goes first.",
+        "helper": {"kind": "growth", "options": len(GROWTH.get(p["spirit"], [])) if p else 0, "chosen": chosen},
         "tips": ["Running low on cards in hand? A reclaim option is usually the right choice.",
                  "Taking a Major power means forgetting (permanently removing) one card you own."],
     }
 
 
 def _energy(s):
+    st = g.spirit_stats(s, 0) if len(s["players"]) == 1 else None
+    if st:
+        ask = (["First: which track did your new disc come from? Press E (energy, top) or C (card "
+                "plays, bottom). The numbers below update."] if st["unassigned"] else [])
+        return {
+            "title": "Gain energy",
+            "single": True,
+            "do": ask + [f"Take {st['energy_per_turn']} energy: the highest number uncovered on your energy track. "
+                   + (f"Put the tokens on your panel's picture ({st['energy']} → {st['energy'] + st['energy_per_turn']}): "
+                      "the game moves on when the camera sees them." if s.get("energy_from_camera") else
+                      f"You'll have {st['energy'] + st['energy_per_turn']} (the app adds it when you press →)."),
+                   f"This round you can play up to {st['card_plays']} power card"
+                   f"{'s' if st['card_plays'] != 1 else ''} (your card plays track)."],
+            "why": "Energy pays for power cards.",
+            "tips": [],
+        }
     return {
         "title": "Gain energy",
         "do": [
@@ -221,12 +573,17 @@ def _energy(s):
     }
 
 
-def _powers(s):
+def _powers_base(s):
+    st = g.spirit_stats(s, 0) if len(s["players"]) == 1 else None
+    extra = [f"You have {st['energy']} energy and can play up to {st['card_plays']} card"
+             f"{'s' if st['card_plays'] != 1 else ''}. When you press →, the cost of the cards the camera "
+             "sees played is paid from your energy."] if st else []
     return {
         "title": "Choose and pay for powers",
-        "do": [
+        "do": extra + [
             "Each spirit plays power cards from hand face up in front of them, up to the number "
-            "visible on their card-plays track.",
+            "visible on their card-plays track. Lay them in the camera's view, off the island: "
+            "the screen lists them with their total cost.",
             "Pay each card's energy cost (top-left corner).",
             "Count the elements on the cards you played (plus any from your tracks). If they meet "
             "a threshold on one of your innate powers, that innate power will happen this round.",
@@ -237,7 +594,12 @@ def _powers(s):
     }
 
 
-def _fast(s):
+
+def _powers(s):
+    g = _powers_base(s)
+    return {**g, "do": list(g["do"]) + innate.lines(s, [c["name"] for c in s.get("played", [])])}
+
+def _fast_base(s):
     return {
         "title": "Fast powers",
         "do": [
@@ -251,6 +613,11 @@ def _fast(s):
         "tips": _invader_threat_tips(s),
     }
 
+
+
+def _fast(s):
+    g = _fast_base(s)
+    return {**g, "do": list(g["do"]) + innate.lines(s, [c["name"] for c in s.get("played", [])])}
 
 def _invader_threat_tips(s):
     slots = s["invaders"]["slots"]
@@ -336,16 +703,34 @@ def _build(s):
     hit, unknown = _lands_for(s, card)
     rows = [{"land": lid, "adds": g.build_preview(s["lands"][lid])}
             for lid in hit if g.build_preview(s["lands"][lid])]
+    # Land by land: what to add, and why (colour-coded to match the drawn board).
+    items, marks = [f"Build card: {rules.card_label(card)}. In each {rules.card_label(card)} land:"], {}
+    colours = {"towns": "#f2c14e", "cities": "#ff8f6b", None: "#8a948c"}
+    for lid in hit:
+        land = s["lands"][lid]
+        adds = g.build_preview(land)
+        t, c, e = land.get("towns", 0), land.get("cities", 0), land.get("explorers", 0)
+        have = ", ".join(x for x in (f"{e} explorer{'s' if e != 1 else ''}" if e else "",
+                                     f"{t} town{'s' if t != 1 else ''}" if t else "",
+                                     f"{c} cit{'ies' if c != 1 else 'y'}" if c else "") if x) or "no invaders"
+        if adds == "cities":
+            what, why = "add a city", f"has {have}: more towns than cities"
+        elif adds == "towns":
+            what, why = "add a town", f"has {have}: not more towns than cities"
+        else:
+            what, why = "nothing", "no invaders, so it doesn't build"
+        items.append({"text": f"Land {lid[len(lid.rstrip('0123456789')):]}: {what} ({why})", "colour": colours[adds]})
+        marks[lid] = {"text": what, "colour": colours[adds]}
+    items.append("Place them: the game moves on when the camera sees them (or press →).")
     return {
-        "title": "Build",
-        "do": [
-            f"Build card: {rules.card_label(card)}. In every land of that terrain that has any invaders:",
-            "If the land has more towns than cities, add a city. Otherwise add a town.",
-            "Lands with no invaders do not build.",
-        ] + _unknown_note(unknown),
-        "why": "Towns and cities hit hard when they ravage later, so builds matter.",
+        "title": f"Build: {rules.card_label(card)}",
+        "single": True,
+        "do": items + _unknown_note(unknown),
+        "why": "Rule: a land with invaders adds a city if it has more towns than cities, otherwise a town. "
+               "Dahan don't stop a build.",
         "tips": [],
         "helper": {"kind": "build", "rows": rows},
+        "marks": marks,
     }
 
 
@@ -366,7 +751,7 @@ def _explore(s):
             "helper": helper,
         }
     hit, unknown = _lands_for(s, slot)
-    rows = [{"land": lid, "explore": g.explore_preview(s["lands"][lid])} for lid in hit]
+    rows = [{"land": lid, "explore": g.explore_preview(s["lands"][lid], s, lid)} for lid in hit]
     helper.update({"rows": rows})
     return {
         "title": "Explore",
@@ -382,12 +767,16 @@ def _explore(s):
 
 
 def _advance(s):
+    slots = s["invaders"]["slots"]
     return {
         "title": "Advance invader cards",
+        "pictures": [{"anim": "advance", "wide": True, "items": [0],
+                      "slots": {k: slots.get(k) for k in ("ravage", "build", "explore")},
+                      "caption": "Each card slides one space left"}],
         "do": [
             "Slide the invader cards one space left: Ravage card to the discard pile, Build card to "
             "Ravage, Explore card to Build.",
-            "Tap Next and the app moves them too.",
+            "The camera moves on by itself once it sees the cards shifted (or tap Next).",
         ],
         "why": "So each card explores, then builds the next round, then ravages the round after: "
                "you always see two rounds of trouble coming.",
@@ -395,7 +784,7 @@ def _advance(s):
     }
 
 
-def _slow(s):
+def _slow_base(s):
     return {
         "title": "Slow powers",
         "do": ["Resolve every slow power card and slow innate power, in any order.",
@@ -405,12 +794,30 @@ def _slow(s):
     }
 
 
+
+def _slow(s):
+    g = _slow_base(s)
+    return {**g, "do": list(g["do"]) + innate.lines(s, [c["name"] for c in s.get("played", [])])}
+
+DAMAGE_CARDS = {"Flash Floods", "Pull Beneath the Hungry Earth", "Accelerated Rot", "Tsunami", "Massive Flooding"}
+
+
+def _damage_this_round(s):
+    """Did anything take damage this round: a ravage that happened, or a damaging power?"""
+    if DAMAGE_CARDS & set(s.get("resolved", {})):
+        return True
+    return any(e.get("round") == s["round"] and e.get("step") == "invader.ravage" and not e["text"].startswith("Next")
+               for e in s.get("log", []))
+
+
 def _time_passes(s):
     return {
         "title": "Time passes",
         "do": [
             "Every spirit discards the power cards played this round to their own discard pile.",
-            "All damage heals: damaged invaders and Dahan are back to full health.",
+            ("Any damage heals: invaders and Dahan that were hurt but not destroyed are back to full "
+             "health." if _damage_this_round(s) else
+             "Any damage would heal now, but nothing took damage this round, so there's nothing to do."),
             "Elements and any 'this round' effects end. Energy stays.",
         ],
         "why": "Each round starts fresh except for what is on the island and in your energy.",

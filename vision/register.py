@@ -33,6 +33,9 @@ def _gray_scaled(image: np.ndarray, max_side: int) -> tuple[np.ndarray, float]:
     return gray, scale
 
 
+_REF_CACHE: dict = {}
+
+
 def register(
     reference: np.ndarray,
     image: np.ndarray,
@@ -52,7 +55,13 @@ def register(
         mask = cv2.resize(reference_mask, (ref_gray.shape[1], ref_gray.shape[0]), interpolation=cv2.INTER_NEAREST)
 
     sift = cv2.SIFT_create(nfeatures=4000)
-    kp_ref, des_ref = sift.detectAndCompute(ref_gray, mask)
+    # The reference is the same photo call after call: find its features once.
+    key = (id(reference), reference.shape, max_side, None if reference_mask is None else id(reference_mask))
+    if key not in _REF_CACHE:
+        if len(_REF_CACHE) > 16:
+            _REF_CACHE.clear()
+        _REF_CACHE[key] = sift.detectAndCompute(ref_gray, mask)
+    kp_ref, des_ref = _REF_CACHE[key]
     kp_img, des_img = sift.detectAndCompute(img_gray, None)
     if des_ref is None or des_img is None or len(kp_ref) < 8 or len(kp_img) < 8:
         return None

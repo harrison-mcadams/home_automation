@@ -28,7 +28,7 @@ const BoardMap = (() => {
       case "dahan": return svg("circle", { r: s * .48, class: "dahan" });
       case "blight": return svg("path", { d: `M0 ${-s * .6} L${s * .2} ${-s * .2} L${s * .6} ${-s * .25} L${s * .3} ${s * .1} L${s * .5} ${s * .55} L0 ${s * .3} L${-s * .5} ${s * .55} L${-s * .3} ${s * .1} L${-s * .6} ${-s * .25} L${-s * .2} ${-s * .2} Z`, class: "blight" });
       case "presence": return svg("circle", { r: s * .42, class: "presence", fill: PRESENCE[p.colour] || "#b993f5" });
-      case "energy": return null;
+      case "energy": case "faint": return null;
       default: return svg("circle", { r: s * .3, class: "unknown" });
     }
   }
@@ -43,16 +43,33 @@ const BoardMap = (() => {
       </pattern>
       <radialGradient id="bm-sea" cx="50%" cy="50%" r="75%"><stop offset="0" stop-color="#1f5d86"/><stop offset="1" stop-color="#0b2236"/></radialGradient>
       <filter id="bm-shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity=".55"/></filter>`;
-    const sea = svg("g"), lands = svg("g"), labels = svg("g", { class: "labels" }), pieces = svg("g");
-    root.append(defs, sea, lands, labels, pieces);
+    const sea = svg("g"), lands = svg("g"), labels = svg("g", { class: "labels" }), pieces = svg("g"), tags = svg("g");
+    // Everything sits in one group, so the board can be turned to face the player.
+    const world = svg("g", {}, sea, lands, labels, pieces, tags);
+    root.append(defs, world);
     container.replaceChildren(root);
-    return { root, sea, lands, labels, pieces, map: null, els: [] };
+    return { root, world, sea, lands, labels, pieces, tags, map: null, els: [], rot: 0 };
+  }
+
+  // Turn the drawn board by 0, 90, 180 or 270 degrees (clockwise); pieces stay upright.
+  function setRotation(v, deg) {
+    v.rot = ((deg % 360) + 360) % 360;
+    if (v.map) frame(v);
+    for (const o of v.els) o.g.querySelector(".upright").setAttribute("transform", `rotate(${-v.rot})`);
+  }
+
+  function frame(v) {
+    const pad = 40, W = v.map.width + 2 * pad, H = v.map.height + 2 * pad;
+    const cx = v.map.width / 2, cy = v.map.height / 2, side = v.rot % 180 !== 0;
+    const w = side ? H : W, h = side ? W : H;
+    v.root.setAttribute("viewBox", `${cx - w / 2} ${cy - h / 2} ${w} ${h}`);
+    v.world.setAttribute("transform", `rotate(${v.rot} ${cx} ${cy})`);
   }
 
   function setMap(v, map) {
     v.map = map;
     const pad = 40;
-    v.root.setAttribute("viewBox", `${-pad} ${-pad} ${map.width + 2 * pad} ${map.height + 2 * pad}`);
+    frame(v);
     v.sea.replaceChildren(
       svg("rect", { x: -pad, y: -pad, width: map.width + 2 * pad, height: map.height + 2 * pad, fill: "url(#bm-sea)" }),
       svg("rect", { x: -pad, y: -pad, width: map.width + 2 * pad, height: map.height + 2 * pad, fill: "url(#bm-waves)" }));
@@ -77,13 +94,14 @@ const BoardMap = (() => {
       const i = info[name] || {};
       poly.style.fill = TERRAIN[i.terrain] || "#6d6a5c";
       poly.classList.toggle("hit", !!i.hit);
+      poly.style.stroke = i.hit && i.colour ? i.colour : "";
     }
   }
 
   function setPieces(v, list) {
     const old = v.els.slice(), next = [];
     for (const p of list) {
-      if (p.type === "energy") continue;
+      if (p.type === "energy" || p.type === "faint") continue;
       const key = p.type + "|" + (p.colour || "");
       // The nearest unclaimed piece of the same kind is the "same" piece, if it's close.
       let best = null, bd = 140;
@@ -97,7 +115,7 @@ const BoardMap = (() => {
         best.g.style.transform = `translate(${p.x}px, ${p.y}px)`;
         next.push(best);
       } else {
-        const inner = svg("g", { class: "bob" }, shape(p));
+        const inner = svg("g", { class: "bob" }, svg("g", { class: "upright", transform: `rotate(${-v.rot})` }, shape(p)));
         const g = svg("g", { class: "piece enter " + p.type, filter: "url(#bm-shadow)" }, inner);
         inner.style.animationDelay = (-Math.random() * 4).toFixed(2) + "s";
         g.style.transform = `translate(${p.x}px, ${p.y}px)`;
@@ -115,5 +133,21 @@ const BoardMap = (() => {
     v.els = next;
   }
 
-  return { create, setMap, setLands, setPieces };
+  // Short notes on lands (what a power card would do there), kept upright.
+  function setTags(v, tags) {
+    v.tags.replaceChildren();
+    for (const l of (v.map && v.map.lands) || []) {
+      let t = tags[l.name];
+      if (!t) continue;
+      const colour = t.colour || "#ffd968";
+      t = t.text || t;
+      const w = Math.max(120, t.length * 17);
+      const inner = svg("g", { transform: `rotate(${-v.rot})` },
+        svg("rect", { x: -w / 2, y: -48, width: w, height: 40, rx: 12, class: "tagbg", style: `stroke:${colour}` }),
+        svg("text", { x: 0, y: -21, class: "tagtx" }, document.createTextNode(t)));
+      v.tags.append(svg("g", { transform: `translate(${l.centre[0]} ${l.centre[1]})` }, inner));
+    }
+  }
+
+  return { create, setMap, setLands, setPieces, setRotation, setTags };
 })();

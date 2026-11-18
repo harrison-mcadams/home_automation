@@ -152,13 +152,20 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     covered = valid_mask(image.shape, reg, reference.shape)
     # Stay clear of the picture's edges, in both photos: where the board runs off the
     # frame, a few pixels of misalignment look like change.
-    edge = max(8, int(0.006 * max(reference.shape[:2])))
+    # The mask work below (big closes and erosions) runs on a quarter-size copy: at full
+    # camera resolution it took seconds per photo, and masks don't need the detail.
+    H_full, W_full = reference.shape[:2]
+    q = 4
+    small = (max(1, W_full // q), max(1, H_full // q))
+    shrink = lambda m: cv2.resize(m, small, interpolation=cv2.INTER_NEAREST)  # noqa: E731
+    covered = shrink(covered)
+    edge = max(2, int(0.006 * max(reference.shape[:2]) / q))
     covered = cv2.erode(covered, np.ones((2 * edge + 1, 2 * edge + 1), np.uint8))
     covered[:edge, :] = 0
     covered[-edge:, :] = 0
     covered[:, :edge] = 0
     covered[:, -edge:] = 0
-    region = cv2.bitwise_and(board_mask, covered)
+    region = cv2.bitwise_and(shrink(board_mask), covered)
     # Only the board itself counts, never the table around it: the board slides, so the
     # wood next to it changes. Outline the board in *this* photo too and keep the overlap,
     # pulled in a little from the rim.
@@ -167,8 +174,14 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
     # not take pieces with them.
     current = find_board(image)
     if current is not None:
-        now_mask = cv2.warpPerspective(current.mask, reg.homography, (reference.shape[1], reference.shape[0]),
-                                       flags=cv2.INTER_NEAREST)
+        # With other boards in view (invader board, spirit panel) the outline finder can
+        # take in far more than the island: then its outline is no use for trimming.
+        test = cv2.warpPerspective(current.mask, reg.homography, (W_full, H_full), flags=cv2.INTER_NEAREST)
+        ratio = float((test > 0).sum()) / max(1, int((board_mask > 0).sum()))
+        if not 0.7 < ratio < 1.4:
+            current = None
+    if current is not None:
+        now_mask = shrink(cv2.warpPerspective(current.mask, reg.homography, (W_full, H_full), flags=cv2.INTER_NEAREST))
         size = np.sqrt(max(1, int((now_mask > 0).sum())))
         close = int(0.08 * size) | 1
         now_mask = cv2.morphologyEx(now_mask, cv2.MORPH_CLOSE,
@@ -178,15 +191,18 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         cv2.drawContours(now_mask, contours, -1, 255, thickness=cv2.FILLED)
         grow = int(0.02 * size) | 1
         now_mask = cv2.dilate(now_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (grow, grow)))
-        # Trust it only near the board's rim, where table can creep in when the board
-        # slides; the interior of the board always stays in.
         band = int(0.04 * size) | 1
         interior = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * band + 1, 2 * band + 1)))
         region = cv2.bitwise_or(interior, cv2.bitwise_and(region, now_mask))
-    rim = max(5, int(0.012 * np.sqrt(max(1, int((region > 0).sum())))))
+    rim = max(2, int(0.012 * np.sqrt(max(1, int((region > 0).sum())))))
     region = cv2.erode(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * rim + 1, 2 * rim + 1)))
+    region = cv2.resize(region, (W_full, H_full), interpolation=cv2.INTER_NEAREST)
     board_area = max(1, int((region > 0).sum()))
     kwargs.setdefault("min_split_thickness", 1.2 * min_thickness * np.sqrt(board_area))
+    if lands and lands[0] is not None:
+        kwargs.setdefault("zones", lands[0])
+    kwargs.setdefault("white_boost", 30.0)
+    kwargs.setdefault("edge_boost", 30.0)
     blobs, change_mask, labels, scale = find_changes(reference, aligned, region, return_labels=True, **kwargs)
     work = cv2.resize(aligned, (labels.shape[1], labels.shape[0]), interpolation=cv2.INTER_AREA)
     full_board_area = float((board_mask > 0).sum()) * scale * scale  # in working pixels
@@ -211,6 +227,41 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
         feats = measure(work, piece_mask, full_board_area)
         entry.update(classify(feats))
         entry["features"] = describe(feats)
+        # A painted presence disc touching another piece: if a good part of a non-presence
+        # blob is vividly coloured (no other piece is), split that part off as presence.
+        if entry["type"] != "presence":
+            hsv = cv2.cvtColor(work, cv2.COLOR_BGR2HSV)
+            vivid = piece_mask & (hsv[..., 1] > 120) & (hsv[..., 2] > 70)
+            vivid = cv2.morphologyEx(vivid.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0
+            disc_px = (0.045 * np.sqrt(full_board_area)) ** 2  # a disc is ~0.065 across
+            if vivid.sum() >= 0.4 * disc_px and vivid.sum() <= 0.85 * piece_mask.sum():
+                vf = measure(work, vivid, full_board_area)
+                vc = classify(vf)
+                if vc["type"] == "presence":
+                    ys, xs = np.nonzero(vivid)
+                    disc = dict(entry)
+                    disc.update(vc)
+                    disc["features"] = describe(vf)
+                    disc["why"] = vc["why"] + "; split off a piece it touches"
+                    vx, vy = xs.mean() / scale, ys.mean() / scale
+                    vcx, vcy = cv2.perspectiveTransform(np.float32([[[vx, vy]]]), H_inv).reshape(2)
+                    disc["centroid"] = [round(float(vcx)), round(float(vcy))]
+                    x0, y0 = xs.min() / scale, ys.min() / scale
+                    disc["reference_bbox"] = [int(x0), int(y0), int((xs.max() - xs.min()) / scale), int((ys.max() - ys.min()) / scale)]
+                    if land_labels is not None:
+                        pts = np.stack([(xs / scale).astype(int).clip(0, land_labels.shape[1] - 1),
+                                        (ys / scale).astype(int).clip(0, land_labels.shape[0] - 1)], axis=1)
+                        disc["land"] = piece_land(land_labels, land_names, pts)
+                    pieces.append(disc)
+                    rest = piece_mask & ~cv2.dilate(vivid.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
+                    if rest.sum() >= 0.3 * disc_px:
+                        piece_mask = rest
+                        feats = measure(work, piece_mask, full_board_area)
+                        entry.update(classify(feats))
+                        entry["features"] = describe(feats)
+                        entry["split_rest"] = True  # what's left once a disc was cut off: a real piece
+                    else:
+                        continue
         if land_labels is not None:
             ys, xs = np.nonzero(piece_mask)
             pts = np.stack([(xs / scale).astype(int).clip(0, land_labels.shape[1] - 1),
@@ -229,10 +280,61 @@ def detect_pieces(reference: np.ndarray, board_mask: np.ndarray, image: np.ndarr
             closed = cv2.morphologyEx(piece_mask.astype(np.uint8), cv2.MORPH_CLOSE,
                                       cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
             closed_thickness = cv2.distanceTransform(closed, cv2.DIST_L2, 5).max() / scale
-            if closed_thickness < min_thickness * np.sqrt(board_area):
-                continue  # a thin line of change along a printed edge, not a piece
+            # A pale plastic town or explorer seen from above can be thin too (a roof edge, a
+            # hollow middle the land shows through), but it is compact, not a long line.
+            compact_white = (entry["type"] in ("town", "explorer", "city") and feats.size >= 0.022
+                             and (feats.value >= 180 or feats.white_frac >= 0.15)
+                             and closed_thickness >= 0.5 * min_thickness * np.sqrt(board_area)
+                             and max(w, h) <= 0.12 * np.sqrt(board_area))
+            if closed_thickness < min_thickness * np.sqrt(board_area) and not compact_white:
+                # Usually a thin line along a printed edge. A small, compact, pale scrap may be
+                # an explorer in shade: kept as "faint", which only ever stands in for a
+                # piece the tracker already expects in that land.
+                if (max(w, h) <= 0.08 * np.sqrt(board_area) and feats.saturation < 90
+                        and feats.size >= 0.02 and feats.elongation <= 3):
+                    entry.update({"type": "faint", "why": "small pale scrap (an explorer in shade?)"})
+                    pieces.append(entry)
+                continue
+            if compact_white and closed_thickness < min_thickness * np.sqrt(board_area):
+                # Only part of a white building shows against a pale land (a roof edge);
+                # a real explorer reads thicker than this, so call it a town.
+                entry.update({"type": "town", "why": entry["why"] + "; thin pale outline: part of a building"})
             entry["thickness_px"] = round(float(closed_thickness), 1)
         pieces.append(entry)
+    # A ragged, washed-out part cut off right next to another piece is that piece's shadow
+    # (domed dahan cast one), not a piece of its own.
+    def _centre_in(a, b):
+        ax, ay, aw, ah = a
+        bx, by, bw, bh = b
+        return bx <= ax + aw / 2 <= bx + bw and by <= ay + ah / 2 <= by + bh or             ax <= bx + bw / 2 <= ax + aw and ay <= by + bh / 2 <= ay + ah
+    pieces = [p for p in pieces if p.get("split_rest") or not (
+        p["type"] in ("explorer", "unknown", "town")
+        and (p.get("features", {}).get("fill", 1) < 0.55
+             or (p["type"] == "unknown" and p.get("features", {}).get("value", 255) < 120))
+        and any(o is not p and o.get("features", {}).get("fill", 0) >= 0.7
+                and _centre_in(p["reference_bbox"], o["reference_bbox"]) for o in pieces))]
+    # Two "towns" in one land where one is much smaller: the small one is an explorer
+    # (both read only as dim outlines in shade, and an explorer is the smaller figure).
+    by_land: dict = {}
+    for p in pieces:
+        if p["type"] == "town" and p.get("land"):
+            by_land.setdefault(p["land"], []).append(p)
+    for group in by_land.values():
+        if len(group) >= 2:
+            big = max(p["features"]["size"] for p in group)
+            for p in group:
+                if p["features"]["size"] < 0.7 * big:
+                    p.update({"type": "explorer", "why": p["why"] + "; smaller than the town beside it: an explorer"})
+    # A long blob counted as two touching pieces, while one of the two was cut out as its
+    # own piece too (the long blob is then the other piece plus shadow): count it once.
+    for p in pieces:
+        if p.get("count", 1) > 1:
+            x, y, w, h = p["reference_bbox"]
+            inside = [o for o in pieces if o is not p and o["type"] == p["type"]
+                      and x <= o["reference_bbox"][0] + o["reference_bbox"][2] / 2 <= x + w
+                      and y <= o["reference_bbox"][1] + o["reference_bbox"][3] / 2 <= y + h]
+            if inside:
+                p["count"] = max(1, p["count"] - len(inside))
     # Safety net: a blob much bigger than a typical piece may be several pieces touching.
     if len(pieces) >= 3:
         median_area = float(np.median([p["area_px"] for p in pieces]))
@@ -257,7 +359,7 @@ def board_state(pieces: list) -> dict:
         land = p.get("land") or "?"
         kind = p.get("type", "unknown") + (f" ({p['colour']})" if p.get("colour") else "")
         state.setdefault(land, {})
-        state[land][kind] = state[land].get(kind, 0) + 1
+        state[land][kind] = state[land].get(kind, 0) + int(p.get("count", 1))
     return dict(sorted(state.items()))
 
 
