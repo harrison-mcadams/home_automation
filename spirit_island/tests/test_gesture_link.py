@@ -80,7 +80,8 @@ def test_store_maps_gestures_to_game_actions(tmp_path):
     app = create_app(str(tmp_path), vision_url="")
     store = app.config["STORE"]
     assert store.choices_open() == 0
-    store.gesture_action({"type": "undo"})          # nothing to undo yet: ignored
+    with pytest.raises(Exception):
+        store.gesture_action({"type": "undo"})      # nothing to undo yet: refused
     _to_growth(store)
     assert store.choices_open() == 3
     store.gesture_action({"type": "choose", "option": 2})
@@ -90,7 +91,8 @@ def test_store_maps_gestures_to_game_actions(tmp_path):
     assert store.game.state["step"] != "spirit.growth" or store.game.state.get("sub", 0) > 0
     store.gesture_action({"type": "undo"})
     assert store.game.state["step"] == "spirit.growth"
-    store.gesture_action({"type": "choose", "option": 9})   # not an option: refused quietly
+    with pytest.raises(Exception):
+        store.gesture_action({"type": "choose", "option": 9})   # not an option: refused
 
 
 def test_gesture_status_endpoint(tmp_path):

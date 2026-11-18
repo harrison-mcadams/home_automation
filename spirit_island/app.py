@@ -204,15 +204,13 @@ class Store:
             if self.game.state["status"] == "setup":
                 action = {"type": "back"}
             elif not self.game.history:
-                return
+                raise ActionError("nothing to undo")
         elif kind == "choose":
             if not 1 <= action["option"] <= self.choices_open():
-                return
+                raise ActionError("not one of the options")
             action = {"type": "growth_choice", "option": action["option"]}
-        try:
-            self.dispatch(action, "gesture")
-        except ActionError:
-            pass
+        # A refused action (ActionError) reaches the gesture link, which shows why on the TV.
+        self.dispatch(action, "gesture")
 
     def vision_changed(self):
         """Called by the vision link when a new camera reading arrives (or the link drops).
