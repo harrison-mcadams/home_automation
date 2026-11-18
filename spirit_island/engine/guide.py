@@ -471,6 +471,17 @@ def _growth(s):
     return {**g, "marks": marks} if marks else g
 
 
+def _presence_note(s, p, n):
+    need = len(rules.GROWTH_PRESENCE.get(p["spirit"], {}).get(n, []))
+    if not need:
+        return ""
+    added = sum(l["presence"] for l in s["lands"].values()) - s.get("presence_at_growth", 0)
+    if added >= need:
+        return "Presence placed. "
+    return (f"{need - added} presence still to place: two-finger double tap to take the option "
+            f"back and pick it again, or add it on the phone. ")
+
+
 def _growth_question(s, p, chosen, q, st, pictures):
     """Growth after picking an option: the one question it is asking now."""
     title = GROWTH[p["spirit"]][chosen - 1][0]
@@ -547,7 +558,7 @@ def _growth_base(s):
                 "title": f"Growth: option {n} ✓" if chosen else f"Growth: option {n}?",
                 "single": True,
                 "do": ([f"Chosen: option {n}, {title}. " + text.format(nextcard=nxt),
-                        (f"Presence placed. " if rules.GROWTH_PRESENCE.get(p["spirit"], {}).get(n) else "")
+                        _presence_note(s, p, n)
                         + "Double tap (or →) for Gain energy; two-finger double tap to go back."] if chosen else
                        [f"The camera thinks you took option {n}, {title}: " + text.format(nextcard=nxt),
                         f"Right? Press → to confirm it and go on to Gain energy. Otherwise press 1, 2 or 3."]) + track_q,
