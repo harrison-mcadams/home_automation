@@ -46,13 +46,20 @@ def load_config():
     cfg = {"host": "0.0.0.0", "port": 5055, "data_dir": "games",
            "board_camera_url": "http://localhost:8091", "public_urls": [],
            "board_reference": "", "board_art_dir": "assets/boards",
-           "camera_snapshot_url": "http://localhost:8091/photo.jpg"}
+           "camera_snapshot_url": "http://localhost:8091/photo.jpg",
+           # Off by default: the game is the truth about the board, and the camera only reads
+           # cards on request. True brings back live piece tracking and the background watchers.
+           "camera_tracking": False}
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             cfg.update(json.load(f))
     if not os.path.isabs(cfg["data_dir"]):
         cfg["data_dir"] = os.path.join(BASE_DIR, cfg["data_dir"])
     return cfg
+
+
+# What the camera may still do when it does not track the board: say which card it read.
+CAMERA_CARD_ACTIONS = {"set_slot", "reveal_invader"}
 
 
 class Store:
@@ -68,6 +75,7 @@ class Store:
         self.game = self._load()
         self.vision = None  # VisionLink, when the board camera page is linked
         self.cards = None   # CardScanner, reads invader cards held up to the camera
+        self.camera_tracking = False  # see load_config: False = the camera never changes the board
 
     def _load(self):
         if os.path.exists(self.path):
@@ -103,6 +111,10 @@ class Store:
         # Paused (e.g. while pieces are moved about to teach the camera): nothing the camera
         # sees touches the game.
         if getattr(self, "paused", False) and source == "camera":
+            return self.snapshot()
+        # Without camera tracking the game owns the board: the camera may only report a card
+        # it read, never pieces, steps or energy.
+        if source == "camera" and not self.camera_tracking and action.get("type") not in CAMERA_CARD_ACTIONS:
             return self.snapshot()
         # With a card in view, Next leaves the step in one go (the card screen is one step).
         if action.get("type") == "next" and self.game.state["step"] in ("spirit.powers", "fast", "slow")                 and self.card_focus():
@@ -537,11 +549,16 @@ REFERENCE = {
 }
 
 
-def create_app(data_dir=None, vision_url=None, start_vision=True):
+def create_app(data_dir=None, vision_url=None, start_vision=True, camera_tracking=None):
     cfg = load_config()
+    if camera_tracking is not None:
+        cfg["camera_tracking"] = camera_tracking
     app = Flask(__name__, template_folder="templates", static_folder="static")
     store = Store(data_dir or cfg["data_dir"])
     app.config["STORE"] = store
+    store.camera_tracking = bool(cfg["camera_tracking"])
+    # The background watchers only make sense while the camera tracks the board.
+    start_vision = start_vision and store.camera_tracking
     url = cfg["board_camera_url"] if vision_url is None else vision_url
     if url:
         store.vision = VisionLink(url, on_change=store.vision_changed,
@@ -795,8 +812,10 @@ def main():
     ap.add_argument("--data-dir", default=cfg["data_dir"])
     ap.add_argument("--board-camera", default=cfg["board_camera_url"],
                     help="URL of the live board page (board_view.py); pass '' to run without the camera")
+    ap.add_argument("--camera-tracking", action="store_true", default=None,
+                    help="let the camera track pieces and change the game (old behaviour; off by default)")
     args = ap.parse_args()
-    app = create_app(args.data_dir, vision_url=args.board_camera)
+    app = create_app(args.data_dir, vision_url=args.board_camera, camera_tracking=args.camera_tracking)
     ip = lan_address()
     print(f"Spirit Island dashboard on port {args.port}")
     print(f"  phone (controls): http://{ip}:{args.port}/phone")

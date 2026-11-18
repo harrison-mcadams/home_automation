@@ -42,6 +42,15 @@ At home: `http://192.168.1.169:5055`. Away over Tailscale: `http://100.98.2.44:5
 
 ## Camera
 
+**Off by default (since the 2026-11 redesign).** The game is the truth about the
+board: it tells you where to put pieces and never checks the table. With
+`camera_tracking` off, the camera can only report a card it read; it can't
+change pieces, steps or energy, and the background watchers (piece tracking,
+invader slots, power cards, spirit panel) don't start.
+
+To bring back the old live tracking, set `"camera_tracking": true` in
+`config.json` or start with `--camera-tracking`. The notes below describe that mode.
+
 If the live board page is running (`python -m spirit_island.board_view ...`,
 port 8091), the dashboard reads its *settled* reading every few seconds. That
 page already copes with a moved camera or board and holds its reading while a
