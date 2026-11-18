@@ -29,9 +29,14 @@ SWIPE_MAX_S = 0.8     # a swipe happens within this long
 SWIPE_MIN = 2.2       # ... and covers at least this many palm lengths sideways
 SWIPE_MAT_FRAC = 0.3  # ... or this fraction of the mat's width, whichever is smaller
 SWIPE_COOLDOWN_S = 0.8
-TAP_DIP = 0.12        # a tap shortens the index finger's image by at least this fraction
-TAP_RECOVER = 0.6     # ... and it springs back at least this share of the dip
-TAP_MAX_S = 0.45      # one tap (down and up) takes at most this long
+TAP_DIP = 0.065       # a tap shortens the index finger's image by at least this fraction
+                      # (Harrison's small taps: 9-12%; rest wobble 2-3%; 2026-11-18)
+TAP_RECOVER = 0.4     # ... and it springs back at least this share of the dip (it need
+                      # not return all the way between the two taps)
+TAP_STILL = 0.25      # during taps the palm stays within this many palm lengths
+TAP_SIZE = 0.12       # ... and its size changes by less than this fraction
+TAP_STILL_S = 1.0     # ... over this long
+TAP_MAX_S = 0.5       # one tap (down and up) takes at most this long
 DOUBLE_TAP_S = 1.0    # two taps within this long make a double tap
 LOST_S = 0.25         # a hand missing this long counts as gone
 
@@ -70,6 +75,11 @@ def count_up(lm):
     return sum(fingers_up(lm))
 
 
+def _middle_clearly_up(lm):
+    """A stricter test than fingers_up, so a half-curled middle finger isn't read as up."""
+    return _d(lm[12], lm[0]) > _d(lm[10], lm[0]) * 1.3
+
+
 def pointing(lm):
     """Index up, middle, ring and pinky down (the thumb may do what it likes)."""
     f = fingers_up(lm)
@@ -85,6 +95,7 @@ class _Tap:
     peak: float = 0.0
     low: float = 0.0
     down_at: float = 0.0
+    first_down: float = 0.0
     taps: deque = field(default_factory=lambda: deque(maxlen=4))
 
     def update(self, t, length):
@@ -94,6 +105,8 @@ class _Tap:
             self.peak = max(recent)
             if length < self.peak * (1 - TAP_DIP):
                 self.down, self.low, self.down_at = True, length, t
+                if not self.taps or t - self.taps[-1] > DOUBLE_TAP_S:
+                    self.first_down = t
             return None
         self.low = min(self.low, length)
         if t - self.down_at > TAP_MAX_S:
@@ -113,32 +126,6 @@ class _Tap:
         self.taps.clear()
 
 
-class _Flash:
-    """A double tap seen as the fingers flashing: shown briefly, gone (folded, fist or
-    hand out of view), and shown again. Finger counts are what the camera reads best, so
-    this catches taps however the hand moves."""
-
-    MAX_SHOW_S = 0.8   # the first showing is short (a longer one is a hold)
-    GAP_S = (0.04, 0.7)
-
-    def __init__(self):
-        self.segs = []  # (value, start time); value 1 / 2 = that pose, 0 = none, -1 = other
-
-    def update(self, t, value):
-        """Fires when the second short showing ends: N, gone, N, gone. (Firing on the
-        second appearance would also catch a single tap that folds the finger.)"""
-        if not self.segs or self.segs[-1][0] != value:
-            self.segs.append((value, t))
-            self.segs = self.segs[-5:]
-            if value == 0 and len(self.segs) >= 4:
-                (a, ta), (b, tb), (c, tc) = self.segs[-4:-1]
-                if a in (1, 2) and a == c and b == 0 and tb - ta <= self.MAX_SHOW_S and \
-                        t - tc <= self.MAX_SHOW_S and self.GAP_S[0] <= tc - tb <= self.GAP_S[1]:
-                    self.segs = [(0, t)]
-                    return a
-        return None
-
-
 class GestureReader:
     def __init__(self, swipes=False):
         self.swipes = swipes  # off: Harrison found them unreliable (2026-11-18 touch test)
@@ -154,8 +141,7 @@ class GestureReader:
         self._last_seen = -1e9
         self._tap = _Tap()
         self._pointed_at = -1e9
-        self._tap_pose = None
-        self._flash = _Flash()
+        self._poses = deque(maxlen=90)
         self._progress = (0.0, None)
 
     def progress(self):
@@ -166,7 +152,6 @@ class GestureReader:
         "width" in pixels, used to size swipes."""
         events = []
         if not hands:
-            self._flash.update(t, 0)
             if t - self._last_seen > LOST_S:
                 self._hold_key, self._hold_fired = None, False
                 self._track.clear()
@@ -224,40 +209,34 @@ class GestureReader:
                 events.append({"kind": "hold", "count": total, "tip": tip, "hands": key[1]})
 
         # --- double tap with 1 finger (Next) or 2 fingers (Back) ----------------------
-        # Two ways to see it: the fingers flash twice, or they dip towards the table twice.
-        fu = fingers_up(main)
-        n = sum(fu[1:]) if not fu[0] else -1
-        flash_val = 0 if n == 0 else (1 if (fu[1] and n == 1) else 2 if (fu[1] and fu[2] and n == 2) else -1)
-        if len(hands) > 1:
-            flash_val = -1
-        got = self._flash.update(t, flash_val)
-        if got:
-            events.append({"kind": "double_tap", "fingers": got, "tip": tuple(main[8]), "how": "flash"})
-            self._hold_fired = True
-            self._tap.reset()
-            return events
-        # The raised fingers may look folded at the bottom of a tap, so the pose is the one
-        # last seen clearly, and only the ring and little fingers must stay curled.
+        # Small taps only (Harrison, 2026-11-18): the hand stays put and the finger tips
+        # down to the table, which shortens it in the picture by ~10%. A moving hand or a
+        # palm changing size (a whole-hand lift) is not a tap. Mid-tap the finger count
+        # can flicker, so those frames are kept; the pose (1 or 2 fingers) is taken from
+        # the clear frames just before the first tap.
         f = fingers_up(main)
-        if len(hands) == 1 and not (f[3] or f[4]):
-            pose = 2 if (f[1] and f[2]) else 1 if (f[1] and not f[2]) else None
-            if pose:
-                if pose != self._tap_pose:
-                    self._tap.reset()
-                self._tap_pose, self._pointed_at = pose, t
-            if self._tap_pose and t - self._pointed_at < 0.5:
-                tips = [main[8]] + ([main[12]] if self._tap_pose == 2 else [])
-                bases = [main[5]] + ([main[9]] if self._tap_pose == 2 else [])
-                length = sum(_d(a_, b_) for a_, b_ in zip(bases, tips)) / len(tips)
-                if self._tap.update(t, length) == "double":
-                    events.append({"kind": "double_tap", "fingers": self._tap_pose, "tip": tuple(main[8]), "how": "dip"})
-                    self._flash.segs = []
-                    # Taps wobble the finger count; don't let that also count as a hold.
-                    self._hold_fired = True
-            else:
-                self._tap.reset()
-                self._tap_pose = None
+        if len(hands) == 1 and not (f[3] or f[4]) and f[1]:
+            self._poses.append((t, 2 if (f[2] and _middle_clearly_up(main)) else 1))
+            self._pointed_at = t
+        if len(hands) == 1 and t - self._pointed_at < 0.6 and self._palm_still(t, cx, cy, p):
+            if self._tap.update(t, _d(main[5], main[8])) == "double":
+                start = self._tap.first_down
+                before = [k for (s_, k) in self._poses if start - 1.0 <= s_ <= start]
+                if not before:
+                    before = [k for (s_, k) in self._poses if t - s_ < 1.5]
+                fingers = 2 if before and before.count(2) >= 2 * max(1, before.count(1)) else 1
+                events.append({"kind": "double_tap", "fingers": fingers, "tip": tuple(main[8])})
+                # Taps wobble the finger count; don't let that also count as a hold.
+                self._hold_fired = True
         else:
             self._tap.reset()
-            self._tap_pose = None
         return events
+
+    def _palm_still(self, t, cx, cy, p):
+        """The palm has stayed put and kept its size over the last second."""
+        for (s, x, y, q) in self._track:
+            if t - s > TAP_STILL_S:
+                continue
+            if _d((x, y), (cx, cy)) > TAP_STILL * p or abs(q - p) > TAP_SIZE * p:
+                return False
+        return True

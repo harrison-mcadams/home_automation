@@ -115,15 +115,39 @@ def test_single_tap_is_not_double():
     assert not [e for e in run(frames) if e["kind"] == "double_tap"]
 
 
-def test_double_tap_as_flashing_fingers():
-    one, fist = hand(("index",)), hand(())
-    frames = [[fist]] * 4 + [[one]] * 3 + [[fist]] * 3 + [[one]] * 3 + [[fist]] * 4
+def test_small_taps_from_recording():
+    """Harrison's small taps (2026-11-18 recording, ~28 fps): the index image shrinks
+    about 10%, the second dip starting before the finger is fully back."""
+    series = [205, 205, 204, 200, 192, 186, 184, 190, 199, 206, 200, 190, 182, 188, 200, 205,
+              205, 205] + [205] * 30 + [199] * 20 + [199, 199, 195, 188, 181, 185, 193, 190, 182, 177, 183,
+              192, 199, 199] + [199] * 30
+    frames = [[hand(("index",), index_len=v / 205)] for v in series]
+    taps = [e for e in run(frames, dt=1 / 28) if e["kind"] == "double_tap"]
+    assert len(taps) == 2 and all(t["fingers"] == 1 for t in taps)
+
+
+def test_rest_wobble_is_not_a_tap():
+    import math
+    frames = [[hand(("index",), index_len=1 + 0.03 * math.sin(i))] for i in range(120)]
+    assert not [e for e in run(frames, dt=1 / 28) if e["kind"] == "double_tap"]
+
+
+def test_whole_hand_lift_is_not_a_tap():
+    """Big lifts move the palm and change its size: not taps (Harrison wants small ones)."""
+    up = hand(("index",))
+    lifted = hand(("index",), at=(300, 200), p=45.0, index_len=0.6)
+    frames = [[up]] * 3 + [[lifted]] * 2 + [[up]] * 2 + [[lifted]] * 2 + [[up]] * 3
+    assert not [e for e in run(frames) if e["kind"] == "double_tap"]
+
+
+def test_half_curled_middle_still_reads_one_finger():
+    up = hand(("index",))
+    up[11], up[12] = (up[9][0], up[9][1] - 0.6 * 60), (up[9][0], up[9][1] - 0.72 * 60)
+    down = hand(("index",), index_len=0.88)
+    down[11], down[12] = up[11], up[12]
+    frames = [[up]] * 6 + [[down]] * 3 + [[up]] * 3 + [[down]] * 3 + [[up]] * 6
     taps = [e for e in run(frames) if e["kind"] == "double_tap"]
     assert len(taps) == 1 and taps[0]["fingers"] == 1
-    two = hand(("index", "middle"))
-    frames = [[fist]] * 4 + [[two]] * 3 + [[]] * 3 + [[two]] * 3 + [[fist]] * 4
-    taps = [e for e in run(frames) if e["kind"] == "double_tap"]
-    assert len(taps) == 1 and taps[0]["fingers"] == 2
 
 
 def test_hold_then_lower_and_raise_slowly_is_not_a_double_tap():
