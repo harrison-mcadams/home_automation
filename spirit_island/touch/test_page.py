@@ -75,12 +75,16 @@ class Session:
             self.rest_hits = []
             self.last_event = None
             self.stamp = time.strftime("%Y%m%d-%H%M%S")
+            self.hand_seen = 0.0   # wall time a hand was last in view
+            self.last_tick = time.time()
 
     def current(self):
         return self.prompts[self.i] if self.i < len(self.prompts) else None
 
     def log_frame(self, t, hands):
         """Keep what the tracker saw while a tap is asked for: enough to tune taps from."""
+        if hands:
+            self.hand_seen = time.time()
         cur = self.current()
         if not cur or cur[1]["kind"] != "double_tap":
             return
@@ -136,6 +140,11 @@ class Session:
             if cur is None:
                 return
             text, want = cur
+            now = time.time()
+            if want["kind"] != "rest" and now - self.hand_seen > 1.0:
+                # Nobody at the table: the prompt waits instead of timing out.
+                self.prompt_t += now - self.last_tick
+            self.last_tick = now
             limit = want.get("seconds", TIMEOUT_S)
             if time.time() - self.prompt_t >= limit:
                 self._advance("rest" if want["kind"] == "rest" else "missed")
