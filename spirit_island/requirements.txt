@@ -2,3 +2,4 @@
 #   python -m pip install -r spirit_island/requirements.txt
 flask>=2.3
 pytest>=7            # tests only
+mediapipe>=0.10.14  # touch/ gestures (stage 2 touch test)
