@@ -642,7 +642,7 @@ def create_app(data_dir=None, vision_url=None, start_vision=True, camera_trackin
                 with open(os.path.join(BASE_DIR, "board_seeds.json"), encoding="utf-8") as f:
                     sources.append(bp.scan_source(scan, json.load(f)["boards"][letter]))
             if cfg.get("board_reference") and os.path.isdir(cfg["board_reference"]):
-                sources += bp.reference_sources(cfg["board_reference"])
+                sources += bp.reference_sources(cfg["board_reference"], letter)
             board = bp.BoardPointer(sources, letter).start() if sources else None
         except Exception as e:  # pointing is optional: numbers still work
             print(f"Pointing at lands is off: {e}")

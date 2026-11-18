@@ -106,13 +106,15 @@ def scan_source(scan_path, seeds):
             "labels": labels, "names": names, "rotate": 0}
 
 
-def reference_sources(ref_dir):
+def reference_sources(ref_dir, letter=None):
     """Every board reference folder the old board camera saved (reference.jpg, board_mask.png,
-    lands.png + lands.json), under `ref_dir` or `ref_dir` itself."""
+    lands.png + lands.json), under `ref_dir` or `ref_dir` itself; only the folder named
+    `letter` when given."""
     from spirit_island.perception.lands import load
     ref_dir = Path(ref_dir)
     folders = [ref_dir] if (ref_dir / "reference.jpg").exists() else \
-        [d for d in sorted(ref_dir.iterdir()) if (d / "reference.jpg").exists()]
+        [d for d in sorted(ref_dir.iterdir()) if (d / "reference.jpg").exists()
+         and (letter is None or d.name.upper() == letter.upper())]
     out = []
     for d in folders:
         labels, names = load(d)
@@ -189,10 +191,10 @@ class _Locator:
 class BoardPointer(_Locator, LandLookup):
     """Keeps the camera lined up with the island board.
 
-    Tries each known picture of the board (the clean scans and the old camera's reference
-    photos; their folder letters aren't trusted, since on 2026-11-18 Harrison's board C
-    matched the folder named A) and keeps whichever lines up with a believable outline.
-    Land ids always use the game's own board letter."""
+    Tries each known picture of the game's board (its clean scan and the old camera's
+    reference photo of that letter) and keeps whichever lines up with a believable outline.
+    Only the game's own letter: boards differ, so another board on the table must not line
+    up (2026-11-18, board A on the table with a board C game)."""
 
     def __init__(self, sources, letter):
         s0 = sources[0] if sources else {"labels": None, "names": None, "rotate": 0}
