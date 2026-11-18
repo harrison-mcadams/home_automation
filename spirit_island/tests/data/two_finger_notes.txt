@@ -1,0 +1,6 @@
+Two-finger prompts from run 20261118-135424 (t is seconds from that run's first frame).
+Prompt 5, 'Double tap with two fingers again': missed; a double tap fired but was read as 1 finger.
+Prompt 6, 'Double tap with two fingers once more': missed; no double tap, only 2-finger hold readings.
+Prompt 7, 'Double tap with two fingers, fourth time': passed in 2.85 s, read as 2 fingers.
+The run did not save event times. Replaying the current rule (0e4de64) over these saved points gives: t=64.32 prompt 5 fingers=1.
+That replay uses newer code than the run, so its times may differ from what fired live.
