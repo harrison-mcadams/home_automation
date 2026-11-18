@@ -549,6 +549,7 @@ keepAwake();
       const g = await (await fetch("/api/gestures")).json();
       live = g.camera && g.camera !== "off";
       box.classList.toggle("hidden", !live);
+      document.body.classList.toggle("gestures", live);
       if (live) {
         const ring = g.ring;
         box.classList.toggle("off", !ring);
