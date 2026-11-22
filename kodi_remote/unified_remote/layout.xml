@@ -1,39 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout color="#1E2A38" onLaunch="launch" onVolumeUp="volume_up" onVolumeDown="volume_down">
+<layout color="#1E2A38" onVolumeUp="kodi_volume_up" onVolumeDown="kodi_volume_down">
 	<row weight="wrap">
-		<label id="status" text="Kodi: starting..." />
+		<label id="kodi_status" text="Kodi: starting..." />
 	</row>
 	<row weight="wrap">
-		<text id="typed" hint="Type here when Kodi shows its keyboard" onchange="text_changed" ondone="text_done" weight="4" />
-		<button text="Send" ontap="send_text" weight="1" />
+		<text id="kodi_typed" hint="Type here when Kodi shows its keyboard" onchange="kodi_text_changed" ondone="kodi_text_done" weight="4" />
+		<button text="Send" ontap="kodi_send_text" weight="1" />
 	</row>
 	<row weight="1">
-		<button icon="back" ontap="back" />
-		<button icon="home" ontap="home" />
-		<button icon="more" ontap="menu" />
+		<button icon="back" ontap="kodi_back" />
+		<button icon="home" ontap="kodi_home" />
+		<button icon="more" ontap="kodi_menu" />
 	</row>
 	<row weight="5">
-		<dpad ontap="select" icon="select">
-			<item ontap="up" onhold="up" />
-			<item ontap="right" onhold="right" />
-			<item ontap="down" onhold="down" />
-			<item ontap="left" onhold="left" />
+		<dpad ontap="kodi_select" icon="select">
+			<item ontap="kodi_up" onhold="kodi_up" />
+			<item ontap="kodi_right" onhold="kodi_right" />
+			<item ontap="kodi_down" onhold="kodi_down" />
+			<item ontap="kodi_left" onhold="kodi_left" />
 		</dpad>
 	</row>
 	<row weight="1">
-		<button icon="rwd" ontap="rewind" />
-		<button icon="playpause" ontap="play_pause" />
-		<button icon="ff" ontap="fast_forward" />
-		<button icon="stop" ontap="stop" />
+		<button icon="rwd" ontap="kodi_rewind" />
+		<button icon="playpause" ontap="kodi_play_pause" />
+		<button icon="ff" ontap="kodi_fast_forward" />
+		<button icon="stop" ontap="kodi_stop" />
 	</row>
 	<row weight="1">
-		<button icon="vdown" ontap="volume_down" />
-		<button icon="vmute" ontap="volume_mute" />
-		<button icon="vup" ontap="volume_up" />
-		<button text="Info" ontap="info" />
+		<button icon="vdown" ontap="kodi_volume_down" />
+		<button icon="vmute" ontap="kodi_volume_mute" />
+		<button icon="vup" ontap="kodi_volume_up" />
+		<button text="Info" ontap="kodi_info" />
 	</row>
 	<row weight="1">
-		<button icon="fullscreen" text="Fullscreen" ontap="fullscreen" />
-		<button text="Close Kodi" ontap="quit" />
+		<button icon="fullscreen" text="Fullscreen" ontap="kodi_fullscreen" />
+		<button text="Close Kodi" ontap="kodi_quit" />
 	</row>
 </layout>

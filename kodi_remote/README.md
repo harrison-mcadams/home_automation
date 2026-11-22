@@ -4,6 +4,10 @@ A Unified Remote remote called **Kodi** that opens Kodi on SpoonBox and drives i
 
 ## Use it
 
+The same controls are also the **Kodi** tab of the Display Modes remote. Opening that tab starts
+Kodi. Both remotes `include("kodi.lua")`, so copy `unified_remote/kodi.lua` into each installed
+remote folder after changing it.
+
 Open the **Kodi** remote (or its home-screen shortcut). Opening it starts Kodi, or brings it to the
 front if it is already running, and shows the remote:
 
