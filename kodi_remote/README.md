@@ -64,7 +64,7 @@ with the search bar (control 9099) focused instead: `defaultcontrol` and the fir
   Kodi Keyboard remote does it. Volume uses the Windows volume keys.
 - `kodi_control.py`: starting Kodi, fullscreen/window, Home, typing (`Input.SendText`) and Close. These go through Kodi's
   JSON-RPC on `localhost:9090`, which Kodi has on by default ("Allow remote control from
-  applications on this system"). Its web server stays off.
+  applications on this system").
 - `commands/*.pyw`: one file per command, so the remote can start each with `pythonw`.
 
 The only Kodi setting this changes is **Display mode** (fullscreen or windowed). Close Kodi puts it
