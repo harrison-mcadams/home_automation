@@ -1,0 +1,5 @@
+meta.name: Kodi
+meta.author: harri
+meta.description: Open Kodi on SpoonBox (fullscreen in Couch mode, a window in Desk mode) and drive it.
+meta.platform: windows
+meta.tags.category: media
