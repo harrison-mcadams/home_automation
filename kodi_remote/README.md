@@ -36,6 +36,16 @@ Every time the remote is opened, Kodi is put back to fullscreen. If the mode cha
 open, it moves to the new mode's screen. **Fullscreen** on the remote toggles to a 65% window and
 back.
 
+Switching to **Couch** also starts Kodi fullscreen on the TV: `C:\Users\harri\DisplayModes\settings.json`
+has `commands\couch.pyw` in Couch's `Launch` list (as `{"Path": pythonw, "Args": couch.pyw}`, which
+Set-DisplayMode.ps1 supports since 2026-11-22). From there Yatse can drive it.
+
+## Yatse
+
+Kodi's web server is on for Yatse at port 8081 (8080 is SABnzbd), user `kodi`; the password is in
+`logs/yatse-login.txt` (not committed). Change Kodi's network settings only while Kodi is closed, by
+editing `userdata/guisettings.xml`: changing them over JSON-RPC while it runs crashed Kodi 21.3.
+
 ## Typing
 
 Open a search or any text field in Kodi so its on-screen keyboard shows. Then type in the remote's

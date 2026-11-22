@@ -1,6 +1,7 @@
 """Start Kodi fullscreen for the current display mode. Run by the Unified Remote "Kodi" remote.
 
     launch      start Kodi if needed, fit it to the mode, bring it to the front
+    couch       the same for Couch mode; Display Modes runs it when switching to Couch
     fullscreen  toggle fullscreen
     home        go to Kodi's home screen
     type        type the text the remote saved into Kodi's on-screen keyboard and press OK
@@ -142,8 +143,10 @@ def is_fullscreen():
     return rpc("Settings.GetSettingValue", {"setting": "videoscreen.screenmode"})["value"] != "WINDOW"
 
 
-def launch():
-    mode = current_mode()
+def launch(mode=None):
+    # Display Modes starts this while switching, before it writes the new mode, so it passes the
+    # mode in (commands/couch.pyw).
+    mode = mode or current_mode()
     started = False
     if not kodi_pids():
         subprocess.Popen([KODI_EXE], cwd=str(Path(KODI_EXE).parent))
@@ -187,6 +190,8 @@ def main(cmd=None):
     try:
         if cmd == "launch":
             launch()
+        elif cmd == "couch":
+            launch("Couch")
         elif cmd == "fullscreen":
             toggle_fullscreen()
         elif cmd == "type":
