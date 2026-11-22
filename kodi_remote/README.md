@@ -48,10 +48,14 @@ editing `userdata/guisettings.xml`: changing them over JSON-RPC while it runs cr
 
 ## Typing
 
-Open a search or any text field in Kodi so its on-screen keyboard shows. Then type in the remote's
-text box and press Enter or **Send**. The text goes into Kodi's keyboard and is confirmed. In Arctic
-Fuse 2's search, that keyboard is the keyboard icon under the A to Z letters. If no keyboard is
-open, nothing is typed, and the log says so.
+Open search in Kodi and type in the remote's text box (or Yatse's keyboard), then press Enter or
+**Send**. Text goes into whatever text box has focus: the search bar, or Kodi's on-screen keyboard
+(confirmed with OK).
+
+Arctic Fuse 2 normally opens search with the A to Z letters focused, where typed text is ignored.
+`skin.arctic.fuse.2/1080i/Includes_Search.xml` (in Kodi's addons folder) is edited so search opens
+with the search bar (control 9099) focused instead: `defaultcontrol` and the first `SetFocus` in
+`Search_Window_Def`, both marked `SpoonBox`. A skin update undoes this; redo it and restart Kodi.
 
 ## How it works
 

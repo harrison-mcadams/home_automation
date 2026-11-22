@@ -169,15 +169,14 @@ def launch(mode=None):
 
 
 def send_text(text):
-    """Type into Kodi's on-screen keyboard and confirm it, as if typed there and OK pressed."""
+    """Type into whatever text box has focus: Kodi's on-screen keyboard (confirmed with OK) or the
+    skin's search bar (Arctic Fuse 2 search opens with it focused; see README)."""
     if not text:
         return
     window = rpc("GUI.GetProperties", {"properties": ["currentwindow"]})["currentwindow"]
-    if window["id"] not in (10103, 10109):  # keyboard, numeric input
-        log(f"typed text but no keyboard is open (on {window['label']})")
-        return
-    rpc("Input.SendText", {"text": text, "done": True})
-    log(f"typed {len(text)} characters")
+    keyboard = window["id"] in (10103, 10109)  # keyboard, numeric input
+    rpc("Input.SendText", {"text": text, "done": keyboard})
+    log(f"typed {len(text)} characters into {window['label'] or window['id']}")
 
 
 def toggle_fullscreen():
