@@ -2,7 +2,7 @@
 
 Why SpoonBox and not the Pi: SABnzbd's par2 repair and unpacking pin the CPU and disk for
 minutes after every download. On the Pi that would delay puck's jobs and stutter Kodi.
-The PC is always on, so it runs everything; the Pi only plays finished files over the network.
+The PC is always on and plugged into the TV, so it runs everything, playback included.
 
 Native Windows installs (no Docker): lighter, fewer moving parts, NTFS hardlinks just work.
 
@@ -47,10 +47,15 @@ Web UIs (via Tailscale):
 4. Turn on authentication (Forms, username/password) in each app.
 5. Windows Firewall: allow inbound 8080, 8989, 7878, 9696 on the Tailscale/private network only.
 
-## 4. Play it on the Pi (Kodi)
-Share `D:\data\media` read-only (folder Properties > Sharing > Advanced Sharing, Everyone: Read),
-then in Kodi: Videos > Files > Add videos > `smb://spoonbox/media` (or the Tailscale name), and set
-content to TV shows / Movies. Direct play over the network is light for the Pi; no transcoding.
+## 4. Play it (Kodi on the PC, which is plugged into the TV)
+Decision 2026-11-21: the Pi is left out. Kodi 21 on SpoonBox has sources C:\data\media\tv and
+C:\data\media\movies. On first open set content: Videos > Files > TV > Set content > TV shows (TVDB),
+and Movies > Movies. (Kodi keeps that in its database, so it can't be preset from sources.xml.)
+
+## 5. As installed on SpoonBox (2026-11-21)
+- Radarr, Prowlarr: Windows services (automatic). Sonarr, SABnzbd: start at logon (Startup shortcuts).
+- Install/wiring scripts on the PC: arr_stack\install_admin.ps1, arr_stack\wire_stack.ps1.
+- Firewall: 8080/8989/7878/9696 inbound on Private + Tailscale only.
 
 ## Optional later
 - Jellyseerr (simple "request this" page). 5055 on SpoonBox is the Spirit Island TV page, so use 5056.
