@@ -6,6 +6,7 @@ local win = libs.win;
 -- kodi_remote (C:\Users\harri\Desktop\home_automation\kodi_remote)
 local pythonw = "C:\\Users\\harri\\AppData\\Local\\Programs\\Python\\Python312\\pythonw.exe";
 local commands = "C:\\Users\\harri\\Desktop\\home_automation\\kodi_remote\\commands\\";
+local typedFile = "C:\\Users\\harri\\Desktop\\home_automation\\kodi_remote\\logs\\typed.txt";
 local modeFile = "C:\\Users\\harri\\DisplayModes\\logs\\current-mode.txt";
 
 local function mode()
@@ -20,7 +21,7 @@ end
 
 local function refresh()
 	local m = mode();
-	local where = (m == "Couch") and "fullscreen on the TV" or "window on the Dell";
+	local where = (m == "Couch") and "fullscreen on the TV" or "fullscreen on the Dell";
 	if running() then
 		layout.status.text = "Kodi: " .. m .. " mode, " .. where;
 	else
@@ -92,6 +93,28 @@ actions.volume_mute = function () keyboard.stroke("volume_mute"); end
 --@help Toggle Kodi between fullscreen and a window
 actions.fullscreen = function ()
 	run("fullscreen");
+end
+
+-- Typing: open a search (or any text box) in Kodi so its on-screen keyboard shows, type on the
+-- phone, then press Enter on the phone keyboard or the Send button.
+local typed = "";
+
+actions.text_changed = function (text)
+	typed = text or "";
+end
+
+--@help Type the text box's contents into Kodi's on-screen keyboard and press OK
+actions.send_text = function ()
+	if typed == "" then return; end
+	fs.write(typedFile, typed);
+	run("type");
+	typed = "";
+	layout.typed.text = "";
+end
+
+actions.text_done = function (text)
+	actions.text_changed(text);
+	actions.send_text();
 end
 
 --@help Close Kodi

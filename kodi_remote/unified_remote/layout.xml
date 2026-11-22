@@ -3,6 +3,10 @@
 	<row weight="wrap">
 		<label id="status" text="Kodi: starting..." />
 	</row>
+	<row weight="wrap">
+		<text id="typed" hint="Type here when Kodi shows its keyboard" onchange="text_changed" ondone="text_done" weight="4" />
+		<button text="Send" ontap="send_text" weight="1" />
+	</row>
 	<row weight="1">
 		<button icon="back" ontap="back" />
 		<button icon="home" ontap="home" />

@@ -1,15 +1,17 @@
-"""Start Kodi and fit it to the current display mode. Run by the Unified Remote "Kodi" remote.
+"""Start Kodi fullscreen for the current display mode. Run by the Unified Remote "Kodi" remote.
 
     launch      start Kodi if needed, fit it to the mode, bring it to the front
     fullscreen  toggle fullscreen
     home        go to Kodi's home screen
+    type        type the text the remote saved into Kodi's on-screen keyboard and press OK
     quit        close Kodi
 
 Each command has a matching commands/<name>.pyw for the remote to start with pythonw, or run
 `python kodi_control.py <command>`.
 
-Couch: fullscreen on the TV.
-Desk:  a window at 65% of the main (Dell) monitor; the remote's Fullscreen button makes it fullscreen.
+Kodi always opens fullscreen on the current display mode's main screen:
+Couch: the TV.  Desk: the main (Dell) monitor.
+The remote's Fullscreen button toggles to a window at 65% of that screen and back.
 
 The mode comes from DisplayModes' current-mode.txt, the same file puckstream reads. Kodi is
 controlled over its local JSON-RPC port (9090, on by default as "Allow remote control from
@@ -29,7 +31,8 @@ KODI_EXE = r"C:\Program Files\Kodi\kodi.exe"
 MODE_FILE = Path(r"C:\Users\harri\DisplayModes\logs\current-mode.txt")
 HERE = Path(__file__).resolve().parent
 LOG = HERE / "logs" / "kodi_remote.log"
-APPLIED = HERE / "logs" / "applied-mode.txt"  # mode last applied to the running Kodi
+APPLIED = HERE / "logs" / "applied-mode.txt"
+TYPED = HERE / "logs" / "typed.txt"  # text from the remote's keyboard box, for the type command
 DESK_FRACTION = 0.65
 
 user32 = ctypes.windll.user32
@@ -139,13 +142,6 @@ def is_fullscreen():
     return rpc("Settings.GetSettingValue", {"setting": "videoscreen.screenmode"})["value"] != "WINDOW"
 
 
-def apply_mode(mode):
-    fullscreen = mode == "Couch"
-    set_fullscreen(fullscreen)
-    APPLIED.write_text(mode)
-    log(f"applied {mode}: fullscreen={fullscreen}")
-
-
 def launch():
     mode = current_mode()
     started = False
@@ -157,12 +153,28 @@ def launch():
         log("Kodi did not answer on port 9090")
         return
     applied = APPLIED.read_text().strip() if APPLIED.exists() else ""
-    # Fit Kodi to the mode when it has just started or the mode changed since; otherwise leave
-    # alone a window the user has made fullscreen (or not) on purpose.
-    if started or applied != mode:
-        apply_mode(mode)
+    if not started and applied and applied != mode:
+        # The mode changed while Kodi was open, so the screen it was on may be off now. Dropping to
+        # a window and back makes Kodi go fullscreen again on the mode's main screen.
+        set_fullscreen(False)
+        time.sleep(1.0)
+    set_fullscreen(True)
+    APPLIED.write_text(mode)
+    log(f"fullscreen in {mode} mode")
     globals()["_pids"] = None
     bring_to_front(kodi_window())
+
+
+def send_text(text):
+    """Type into Kodi's on-screen keyboard and confirm it, as if typed there and OK pressed."""
+    if not text:
+        return
+    window = rpc("GUI.GetProperties", {"properties": ["currentwindow"]})["currentwindow"]
+    if window["id"] not in (10103, 10109):  # keyboard, numeric input
+        log(f"typed text but no keyboard is open (on {window['label']})")
+        return
+    rpc("Input.SendText", {"text": text, "done": True})
+    log(f"typed {len(text)} characters")
 
 
 def toggle_fullscreen():
@@ -177,6 +189,8 @@ def main(cmd=None):
             launch()
         elif cmd == "fullscreen":
             toggle_fullscreen()
+        elif cmd == "type":
+            send_text(TYPED.read_text(encoding="utf-8").strip())
         elif cmd == "home":
             rpc("Input.Home")
         elif cmd == "quit":
