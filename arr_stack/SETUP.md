@@ -1,30 +1,32 @@
-# Usenet arr stack on SpoonBox
+# Usenet arr stack on SpoonBox (Windows PC)
 
-Why SpoonBox and not the Pi: SABnzbd's par2 repair and unpacking pin the CPU and disk
-for minutes after every download. On the Pi that would delay puck's jobs and stutter Kodi.
-The Pi only plays finished files over the network.
+Why SpoonBox and not the Pi: SABnzbd's par2 repair and unpacking pin the CPU and disk for
+minutes after every download. On the Pi that would delay puck's jobs and stutter Kodi.
+The PC is always on, so it runs everything; the Pi only plays finished files over the network.
 
-## What you need first
-- An external drive plugged into SpoonBox (downloads + library on the same drive).
+Native Windows installs (no Docker): lighter, fewer moving parts, NTFS hardlinks just work.
+
+## What Harrison needs first
 - A Usenet provider account (server host, port 563, username, password).
 - At least one indexer account (API key), e.g. NZBGeek.
+- Enough free disk space (1080p movie ~2-10 GB, TV season ~5-30 GB). An external drive can be added later.
 
-## 1. Install Docker on SpoonBox
-OrbStack is lighter than Docker Desktop on a Mac: `brew install --cask orbstack`, open it once,
-and set it to start at login.
-
-## 2. Make the folders
-```bash
-DATA=/Volumes/<YourDrive>/data
-mkdir -p $DATA/usenet/incomplete $DATA/usenet/complete/{tv,movies} $DATA/media/{tv,movies}
+## 1. Folders (downloads and library on the SAME drive, for instant hardlink moves)
+```powershell
+$D = "D:\data"   # or C:\data if there is only one drive
+New-Item -ItemType Directory -Force "$D\usenet\incomplete","$D\usenet\complete\tv","$D\usenet\complete\movies","$D\media\tv","$D\media\movies"
 ```
 
-## 3. Start the stack
-```bash
-cd ~/home_automation/arr_stack
-cp .env.example .env   # set DATA_ROOT=/Volumes/<YourDrive>/data, PUID=$(id -u), PGID=$(id -g)
-docker compose up -d
+## 2. Install (admin PowerShell; each prompts once for admin)
+```powershell
+winget install --id SABnzbdTeam.SABnzbd -e
+winget install --id TeamSonarr.Sonarr -e
+winget install --id TeamRadarr.Radarr -e
+winget install --id TeamProwlarr.Prowlarr -e
 ```
+(If an id isn't found, `winget search sonarr` etc., or use the installer from each project's site.)
+In each installer, choose **"Install as Windows Service"** so it starts at boot with nobody logged in.
+SABnzbd: Config > General > enable "Start SABnzbd as a Windows service" or add it to Startup.
 
 Web UIs (via Tailscale):
 - SABnzbd  http://spoonbox.tailcfee0c.ts.net:8080
@@ -32,21 +34,23 @@ Web UIs (via Tailscale):
 - Sonarr   http://spoonbox.tailcfee0c.ts.net:8989
 - Radarr   http://spoonbox.tailcfee0c.ts.net:7878
 
-## 4. Wire it together
-1. **SABnzbd**: run the wizard with your provider details (SSL, port 563, connections per your plan).
-   Folders: temporary `/data/usenet/incomplete`, completed `/data/usenet/complete`.
+## 3. Wire it together
+1. **SABnzbd**: wizard with the provider details (SSL, port 563, connections per plan).
+   Folders: temporary `D:\data\usenet\incomplete`, completed `D:\data\usenet\complete`.
    Categories: `tv` -> `tv`, `movies` -> `movies`. Copy the API key (Config > General).
    Config > Special: add `spoonbox.tailcfee0c.ts.net` to `host_whitelist`.
-2. **Sonarr / Radarr**: Settings > Media Management > root folder `/data/media/tv` (Sonarr) or
-   `/data/media/movies` (Radarr); turn on "Use Hardlinks instead of Copy".
-   Settings > Download Clients > add SABnzbd, host `sabnzbd`, port 8080, API key, category `tv` / `movies`.
-   Copy each app's API key (Settings > General).
-3. **Prowlarr**: Indexers > add your indexer. Settings > Apps > add Sonarr (`http://sonarr:8989`)
-   and Radarr (`http://radarr:7878`) with their API keys, Prowlarr server `http://prowlarr:9696`.
-   Prowlarr then pushes indexers into both apps.
-4. Set authentication (Forms + username/password) in each app when it asks.
+2. **Sonarr / Radarr**: Settings > Media Management > root folder `D:\data\media\tv` / `D:\data\media\movies`;
+   "Use Hardlinks instead of Copy" on. Settings > Download Clients > SABnzbd, host `localhost`, port 8080,
+   API key, category `tv` / `movies`. Copy each app's API key (Settings > General).
+3. **Prowlarr**: Indexers > add the indexer. Settings > Apps > add Sonarr (`http://localhost:8989`) and
+   Radarr (`http://localhost:7878`) with their API keys. Prowlarr pushes indexers into both.
+4. Turn on authentication (Forms, username/password) in each app.
+5. Windows Firewall: allow inbound 8080, 8989, 7878, 9696 on the Tailscale/private network only.
 
-## 5. Play it on the Pi (Kodi)
-Share `/Volumes/<YourDrive>/data/media` from SpoonBox (System Settings > General > Sharing >
-File Sharing), then in Kodi add it as an SMB video source and set content types (TV shows / Movies).
-Direct play over the network is light for the Pi; no transcoding happens.
+## 4. Play it on the Pi (Kodi)
+Share `D:\data\media` read-only (folder Properties > Sharing > Advanced Sharing, Everyone: Read),
+then in Kodi: Videos > Files > Add videos > `smb://spoonbox/media` (or the Tailscale name), and set
+content to TV shows / Movies. Direct play over the network is light for the Pi; no transcoding.
+
+## Optional later
+- Jellyseerr (simple "request this" page). 5055 on SpoonBox is the Spirit Island TV page, so use 5056.
